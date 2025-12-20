@@ -52,7 +52,6 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
   // Web search integration
   final WebSearchService _webSearchService = WebSearchService();
   bool _webSearchEnabled = false;
-  bool _isSearchingWeb = false;
   String _currentStatusMessage = '';
 
   // Model selection
@@ -1117,7 +1116,6 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
       // Handle web search if enabled
       if (_webSearchEnabled) {
         setState(() {
-          _isSearchingWeb = true;
           _currentStatusMessage = 'Searching the web...';
           // Update last message to show web search status
           if (_messages.isNotEmpty && _messages.last.isTyping) {
@@ -1135,13 +1133,11 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
             searchResults,
           );
           setState(() {
-            _isSearchingWeb = false;
             _currentStatusMessage = 'Generating response...';
           });
           response = await _callWithFallback(enhancedPrompt);
         } catch (e) {
           setState(() {
-            _isSearchingWeb = false;
             _currentStatusMessage = 'Generating response...';
           });
           response = '⚠️ Web search error: $e\n\nTrying AI database...';
@@ -1168,7 +1164,6 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
               _messages.add(
                 _Message(text: '🔍 Searching the web...', fromUser: false),
               );
-              _isSearchingWeb = true;
             });
 
             try {
@@ -1177,7 +1172,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
                 text,
                 searchResults,
               );
-              setState(() => _isSearchingWeb = false);
+
               response = await _callWithFallback(enhancedPrompt);
 
               // Remove search indicator
@@ -1189,7 +1184,6 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
               });
             } catch (e) {
               setState(() {
-                _isSearchingWeb = false;
                 // Remove search indicator
                 if (_messages.isNotEmpty &&
                     _messages.last.text == '🔍 Searching the web...') {

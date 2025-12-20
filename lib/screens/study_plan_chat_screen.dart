@@ -161,7 +161,6 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   // Web search integration
   final WebSearchService _webSearchService = WebSearchService();
   bool _webSearchEnabled = false;
-  bool _isSearchingWeb = false;
 
   // Image handling
   final ImagePicker _imagePicker = ImagePicker();
@@ -174,7 +173,6 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   // Quiz generation
   String? _userGradeLevel;
   final List<QuizArtifact> _quizArtifacts = [];
-  bool _isGeneratingQuiz = false;
 
   @override
   void initState() {
@@ -355,10 +353,8 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     } else {
       // Handle web search if enabled
       if (_webSearchEnabled) {
-        setState(() => _isSearchingWeb = true);
         try {
           final searchResults = await _webSearchService.search(query: t);
-          setState(() => _isSearchingWeb = false);
 
           // Build conversation history (last 20 messages for better context)
           final all = _messages.skip(1).toList().reversed.toList();
@@ -393,7 +389,6 @@ Based on the above web search results and conversation context, please answer: $
             enhancedPrompt,
           );
         } catch (e) {
-          setState(() => _isSearchingWeb = false);
           response = '⚠️ Web search error: $e\n\nTrying AI database...';
 
           // Fallback to normal AI
@@ -474,12 +469,10 @@ Based on the above web search results and conversation context, please answer: $
                   timestamp: DateTime.now(),
                 ),
               );
-              _isSearchingWeb = true;
             });
 
             try {
               final searchResults = await _webSearchService.search(query: t);
-              setState(() => _isSearchingWeb = false);
 
               final enhancedPrompt =
                   '''$modePrompt
@@ -508,7 +501,6 @@ Based on the above web search results, please answer: $t''';
               });
             } catch (e) {
               setState(() {
-                _isSearchingWeb = false;
                 // Remove search indicator
                 if (_messages.isNotEmpty &&
                     _messages.first.text == '🔍 Searching the web...') {
@@ -778,9 +770,6 @@ Based on the above web search results, please answer: $t''';
     required int numQuestions,
     required bool includeAnswers,
   }) async {
-    // Show loading state
-    setState(() => _isGeneratingQuiz = true);
-
     // Add loading message to chat
     final loadingMessage = ChatMessage(
       text: '🎯 Generating your quiz...',
@@ -975,9 +964,9 @@ Now create $numQuestions questions following this EXACT format with **Question 1
         );
       }
     } finally {
-      // Always remove loading state
+      // Always remove loading message
       if (mounted) {
-        setState(() => _isGeneratingQuiz = false);
+        // Loading message already removed in success/error paths
       }
     }
   }

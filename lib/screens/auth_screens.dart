@@ -61,10 +61,7 @@ class _AuthScreenState extends State<AuthScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Image.asset(
-                    'assets/logo.png',
-                    height: 80,
-                  ),
+                  Image.asset('assets/logo.png', height: 80),
                   const SizedBox(height: AppTheme.spaceMd),
                   Text(
                     'MyAI',
@@ -83,8 +80,9 @@ class _AuthScreenState extends State<AuthScreen> {
                   const SizedBox(height: AppTheme.spaceLg),
                   Text(
                     isLogin ? 'Welcome Back!' : 'Join MyAI',
-                    style: Theme.of(context).textTheme.headlineMedium
-                        ?.copyWith(fontWeight: FontWeight.bold),
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   Text(
                     isLogin
@@ -100,9 +98,16 @@ class _AuthScreenState extends State<AuthScreen> {
                         TextFormField(
                           decoration: InputDecoration(
                             labelText: 'Email',
-                            prefixIcon: Icon(Icons.email_outlined, color: AppTheme.primaryBlue),
+                            prefixIcon: Icon(
+                              Icons.email_outlined,
+                              color: AppTheme.primaryBlue,
+                            ),
                             suffixIcon: email.isNotEmpty && email.contains('@')
-                                ? Icon(Icons.check_circle, color: AppTheme.success, size: 20)
+                                ? Icon(
+                                    Icons.check_circle,
+                                    color: AppTheme.success,
+                                    size: 20,
+                                  )
                                 : null,
                           ),
                           keyboardType: TextInputType.emailAddress,
@@ -110,15 +115,24 @@ class _AuthScreenState extends State<AuthScreen> {
                               setState(() => email = val.trim()),
                           validator: (val) =>
                               val == null || val.isEmpty ? 'Enter email' : null,
-                          style: AppTheme.bodyLarge.copyWith(color: AppTheme.textPrimary),
+                          style: AppTheme.bodyLarge.copyWith(
+                            color: AppTheme.textPrimary,
+                          ),
                         ),
                         const SizedBox(height: AppTheme.spaceMd),
                         TextFormField(
                           decoration: InputDecoration(
                             labelText: 'Password',
-                            prefixIcon: Icon(Icons.lock_outline, color: AppTheme.primaryBlue),
+                            prefixIcon: Icon(
+                              Icons.lock_outline,
+                              color: AppTheme.primaryBlue,
+                            ),
                             suffixIcon: password.length >= 6
-                                ? Icon(Icons.check_circle, color: AppTheme.success, size: 20)
+                                ? Icon(
+                                    Icons.check_circle,
+                                    color: AppTheme.success,
+                                    size: 20,
+                                  )
                                 : null,
                           ),
                           obscureText: true,
@@ -126,19 +140,25 @@ class _AuthScreenState extends State<AuthScreen> {
                           validator: (val) => val == null || val.length < 6
                               ? 'Password must be >= 6 chars'
                               : null,
-                          style: AppTheme.bodyLarge.copyWith(color: AppTheme.textPrimary),
+                          style: AppTheme.bodyLarge.copyWith(
+                            color: AppTheme.textPrimary,
+                          ),
                         ),
                         const SizedBox(height: AppTheme.spaceLg),
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: AppTheme.spaceMd),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: AppTheme.spaceMd,
+                              ),
                               backgroundColor: AppTheme.primaryBlue,
                               foregroundColor: Colors.white,
                               elevation: 0,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                                borderRadius: BorderRadius.circular(
+                                  AppTheme.radiusLg,
+                                ),
                               ),
                             ),
                             onPressed: _loading
@@ -152,14 +172,8 @@ class _AuthScreenState extends State<AuthScreen> {
                                     User? user;
                                     try {
                                       user = isLogin
-                                          ? await _auth.signIn(
-                                              email,
-                                              password,
-                                            )
-                                          : await _auth.signUp(
-                                              email,
-                                              password,
-                                            );
+                                          ? await _auth.signIn(email, password)
+                                          : await _auth.signUp(email, password);
                                     } catch (e) {
                                       if (!mounted) return;
                                       _showError(e.toString());
@@ -210,43 +224,48 @@ class _AuthScreenState extends State<AuthScreen> {
                                   )
                                 : Text(
                                     isLogin ? 'Login' : 'Sign Up',
-                                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                           ),
-                          const SizedBox(height: 16),
-                          TextButton(
-                            onPressed: () {
-                              // TODO: Implement forgot password functionality
-                              _showError(
-                                'Forgot password functionality not yet implemented.',
-                              );
-                            },
-                            style: TextButton.styleFrom(
-                              foregroundColor: AppTheme.primaryBlue,
-                            ),
-                            child: Text(
-                              'Forgot Password?',
-                              style: AppTheme.bodyMedium.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: AppTheme.spaceMd),
+                        TextButton(
+                          onPressed: () {
+                            // TODO: Implement forgot password functionality
+                            _showError(
+                              'Forgot password functionality not yet implemented.',
+                            );
+                          },
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppTheme.primaryBlue,
+                          ),
+                          child: Text(
+                            'Forgot Password?',
+                            style: AppTheme.bodyMedium.copyWith(
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          TextButton(
-                            style: TextButton.styleFrom(
-                              foregroundColor: AppTheme.textPrimary,
-                            ),
-                            child: Text(
-                              isLogin
-                                  ? 'Don\'t have an account? Sign Up'
-                                  : 'Already have an account? Login',
-                              style: AppTheme.bodyMedium,
-                            ),
-                            onPressed: () => setState(() => isLogin = !isLogin),
+                        ),
+                        const SizedBox(height: AppTheme.spaceSm),
+                        TextButton(
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppTheme.textPrimary,
                           ),
-                        ],
-                      ),
+                          child: Text(
+                            isLogin
+                                ? 'Don\'t have an account? Sign Up'
+                                : 'Already have an account? Login',
+                            style: AppTheme.bodyMedium,
+                          ),
+                          onPressed: () => setState(() => isLogin = !isLogin),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
