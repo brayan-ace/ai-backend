@@ -455,7 +455,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
                 child: SingleChildScrollView(
                   padding: EdgeInsets.all(AppTheme.spaceLg),
                   child: Column(
-                    mainAxisSize: MainAxisSize.size.min,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       // Handle bar
                       Container(
@@ -1633,7 +1633,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.textAlign.center,
+                  textAlign: TextAlign.center,
                 ),
                 SizedBox(height: AppTheme.spaceLg),
                 // Options

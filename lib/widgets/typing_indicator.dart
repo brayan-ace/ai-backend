@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import '../utils/theme.dart';
 
 class TypingIndicator extends StatefulWidget {
-  const TypingIndicator({super.key});
+  final String? message;
+  const TypingIndicator({super.key, this.message});
 
   @override
   State<TypingIndicator> createState() => _TypingIndicatorState();
@@ -51,6 +52,16 @@ class _TypingIndicatorState extends State<TypingIndicator>
           _buildDot(1),
           SizedBox(width: 6),
           _buildDot(2),
+          if (widget.message != null) ...[
+            SizedBox(width: AppTheme.spaceMd),
+            Text(
+              widget.message!,
+              style: AppTheme.bodyMedium.copyWith(
+                color: AppTheme.textSecondary,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
         ],
       ),
     );

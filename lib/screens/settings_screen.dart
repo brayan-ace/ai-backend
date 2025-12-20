@@ -283,21 +283,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
 
-              // Developer section
-              _sectionHeader('Developer'),
-              _buildCard(
-                children: [
-                  _tile(
-                    context,
-                    icon: Icons.api,
-                    title: 'Test APIs',
-                    subtitle: 'Check API status (Groq, OpenRouter, DeepSeek)',
-                    gradient: [AppTheme.accentBlue, AppTheme.accentBlueLight],
-                    onTap: () => Navigator.pushNamed(context, '/api-test'),
-                  ),
-                ],
-              ),
-
               // General
               _sectionHeader('General'),
               _buildCard(
@@ -311,7 +296,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ? 'System default'
                             : _themeMode == 'dark'
                             ? 'Dark mode'
-                            : 'Light mode'}',
+                            : 'light mode'}',
                     gradient: AppTheme.primaryGradient,
                     onTap: () => _showThemeDialog(),
                   ),
@@ -401,46 +386,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     subtitle: 'Manage local data and cache',
                     onTap: () => _showDataManagementDialog(),
                   ),
-                  _buildDivider(),
-                  _tile(
-                    context,
-                    icon: Icons.shield,
-                    title: 'Permissions',
-                    subtitle: 'Camera, microphone, files',
-                    onTap: () => _showComingSoonDialog('Permissions Manager'),
-                  ),
                 ],
               ),
 
-              // Capabilities
-              _sectionHeader('Capabilities'),
+              // Accessibility
+              _sectionHeader('Accessibility'),
               _buildCard(
                 children: [
-                  _tile(
-                    context,
-                    icon: Icons.flash_on,
-                    title: 'Capabilities',
-                    subtitle: 'Model features and limits',
-                    gradient: AppTheme.primaryGradient,
-                    onTap: null,
-                  ),
-                  _buildDivider(),
-                  _tile(
-                    context,
-                    icon: Icons.science,
-                    title: 'Labs',
-                    subtitle: 'Experimental features',
-                    onTap: null,
-                  ),
-                  _buildDivider(),
-                  _tile(
-                    context,
-                    icon: Icons.money,
-                    title: 'Earnings',
-                    subtitle: 'Make a stable income',
-                    onTap: null,
-                  ),
-                  _buildDivider(),
                   _tile(
                     context,
                     icon: Icons.vibration,
