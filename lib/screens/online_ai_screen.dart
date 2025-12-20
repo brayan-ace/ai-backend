@@ -53,6 +53,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
   final WebSearchService _webSearchService = WebSearchService();
   bool _webSearchEnabled = false;
   bool _isSearchingWeb = false;
+  String _currentStatusMessage = '';
 
   // Model selection
   String _selectedModel = 'Sirri';
@@ -1035,8 +1036,11 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
       _selectedFileName = null;
     });
 
-    // Add typing indicator immediately
+    // Add typing indicator with status message
     setState(() {
+      _currentStatusMessage = hasImage
+          ? 'Analyzing image...'
+          : 'Generating response...';
       _messages.add(_Message(text: '', fromUser: false, isTyping: true));
     });
 
@@ -1112,17 +1116,34 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
     } else {
       // Handle web search if enabled
       if (_webSearchEnabled) {
-        setState(() => _isSearchingWeb = true);
+        setState(() {
+          _isSearchingWeb = true;
+          _currentStatusMessage = 'Searching the web...';
+          // Update last message to show web search status
+          if (_messages.isNotEmpty && _messages.last.isTyping) {
+            _messages.removeLast();
+            _messages.add(_Message(text: '', fromUser: false, isTyping: true));
+          }
+        });
         try {
           final searchResults = await _webSearchService.search(query: text);
+          setState(
+            () => _currentStatusMessage = 'Processing search results...',
+          );
           final enhancedPrompt = _webSearchService.createEnhancedPrompt(
             text,
             searchResults,
           );
-          setState(() => _isSearchingWeb = false);
+          setState(() {
+            _isSearchingWeb = false;
+            _currentStatusMessage = 'Generating response...';
+          });
           response = await _callWithFallback(enhancedPrompt);
         } catch (e) {
-          setState(() => _isSearchingWeb = false);
+          setState(() {
+            _isSearchingWeb = false;
+            _currentStatusMessage = 'Generating response...';
+          });
           response = '⚠️ Web search error: $e\n\nTrying AI database...';
           response = await _callWithFallback(text);
         }
@@ -2693,13 +2714,10 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.start,
                           children: [
-                            TypingIndicator(),
-                            SizedBox(width: AppTheme.spaceSm),
-                            Text(
-                              'Generating response...', // Text for user interaction
-                              style: AppTheme.bodyMedium.copyWith(
-                                color: AppTheme.textSecondary,
-                              ),
+                            TypingIndicator(
+                              message: _currentStatusMessage.isNotEmpty
+                                  ? _currentStatusMessage
+                                  : 'Generating response...',
                             ),
                           ],
                         ),
