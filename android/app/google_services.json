@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "356182134428",
+    "project_id": "myai-174a0",
+    "storage_bucket": "myai-174a0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:356182134428:android:226025c0eaa666fc30a759",
+        "android_client_info": {
+          "package_name": "com.example.myai"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDH-d9tC853bXoDpvxGJNW3IEka1hxcJA8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
