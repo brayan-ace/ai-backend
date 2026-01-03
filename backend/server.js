@@ -18,16 +18,35 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log("Server running on", PORT);
 });
-/*app.post("/proxy", (req, res) => {
-  const { type, payload } = req.body;
-  if (!type || !payload) {
-    return res.status(400).json({ error: "type and payload are required" });
+app.post("/api/ask", (req, res) => {
+  const { type, data } = req.body;
+
+  if (!type || !data) {
+    return res.status(400).json({ error: "Invalid request format" });
   }
-  req.json({
-    status: "received",
-    type,
-    payload,
-  });
+
+  switch (type) {
+    case "chat":
+      return res.json({
+        provider: "groq",
+        reply: "Mock chat response",
+      });
+
+    case "search":
+      return res.json({
+        provider: "tavily",
+        results: ["Mock search result 1", "Mock search result 2"],
+      });
+
+    case "image":
+      return res.json({
+        provider: "gemini",
+        analysis: "Mock image analysis",
+      });
+
+    default:
+      return res.status(400).json({ error: "Unknown request type" });
+  }
 });
 /*require("dotenv").config();
 const express = require("express");
