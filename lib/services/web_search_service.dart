@@ -5,18 +5,22 @@ import 'api_service.dart';
 class WebSearchService {
   /// Performs a web search by delegating to the backend. The backend
   /// can call Tavily or other search providers securely.
-  Future<String> search({required String query, int maxResults = 5}) async {
+  Future<String> search({
+    required String query,
+    int maxResults = 5,
+    String searchDepth = 'basic',
+  }) async {
     try {
-      final input = jsonEncode({
+      final input = {
         'query': query,
-        'max_results': maxResults,
-        'search_depth': 'basic',
-        'include_answer': true,
-      });
-      final resp = await ApiService.send('openai', 'generate', input);
+        'maxResults': maxResults,
+        'searchDepth': searchDepth,
+        'includeAnswer': true,
+      };
+      final resp = await ApiService.send('tavily', 'search', input);
       return resp;
     } catch (e) {
-      throw Exception('Web search error: $e');
+      return 'Error during web search: $e. Please try again.';
     }
   }
 

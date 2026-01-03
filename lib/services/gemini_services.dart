@@ -144,16 +144,16 @@ Make the questions clear, educational, and at an appropriate level for learning.
     final actualMimeType = mimeType ?? 'image/jpeg';
     final payload = {
       'prompt': prompt,
-      'image_base64': base64Image,
-      'mime': actualMimeType,
+      'imageBase64': base64Image,
+      'mimeType': actualMimeType,
       'system': AiConstants.systemPrompt,
     };
 
     try {
-      final resp = await ApiService.send('google', 'generate', payload);
+      final resp = await ApiService.send('gemini', 'image', payload);
       return _cleanResponse(resp);
     } catch (e) {
-      return '⚠️ Error processing image: $e';
+      return '⚠️ Gemini image analysis failed: $e';
     }
   }
 }
