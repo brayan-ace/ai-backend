@@ -1,4 +1,195 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
+import '../services/gemini_services.dart';
+import '../services/study_plan_service.dart';
+import '../services/chat_storage_service.dart';
+import '../utils/theme.dart';
+
+class StudyPlanChatScreen extends StatefulWidget {
+  final String? planId;
+  final String? planTitle;
+  final String? planContext;
+
+  const StudyPlanChatScreen({Key? key, this.planId, this.planTitle, this.planContext}) : super(key: key);
+
+  @override
+  State<StudyPlanChatScreen> createState() => _StudyPlanChatScreenState();
+}
+
+class ChatMessage {
+  final String text;
+  final bool fromUser;
+  final DateTime timestamp;
+
+  ChatMessage({required this.text, required this.fromUser, DateTime? timestamp}) : timestamp = timestamp ?? DateTime.now();
+}
+
+class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
+  final GeminiService _gemini = GeminiService();
+  final StudyPlanService _planService = StudyPlanService();
+  final ChatStorageService _chatStorage = ChatStorageService();
+
+  final List<ChatMessage> _messages = [];
+  final TextEditingController _controller = TextEditingController();
+  bool _isSending = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedChat();
+  }
+
+  Future<void> _loadSavedChat() async {
+    if (widget.planId == null) return;
+    try {
+      final chats = await _planService.getPlanChats(widget.planId!);
+      setState(() {
+        _messages.clear();
+        for (final c in chats) {
+          _messages.add(ChatMessage(
+            text: c['ai'] ?? c['user'] ?? '',
+            fromUser: c['ai'] == null,
+            timestamp: DateTime.tryParse(c['timestamp'] ?? '') ?? DateTime.now(),
+          ));
+        }
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _sendMessage() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty || _isSending) return;
+
+    setState(() {
+      _messages.insert(0, ChatMessage(text: text, fromUser: true));
+      _controller.clear();
+      _isSending = true;
+    });
+
+    try {
+      final prompt = '${widget.planContext ?? ''}\nUser: $text';
+      final resp = await _gemini.generateContentWithContext(prompt, widget.planContext ?? '');
+      final reply = resp ?? 'No response from AI';
+
+      setState(() {
+        _messages.insert(0, ChatMessage(text: reply, fromUser: false));
+      });
+
+      // Optionally save the chat to local study plan storage
+      if (widget.planId != null) {
+        await _planService.saveChatMessage(widget.planId!, text, reply);
+      }
+    } catch (e) {
+      setState(() {
+        _messages.insert(0, ChatMessage(text: 'Error: $e', fromUser: false));
+      });
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
+  }
+
+  Widget _buildMessageTile(ChatMessage m) {
+    final time = DateFormat.Hm().format(m.timestamp);
+    return Align(
+      alignment: m.fromUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+        padding: const EdgeInsets.all(12),
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+        decoration: BoxDecoration(
+          color: m.fromUser ? AppTheme.primaryBlue : AppTheme.surfaceElevated,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              m.text,
+              style: TextStyle(color: m.fromUser ? Colors.white : AppTheme.textPrimary),
+            ),
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.bottomRight,
+              child: Text(time, style: TextStyle(fontSize: 10, color: (m.fromUser ? Colors.white70 : AppTheme.textSecondary))),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.planTitle ?? 'Study Plan Chat'),
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: _messages.isEmpty
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Text(
+                        widget.planContext ?? 'No study plan context provided. Start the conversation by asking a question.',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyLarge,
+                      ),
+                    ),
+                  )
+                : ListView.builder(
+                    reverse: true,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    itemCount: _messages.length,
+                    itemBuilder: (context, index) => _buildMessageTile(_messages[index]),
+                  ),
+          ),
+          SafeArea(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => _sendMessage(),
+                      decoration: InputDecoration(
+                        hintText: 'Ask about the study plan...',
+                        filled: true,
+                        fillColor: AppTheme.surfaceElevated,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _isSending
+                      ? Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                          child: SizedBox(width: 36, height: 36, child: CircularProgressIndicator()),
+                        )
+                      : IconButton(
+                          onPressed: _sendMessage,
+                          icon: Icon(Icons.send, color: AppTheme.primaryBlue),
+                        ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+import 'package:flutter/material.dart';
 
 /// Minimal placeholder for StudyPlanChatScreen (single definition).
 class StudyPlanChatScreen extends StatelessWidget {
