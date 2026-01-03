@@ -194,7 +194,7 @@ app.post("/api/ask", async (req, res) => {
           }
 
           const resp = await axios.post(
-            "https://api.tavily.com/v1/search",
+            "https://api.tavily.com/search",
             { query },
             {
               headers: { Authorization: `Bearer ${TAVILY_KEY}` },
