@@ -257,21 +257,41 @@ app.post("/api/ask", async (req, res) => {
 
           // Build request payload for Gemini API
           let imagePayload;
+          let imageData = imageBase64;
+
+          // If URL is provided, fetch and convert to base64
           if (imageUrl) {
-            imagePayload = {
-              inlineData: {
-                mimeType: "image/jpeg",
-                data: imageUrl,
-              },
-            };
-          } else {
-            imagePayload = {
-              inlineData: {
-                mimeType: "image/jpeg",
-                data: imageBase64,
-              },
-            };
+            try {
+              console.log("[Image] Fetching image from URL:", imageUrl);
+              const imageResponse = await axios.get(imageUrl, {
+                responseType: "arraybuffer",
+                timeout: 15000,
+              });
+              imageData = Buffer.from(imageResponse.data, "binary").toString(
+                "base64"
+              );
+              console.log("[Image] Image fetched and converted to base64");
+            } catch (fetchErr) {
+              console.error(
+                "[Image] Failed to fetch image from URL:",
+                fetchErr.message
+              );
+              return res.status(400).json({
+                error: "Failed to fetch image",
+                message:
+                  "Could not fetch image from URL. Ensure URL is accessible and returns an image.",
+                details: fetchErr.message,
+                timestamp: new Date().toISOString(),
+              });
+            }
           }
+
+          imagePayload = {
+            inlineData: {
+              mimeType: "image/jpeg",
+              data: imageData,
+            },
+          };
 
           const geminiResponse = await axios.post(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent?key=${GEMINI_KEY}`,
