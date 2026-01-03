@@ -1,3 +1,4 @@
+const fetch = require("node-fetch");
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
@@ -18,7 +19,7 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log("Server running on", PORT);
 });
-app.post("/api/ask", (req, res) => {
+app.post("/api/ask", async (req, res) => {
   const { type, data } = req.body;
 
   if (!type || !data) {
@@ -27,10 +28,31 @@ app.post("/api/ask", (req, res) => {
 
   switch (type) {
     case "chat":
-      return res.json({
-        provider: "groq",
-        reply: "Mock chat response",
-      });
+      const userMessage = data.message || "Hello, how can I help you?";
+      if (userMessage) {
+        return res
+          .status(400)
+          .json({ error: "Chat functionality not implemented yet" });
+      }
+      try {
+        const response = await fetch(
+          "https://api.groq.com/openai/v1/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+            },
+            body: JSON.stringify({ message: userMessage }),
+          }
+        );
+        const result = await response.json();
+        return res.json({ provider: "groq", reply: result.reply });
+      } catch (error) {
+        return res
+          .status(500)
+          .json({ error: "Failed to process chat request" });
+      }
 
     case "search":
       return res.json({
