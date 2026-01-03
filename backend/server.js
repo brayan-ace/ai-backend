@@ -224,38 +224,8 @@ app.post("/api/ask", async (req, res) => {
       case "image":
         console.log("[Image Case] Processing image request:", data);
         try {
-          const renderUrl = process.env.RENDER_SERVICE_URL;
-          // If a render service is configured, forward the request there (useful for Render deployments)
-          if (renderUrl) {
-            try {
-              const forwardResp = await axios.post(
-                renderUrl,
-                { provider: "gemini", action: "image", input: data },
-                { timeout: 30000 }
-              );
-              return res.json({
-                provider: "gemini",
-                forwarded: true,
-                response: forwardResp.data,
-                timestamp: new Date().toISOString(),
-                status: "success",
-              });
-            } catch (forwardErr) {
-              console.error(
-                "[Image] Render service forward error:",
-                forwardErr?.response?.data || forwardErr.message || forwardErr
-              );
-              return res.status(forwardErr?.response?.status || 502).json({
-                error: "Render service forwarding failed",
-                message: forwardErr?.response?.data || forwardErr.message,
-                provider: "gemini",
-                timestamp: new Date().toISOString(),
-              });
-            }
-          }
-
-          // If no render service, check for direct Gemini API key
-          const GEMINI_KEY = process.env.geminiapikey;
+          // Check for Gemini API key
+          const GEMINI_KEY = process.env.geminiApi;
           if (!GEMINI_KEY) {
             console.error(
               "[Image] GEMINI API key not configured (env 'geminiapikey')"
@@ -263,28 +233,87 @@ app.post("/api/ask", async (req, res) => {
             return res.status(500).json({
               error: "API configuration error",
               message:
-                "Gemini API key not configured and no RENDER_SERVICE_URL is set. Set 'geminiapikey' or 'RENDER_SERVICE_URL'.",
+                "Gemini API key not configured. Set env var 'geminiapikey'.",
               provider: "gemini",
               timestamp: new Date().toISOString(),
             });
           }
 
-          // Direct Gemini integration not implemented here - return clear message
-          return res.status(501).json({
-            error: "Not implemented",
-            message:
-              "Direct Gemini image analysis is not implemented in this backend. A Gemini key is present but the request should be forwarded to a proper Gemini integration or Render service. Set 'RENDER_SERVICE_URL' to forward requests.",
+          // Extract image data from request
+          const imageUrl = data.imageUrl || data.url;
+          const imageBase64 = data.imageBase64 || data.base64;
+          const prompt = data.prompt || "Analyze this image";
+
+          if (!imageUrl && !imageBase64) {
+            return res.status(400).json({
+              error: "Invalid image request",
+              message:
+                "Missing image. Provide 'data.imageUrl' or 'data.imageBase64'.",
+              timestamp: new Date().toISOString(),
+            });
+          }
+
+          console.log("[Image] Calling Gemini API...");
+
+          // Build request payload for Gemini API
+          let imagePayload;
+          if (imageUrl) {
+            imagePayload = {
+              inlineData: {
+                mimeType: "image/jpeg",
+                data: imageUrl,
+              },
+            };
+          } else {
+            imagePayload = {
+              inlineData: {
+                mimeType: "image/jpeg",
+                data: imageBase64,
+              },
+            };
+          }
+
+          const geminiResponse = await axios.post(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent?key=${GEMINI_KEY}`,
+            {
+              contents: [
+                {
+                  parts: [
+                    imagePayload,
+                    {
+                      text: prompt,
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              headers: { "Content-Type": "application/json" },
+              timeout: 30000,
+            }
+          );
+
+          console.log("[Image] Gemini API success:", geminiResponse.data);
+
+          return res.json({
             provider: "gemini",
+            analysis:
+              geminiResponse.data?.candidates?.[0]?.content?.parts?.[0]?.text ||
+              "No analysis returned",
+            fullResponse: geminiResponse.data,
             timestamp: new Date().toISOString(),
+            status: "success",
           });
         } catch (imageError) {
-          console.error(
-            "[Image] Error:",
-            imageError?.response?.data || imageError.message || imageError
-          );
+          console.error("[Image] Error:", {
+            status: imageError?.response?.status,
+            data: imageError?.response?.data,
+            message: imageError?.message,
+          });
           return res.status(imageError?.response?.status || 500).json({
-            error: "Image request failed",
-            message: imageError?.response?.data || imageError.message,
+            error: "Image analysis failed",
+            message:
+              imageError?.response?.data?.error?.message || imageError.message,
             provider: "gemini",
             timestamp: new Date().toISOString(),
           });
