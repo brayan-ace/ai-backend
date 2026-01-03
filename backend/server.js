@@ -116,7 +116,7 @@ app.post("/api/ask", async (req, res) => {
               },
               body: JSON.stringify({
                 messages: [{ role: "user", content: userMessage }],
-                model: "mixtral-8x7b-32768",
+                model: "llama-3.3-70b-chat",
               }),
               timeout: 30000,
             }
