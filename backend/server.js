@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const axios = require("axios");
 
 const app = express();
 app.use(cors());
@@ -168,20 +169,53 @@ app.post("/api/ask", async (req, res) => {
       case "search":
         console.log("[Search Case] Processing search request:", data);
         try {
-          // This is a mock response - replace with real Tavily API call
+          const TAVILY_KEY = process.env.tavily;
+          if (!TAVILY_KEY) {
+            console.error("[Search] TAVILY key not configured (env 'tavily')");
+            return res.status(500).json({
+              error: "API configuration error",
+              message: "Tavily API key not configured. Set env var 'tavily'",
+              provider: "tavily",
+              timestamp: new Date().toISOString(),
+            });
+          }
+
+          const query =
+            data.query ||
+            data.q ||
+            (typeof data === "string" ? data : undefined);
+          if (!query) {
+            return res.status(400).json({
+              error: "Invalid search request",
+              message:
+                "Missing query. Provide 'data.query' or 'data.q' or string data",
+              timestamp: new Date().toISOString(),
+            });
+          }
+
+          const resp = await axios.post(
+            "https://api.tavily.com/v1/search",
+            { query },
+            {
+              headers: { Authorization: `Bearer ${TAVILY_KEY}` },
+              timeout: 30000,
+            }
+          );
+
           return res.json({
             provider: "tavily",
-            results: ["Mock search result 1", "Mock search result 2"],
-            message:
-              "This is a mock response. Configure TAVILY_API_KEY to enable real searches.",
+            results: resp.data,
             timestamp: new Date().toISOString(),
             status: "success",
           });
         } catch (searchError) {
-          console.error("[Search] Error:", searchError.message);
-          return res.status(500).json({
+          console.error(
+            "[Search] Error:",
+            searchError?.response?.data || searchError.message || searchError
+          );
+          return res.status(searchError?.response?.status || 500).json({
             error: "Search request failed",
-            message: searchError.message,
+            message: searchError?.response?.data || searchError.message,
             provider: "tavily",
             timestamp: new Date().toISOString(),
           });
@@ -190,20 +224,67 @@ app.post("/api/ask", async (req, res) => {
       case "image":
         console.log("[Image Case] Processing image request:", data);
         try {
-          // This is a mock response - replace with real Gemini API call
-          return res.json({
-            provider: "gemini",
-            analysis: "Mock image analysis",
+          const renderUrl = process.env.RENDER_SERVICE_URL;
+          // If a render service is configured, forward the request there (useful for Render deployments)
+          if (renderUrl) {
+            try {
+              const forwardResp = await axios.post(
+                renderUrl,
+                { provider: "gemini", action: "image", input: data },
+                { timeout: 30000 }
+              );
+              return res.json({
+                provider: "gemini",
+                forwarded: true,
+                response: forwardResp.data,
+                timestamp: new Date().toISOString(),
+                status: "success",
+              });
+            } catch (forwardErr) {
+              console.error(
+                "[Image] Render service forward error:",
+                forwardErr?.response?.data || forwardErr.message || forwardErr
+              );
+              return res.status(forwardErr?.response?.status || 502).json({
+                error: "Render service forwarding failed",
+                message: forwardErr?.response?.data || forwardErr.message,
+                provider: "gemini",
+                timestamp: new Date().toISOString(),
+              });
+            }
+          }
+
+          // If no render service, check for direct Gemini API key
+          const GEMINI_KEY = process.env.geminiapikey;
+          if (!GEMINI_KEY) {
+            console.error(
+              "[Image] GEMINI API key not configured (env 'geminiapikey')"
+            );
+            return res.status(500).json({
+              error: "API configuration error",
+              message:
+                "Gemini API key not configured and no RENDER_SERVICE_URL is set. Set 'geminiapikey' or 'RENDER_SERVICE_URL'.",
+              provider: "gemini",
+              timestamp: new Date().toISOString(),
+            });
+          }
+
+          // Direct Gemini integration not implemented here - return clear message
+          return res.status(501).json({
+            error: "Not implemented",
             message:
-              "This is a mock response. Configure GEMINI_API_KEY to enable real analysis.",
+              "Direct Gemini image analysis is not implemented in this backend. A Gemini key is present but the request should be forwarded to a proper Gemini integration or Render service. Set 'RENDER_SERVICE_URL' to forward requests.",
+            provider: "gemini",
             timestamp: new Date().toISOString(),
-            status: "success",
           });
         } catch (imageError) {
-          console.error("[Image] Error:", imageError.message);
-          return res.status(500).json({
+          console.error(
+            "[Image] Error:",
+            imageError?.response?.data || imageError.message || imageError
+          );
+          return res.status(imageError?.response?.status || 500).json({
             error: "Image request failed",
-            message: imageError.message,
+            message: imageError?.response?.data || imageError.message,
             provider: "gemini",
             timestamp: new Date().toISOString(),
           });
