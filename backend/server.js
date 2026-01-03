@@ -116,7 +116,7 @@ app.post("/api/ask", async (req, res) => {
               },
               body: JSON.stringify({
                 messages: [{ role: "user", content: userMessage }],
-                model: "llama-3.3-70b-chat",
+                model: "openai/gpt-oss-20b",
               }),
               timeout: 30000,
             }
