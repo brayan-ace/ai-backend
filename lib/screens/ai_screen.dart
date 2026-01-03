@@ -1,11 +1,8 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import '../services/gemini_services.dart';
 import '../utils/theme.dart';
-import '../utils/ai_constants.dart';
 import '../widgets/ai_message_bubble.dart';
-import '../widgets/typing_indicator.dart'; // Added import
+import '../widgets/typing_indicator.dart';
 
 class AiScreen extends StatefulWidget {
   const AiScreen({super.key});
@@ -15,12 +12,8 @@ class AiScreen extends StatefulWidget {
 }
 
 class _AiScreenState extends State<AiScreen> {
-  // API keys with fallback support
-  static const String groqApiKey =
-      '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';
-  static const String openRouterApiKey =
-      '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';
-  static const String deepSeekApiKey = 'sk-8d17e5b0c355485da07af11f552e37f9';
+  // API keys removed — requests go through the backend
+  final GeminiService _gemini = GeminiService();
 
   final List<_Message> _messages = [];
   final TextEditingController _controller = TextEditingController();
@@ -62,147 +55,11 @@ class _AiScreenState extends State<AiScreen> {
   }
 
   Future<String?> _callWithFallback(String prompt) async {
-    // Try Groq first
-    var response = await _callGroq(groqApiKey, prompt);
-    if (response != null &&
-        !response.contains('ERROR') &&
-        !response.contains('⚠️')) {
-      return response;
-    }
-
-    // If Groq fails, try OpenRouter
-    response = await _callOpenRouter(openRouterApiKey, prompt);
-    if (response != null &&
-        !response.contains('ERROR') &&
-        !response.contains('⚠️')) {
-      return response;
-    }
-
-    // If OpenRouter fails, try DeepSeek
-    response = await _callDeepSeek(deepSeekApiKey, prompt);
-    if (response != null &&
-        !response.contains('ERROR') &&
-        !response.contains('⚠️')) {
-      return response;
-    }
-
-    // All APIs failed
-    return '⚠️ All AI services are currently unavailable. Please try again later.';
-  }
-
-  Future<String?> _callGroq(String apiKey, String prompt) async {
     try {
-      final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
-
-      final resp = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $apiKey',
-        },
-        body: jsonEncode({
-          'model': 'llama-3.3-70b-versatile',
-          'messages': [
-            {'role': 'system', 'content': AiConstants.systemPrompt},
-            {'role': 'user', 'content': prompt},
-          ],
-        }),
-      );
-
-      if (resp.statusCode == 200) {
-        final json = jsonDecode(resp.body) as Map<String, dynamic>;
-        final choices = json['choices'] as List<dynamic>?;
-        if (choices != null && choices.isNotEmpty) {
-          final message = choices[0]['message'] as Map<String, dynamic>?;
-          if (message != null) {
-            var out = message['content'] as String?;
-            if (out != null) return out.trim();
-          }
-        }
-        return '[[GROQ: no text found]]';
-      } else if (resp.statusCode == 429) {
-        return '⚠️ API quota exceeded. Please wait a few minutes and try again.';
-      } else {
-        return '[[GROQ ERROR: ${resp.statusCode}]] ${resp.body}';
-      }
+      final resp = await _gemini.generateContent(prompt);
+      return resp;
     } catch (e) {
-      return '[[GROQ EXCEPTION]] $e';
-    }
-  }
-
-  Future<String?> _callOpenRouter(String apiKey, String prompt) async {
-    try {
-      final uri = Uri.parse('https://openrouter.ai/api/v1/chat/completions');
-
-      final resp = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $apiKey',
-        },
-        body: jsonEncode({
-          'model': 'meta-llama/llama-3.1-8b-instruct:free',
-          'messages': [
-            {'role': 'system', 'content': AiConstants.systemPrompt},
-            {'role': 'user', 'content': prompt},
-          ],
-        }),
-      );
-
-      if (resp.statusCode == 200) {
-        final json = jsonDecode(resp.body) as Map<String, dynamic>;
-        final choices = json['choices'] as List<dynamic>?;
-        if (choices != null && choices.isNotEmpty) {
-          final message = choices[0]['message'] as Map<String, dynamic>?;
-          if (message != null) {
-            var out = message['content'] as String?;
-            if (out != null) return out.trim();
-          }
-        }
-        return '[[OPENROUTER: no text found]]';
-      } else {
-        return '[[OPENROUTER ERROR: ${resp.statusCode}]]';
-      }
-    } catch (e) {
-      return '[[OPENROUTER EXCEPTION]] $e';
-    }
-  }
-
-  Future<String?> _callDeepSeek(String apiKey, String prompt) async {
-    try {
-      final uri = Uri.parse('https://api.deepseek.com/v1/chat/completions');
-
-      final resp = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $apiKey',
-        },
-        body: jsonEncode({
-          'model': 'deepseek-chat',
-          'messages': [
-            {'role': 'system', 'content': AiConstants.systemPrompt},
-            {'role': 'user', 'content': prompt},
-          ],
-        }),
-      );
-
-      if (resp.statusCode == 200) {
-        final json = jsonDecode(resp.body) as Map<String, dynamic>;
-        final choices = json['choices'] as List<dynamic>?;
-        if (choices != null && choices.isNotEmpty) {
-          final message = choices[0]['message'] as Map<String, dynamic>?;
-          if (message != null) {
-            var out = message['content'] as String?;
-            if (out != null) return out.trim();
-          }
-        }
-        return '[[DEEPSEEK: no text found]]';
-      } else {
-        return '[[DEEPSEEK ERROR: ${resp.statusCode}]]';
-      }
-    } catch (e) {
-      return '[[DEEPSEEK EXCEPTION]] $e';
+      return '⚠️ All AI services are currently unavailable. ($e)';
     }
   }
 

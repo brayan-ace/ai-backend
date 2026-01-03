@@ -2,24 +2,41 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  static const String baseUrl =
-      "http://localhost:3000"; // Replace with your backend URL
+  // Backend URL (Render)
+  static const String baseUrl = "https://ai-backend-vf75.onrender.com";
 
-  static Future<String> chat(String message) async {
+  /// Send a request to the central backend using the agreed JSON contract:
+  /// { provider: "groq|openrouter|deepseek|tavily|google", action: "chat|generate|search|image", input: ... }
+  static Future<String> send(
+    String provider,
+    String action,
+    dynamic input,
+  ) async {
+    final body = jsonEncode({
+      'provider': provider,
+      'action': action,
+      'input': input,
+    });
+
     final response = await http.post(
-      Uri.parse("$baseUrl/chat"),
-      headers: <String, String>{
-        'Content-Type': 'application/json; charset=UTF-8',
-      },
-      body: jsonEncode(<String, String>{'message': message}),
+      Uri.parse("$baseUrl/proxy"),
+      headers: <String, String>{'Content-Type': 'application/json'},
+      body: body,
     );
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return data["response"];
+      if (data is Map && data.containsKey('response'))
+        return data['response'].toString();
+      return response.body;
     } else {
-      final errorData = jsonDecode(response.body);
-      throw Exception(errorData["error"] ?? "Failed to get AI response");
+      String body = response.body;
+      try {
+        final parsed = jsonDecode(response.body);
+        if (parsed is Map && parsed.containsKey('error'))
+          body = parsed['error'].toString();
+      } catch (_) {}
+      throw Exception('Backend error (${response.statusCode}): $body');
     }
   }
 }

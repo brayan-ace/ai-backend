@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../utils/globals.dart';
 import '../services/study_plan_service.dart';
-import 'study_plan_chat_screen.dart';
 import '../utils/theme.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -212,16 +211,7 @@ class HomeScreen extends StatelessWidget {
                               Navigator.pop(context);
                               hideTopOverlay.value = true;
                               navigatorKey.currentState
-                                  ?.push(
-                                    MaterialPageRoute(
-                                      builder: (_) => StudyPlanChatScreen(
-                                        planId: p['id'] as String,
-                                        planTitle: title,
-                                        planContext:
-                                            p['context'] as String? ?? '',
-                                      ),
-                                    ),
-                                  )
+                                  ?.pushNamed('/study')
                                   .then((_) {
                                     hideTopOverlay.value = false;
                                   });

@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:image_picker/image_picker.dart';
 import '../utils/theme.dart';
@@ -10,395 +9,67 @@ import '../utils/ai_constants.dart';
 import '../widgets/ai_message_bubble.dart';
 import '../widgets/typing_indicator.dart';
 import '../services/gemini_services.dart';
-import '../services/chat_storage_service.dart';
 import '../services/web_search_service.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import '../services/chat_storage_service.dart';
 
 class OnlineAiScreen extends StatefulWidget {
-  const OnlineAiScreen({super.key});
+  const OnlineAiScreen({Key? key}) : super(key: key);
 
   @override
-  State<OnlineAiScreen> createState() => _OnlineAiScreenState();
+  _OnlineAiScreenState createState() => _OnlineAiScreenState();
 }
 
 class _OnlineAiScreenState extends State<OnlineAiScreen> {
-  // API keys with fallback support
-  static const String groqApiKey =
-      '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';
-  static const String openRouterApiKey =
-      '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';
-  static const String deepSeekApiKey = 'sk-8d17e5b0c355485da07af11f552e37f9';
-
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  final TextEditingController _searchController = TextEditingController();
-  final List<_Message> _messages = [];
   final TextEditingController _controller = TextEditingController();
-  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+  final stt.SpeechToText _speech = stt.SpeechToText();
+  final ImagePicker _imagePicker = ImagePicker();
 
-  // Firebase chat storage
-  final ChatStorageService _chatStorage = ChatStorageService();
-  String? _currentChatId;
-  bool _isSavingEnabled = false;
-
-  // Speech recognition
-  late stt.SpeechToText _speech;
-  bool _isListening = false;
   bool _speechAvailable = false;
-
-  // Response mode: 'detailed' or 'straight'
+  bool _isListening = false;
+  bool _webSearchEnabled = false;
   String _responseMode = 'detailed';
   bool _showResponseModeChip = false;
 
-  // Web search integration
-  final WebSearchService _webSearchService = WebSearchService();
-  bool _webSearchEnabled = false;
-  String _currentStatusMessage = '';
-
-  // Model selection
-  String _selectedModel = 'Sirri';
-
-  // Image/File handling
-  final ImagePicker _imagePicker = ImagePicker();
-  final GeminiService _geminiService = GeminiService();
   File? _selectedImage;
   String? _selectedFileName;
+
+  final List<_Message> _messages = [];
+  String _currentStatusMessage = '';
+
+  bool _isSavingEnabled = false;
+  String? _currentChatId;
+
+  late final GeminiService _geminiService;
+  late final WebSearchService _webSearchService;
+  late final ChatStorageService _chatStorage;
+
+  String _selectedModel = 'Ace';
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
+    _geminiService = GeminiService();
+    _webSearchService = WebSearchService();
+    _chatStorage = ChatStorageService();
     _messages.add(
       _Message(
         text: 'Welcome — type a message and press send to chat with Sirri AI.',
         fromUser: false,
       ),
     );
-    _speech = stt.SpeechToText();
-    _initializeSpeech();
-    _checkAuthAndEnableSaving();
+    _checkSpeechAvailability();
   }
 
-  /// Check if user is authenticated to enable chat saving
-  void _checkAuthAndEnableSaving() {
-    final user = FirebaseAuth.instance.currentUser;
-    setState(() {
-      _isSavingEnabled = user != null;
-    });
-  }
-
-  Future<void> _initializeSpeech() async {
-    _speechAvailable = await _speech.initialize(
-      onStatus: (status) {
-        print('Speech status: $status');
-        if (status == 'done' && _isListening) {
-          // Auto-restart listening if it stops while user wants to continue
-          Future.delayed(Duration(milliseconds: 100), () {
-            if (_isListening && mounted) {
-              _startListening();
-            }
-          });
-        } else if (status == 'notListening' && _isListening) {
-          // Keep the UI showing listening state
-          print('Not listening but should be - attempting restart');
-        }
-      },
-      onError: (error) {
-        print('Speech error: $error');
-        if (_isListening) {
-          setState(() => _isListening = false);
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Speech recognition error: ${error.errorMsg}'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      },
-    );
-    setState(() {});
-  }
-
-  void _showResponseModeDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: AppTheme.surfaceElevated,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-            side: BorderSide(color: AppTheme.primaryBlue.withOpacity(0.3)),
-          ),
-          title: Row(
-            children: [
-              Icon(Icons.tune, color: AppTheme.primaryBlue),
-              SizedBox(width: AppTheme.spaceSm),
-              Text(
-                'Options',
-                style: AppTheme.headlineMedium.copyWith(
-                  color: AppTheme.textPrimary,
-                ),
-              ),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Response Mode Section
-                Text(
-                  'Response Mode',
-                  style: AppTheme.labelLarge.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-                SizedBox(height: AppTheme.spaceXs),
-                ListTile(
-                  leading: Container(
-                    padding: EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: AppTheme.primaryGradient,
-                      ),
-                      borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                    ),
-                    child: Icon(Icons.article, color: Colors.black, size: 20),
-                  ),
-                  title: Text(
-                    'Detailed Analysis',
-                    style: AppTheme.bodyLarge.copyWith(
-                      color: AppTheme.textPrimary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  subtitle: Text(
-                    'Comprehensive explanations',
-                    style: AppTheme.bodySmall.copyWith(
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                  selected: _responseMode == 'detailed',
-                  selectedTileColor: AppTheme.primaryBlue.withOpacity(0.1),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                  ),
-                  onTap: () {
-                    setState(() => _responseMode = 'detailed');
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('✓ Detailed Analysis mode activated'),
-                        backgroundColor: AppTheme.primaryBlue,
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  },
-                ),
-                SizedBox(height: AppTheme.spaceXs),
-                ListTile(
-                  leading: Container(
-                    padding: EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(colors: AppTheme.accentGradient),
-                      borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                    ),
-                    child: Icon(Icons.flash_on, color: Colors.white, size: 20),
-                  ),
-                  title: Text(
-                    'Straight to the Point',
-                    style: AppTheme.bodyLarge.copyWith(
-                      color: AppTheme.textPrimary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  subtitle: Text(
-                    'Concise answers',
-                    style: AppTheme.bodySmall.copyWith(
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                  selected: _responseMode == 'straight',
-                  selectedTileColor: AppTheme.accentBlue.withOpacity(0.1),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                  ),
-                  onTap: () {
-                    setState(() => _responseMode = 'straight');
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('⚡ Straight to the Point mode activated'),
-                        backgroundColor: AppTheme.accentBlue,
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  },
-                ),
-
-                SizedBox(height: AppTheme.spaceLg),
-                Divider(color: AppTheme.surfaceElevated),
-                SizedBox(height: AppTheme.spaceSm),
-
-                // Web Search Section
-                Text(
-                  'Search Options',
-                  style: AppTheme.labelLarge.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-                SizedBox(height: AppTheme.spaceXs),
-                ListTile(
-                  leading: Container(
-                    padding: EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFF00D9FF), Color(0xFF0099FF)],
-                      ),
-                      borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                    ),
-                    child: Icon(
-                      Icons.travel_explore,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
-                  title: Text(
-                    'Web Search',
-                    style: AppTheme.bodyLarge.copyWith(
-                      color: AppTheme.textPrimary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  subtitle: Text(
-                    _webSearchEnabled
-                        ? 'Enabled - real-time data'
-                        : 'Disabled - AI database',
-                    style: AppTheme.bodySmall.copyWith(
-                      color: _webSearchEnabled
-                          ? AppTheme.primaryBlue
-                          : AppTheme.textSecondary,
-                    ),
-                  ),
-                  trailing: Switch(
-                    value: _webSearchEnabled,
-                    onChanged: (value) {
-                      setState(() => _webSearchEnabled = value);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            value
-                                ? '🌐 Web search enabled'
-                                : '📚 Using AI database',
-                          ),
-                          backgroundColor: value
-                              ? AppTheme.primaryBlue
-                              : AppTheme.surfaceElevated,
-                          behavior: SnackBarBehavior.floating,
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                    },
-                    activeColor: AppTheme.primaryBlue,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                  ),
-                ),
-
-                SizedBox(height: AppTheme.spaceLg),
-                Divider(color: AppTheme.surfaceElevated),
-                SizedBox(height: AppTheme.spaceSm),
-
-                // Attach Media Section
-                Text(
-                  'Attach Media',
-                  style: AppTheme.labelLarge.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-                SizedBox(height: AppTheme.spaceXs),
-                ListTile(
-                  leading: Container(
-                    padding: EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [AppTheme.accentBlueLight, AppTheme.accentBlue],
-                      ),
-                      borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                    ),
-                    child: Icon(
-                      Icons.camera_alt,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
-                  title: Text(
-                    'Take Photo',
-                    style: AppTheme.bodyLarge.copyWith(
-                      color: AppTheme.textPrimary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  subtitle: Text(
-                    'Use camera to capture',
-                    style: AppTheme.bodySmall.copyWith(
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickImage(ImageSource.camera);
-                  },
-                ),
-                SizedBox(height: AppTheme.spaceXs),
-                ListTile(
-                  leading: Container(
-                    padding: EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppTheme.primaryBlue,
-                          AppTheme.primaryBlueDark,
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                    ),
-                    child: Icon(
-                      Icons.photo_library,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
-                  title: Text(
-                    'Choose from Gallery',
-                    style: AppTheme.bodyLarge.copyWith(
-                      color: AppTheme.textPrimary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  subtitle: Text(
-                    'Select existing image',
-                    style: AppTheme.bodySmall.copyWith(
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickImage(ImageSource.gallery);
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+  Future<void> _checkSpeechAvailability() async {
+    try {
+      final available = await _speech.initialize();
+      setState(() => _speechAvailable = available);
+    } catch (_) {
+      setState(() => _speechAvailable = false);
+    }
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -1349,203 +1020,11 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
 
   Future<String?> _callWithFallback(String prompt) async {
     // Try Groq first
-    var response = await _callGroq(groqApiKey, prompt);
-    if (response != null &&
-        !response.contains('ERROR') &&
-        !response.contains('⚠️')) {
-      return response;
-    }
-
-    // If Groq fails, try OpenRouter
-    response = await _callOpenRouter(openRouterApiKey, prompt);
-    if (response != null &&
-        !response.contains('ERROR') &&
-        !response.contains('⚠️')) {
-      return response;
-    }
-
-    // If OpenRouter fails, try DeepSeek
-    response = await _callDeepSeek(deepSeekApiKey, prompt);
-    if (response != null &&
-        !response.contains('ERROR') &&
-        !response.contains('⚠️')) {
-      return response;
-    }
-
-    // All APIs failed
-    return '⚠️ All AI services are currently unavailable. Please try again later.';
-  }
-
-  Future<String?> _callGroq(String apiKey, String prompt) async {
     try {
-      final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
-
-      // Build conversation history
-      final conversationMessages = <Map<String, String>>[
-        {
-          'role': 'system',
-          'content': _responseMode == 'straight'
-              ? 'You are Sirri AI. Provide CONCISE, DIRECT answers without DETAILED explanations. Get straight to the point. Use markdown and LaTeX for math (\$formula\$ for inline, \$\$formula\$\$ for display). No lengthy examples unless specifically asked'
-              : AiConstants.systemPrompt,
-        },
-      ];
-
-      // Add conversation history (last 20 messages for context)
-      final historyMessages = _messages.length > 20
-          ? _messages.sublist(_messages.length - 20)
-          : _messages;
-
-      for (final msg in historyMessages) {
-        conversationMessages.add({
-          'role': msg.fromUser ? 'user' : 'assistant',
-          'content': msg.text,
-        });
-      }
-
-      final resp = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $apiKey',
-        },
-        body: jsonEncode({
-          'model': 'llama-3.3-70b-versatile',
-          'messages': conversationMessages,
-        }),
-      );
-
-      if (resp.statusCode == 200) {
-        final json = jsonDecode(resp.body) as Map<String, dynamic>;
-        final choices = json['choices'] as List<dynamic>?;
-        if (choices != null && choices.isNotEmpty) {
-          final message = choices[0]['message'] as Map<String, dynamic>?;
-          if (message != null) {
-            var out = message['content'] as String?;
-            if (out != null) return out.trim();
-          }
-        }
-        return '[[GROQ: no text found]]';
-      } else if (resp.statusCode == 429) {
-        return '⚠️ API quota exceeded. Please wait a few minutes and try again.';
-      } else {
-        return '[[GROQ ERROR: ${resp.statusCode}]] ${resp.body}';
-      }
+      final resp = await _geminiService.generateContent(prompt);
+      return resp;
     } catch (e) {
-      return '[[GROQ EXCEPTION]] $e';
-    }
-  }
-
-  Future<String?> _callOpenRouter(String apiKey, String prompt) async {
-    try {
-      final uri = Uri.parse('https://openrouter.ai/api/v1/chat/completions');
-
-      // Build conversation history
-      final conversationMessages = <Map<String, String>>[
-        {
-          'role': 'system',
-          'content': _responseMode == 'straight'
-              ? 'You are Sirri AI. Provide CONCISE, DIRECT answers without extra explanations. Get straight to the point. Use markdown and LaTeX for math (\$formula\$ for inline, \$\$formula\$\$ for display). No lengthy examples unless specifically asked.'
-              : AiConstants.systemPrompt,
-        },
-      ];
-
-      // Add conversation history (last 20 messages for context)
-      final historyMessages = _messages.length > 20
-          ? _messages.sublist(_messages.length - 20)
-          : _messages;
-
-      for (final msg in historyMessages) {
-        conversationMessages.add({
-          'role': msg.fromUser ? 'user' : 'assistant',
-          'content': msg.text,
-        });
-      }
-
-      final resp = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $apiKey',
-        },
-        body: jsonEncode({
-          'model': 'meta-llama/llama-3.1-8b-instruct:free',
-          'messages': conversationMessages,
-        }),
-      );
-
-      if (resp.statusCode == 200) {
-        final json = jsonDecode(resp.body) as Map<String, dynamic>;
-        final choices = json['choices'] as List<dynamic>?;
-        if (choices != null && choices.isNotEmpty) {
-          final message = choices[0]['message'] as Map<String, dynamic>?;
-          if (message != null) {
-            var out = message['content'] as String?;
-            if (out != null) return out.trim();
-          }
-        }
-        return '[[OPENROUTER: no text found]]';
-      } else {
-        return '[[OPENROUTER ERROR: ${resp.statusCode}]]';
-      }
-    } catch (e) {
-      return '[[OPENROUTER EXCEPTION]] $e';
-    }
-  }
-
-  Future<String?> _callDeepSeek(String apiKey, String prompt) async {
-    try {
-      final uri = Uri.parse('https://api.deepseek.com/v1/chat/completions');
-
-      // Build conversation history
-      final conversationMessages = <Map<String, String>>[
-        {
-          'role': 'system',
-          'content': _responseMode == 'straight'
-              ? 'You are Sirri AI. Provide CONCISE, DIRECT answers without extra explanations. Get straight to the point. Use markdown and LaTeX for math (\$formula\$ for inline, \$\$formula\$\$ for display). No lengthy examples unless specifically asked.'
-              : AiConstants.systemPrompt,
-        },
-      ];
-
-      // Add conversation history (last 20 messages for context)
-      final historyMessages = _messages.length > 20
-          ? _messages.sublist(_messages.length - 20)
-          : _messages;
-
-      for (final msg in historyMessages) {
-        conversationMessages.add({
-          'role': msg.fromUser ? 'user' : 'assistant',
-          'content': msg.text,
-        });
-      }
-
-      final resp = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $apiKey',
-        },
-        body: jsonEncode({
-          'model': 'deepseek-chat',
-          'messages': conversationMessages,
-        }),
-      );
-
-      if (resp.statusCode == 200) {
-        final json = jsonDecode(resp.body) as Map<String, dynamic>;
-        final choices = json['choices'] as List<dynamic>?;
-        if (choices != null && choices.isNotEmpty) {
-          final message = choices[0]['message'] as Map<String, dynamic>?;
-          if (message != null) {
-            var out = message['content'] as String?;
-            if (out != null) return out.trim();
-          }
-        }
-        return '[[DEEPSEEK: no text found]]';
-      } else {
-        return '[[DEEPSEEK ERROR: ${resp.statusCode}]]';
-      }
-    } catch (e) {
-      return '[[DEEPSEEK EXCEPTION]] $e';
+      return '⚠️ All AI services are currently unavailable. ($e)';
     }
   }
 
@@ -3089,20 +2568,11 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
     required IconData icon,
     required VoidCallback onPressed,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(colors: AppTheme.glassGradient),
-        border: Border.all(
-          color: AppTheme.surfaceElevated.withOpacity(0.5),
-          width: 1,
-        ),
-      ),
-      child: IconButton(
-        icon: Icon(icon, color: AppTheme.textSecondary),
-        onPressed: onPressed,
-        iconSize: 22,
-      ),
+    // Previously used helper removed; leave a minimal placeholder
+    return IconButton(
+      icon: Icon(icon, color: AppTheme.textSecondary),
+      onPressed: onPressed,
+      iconSize: 22,
     );
   }
 

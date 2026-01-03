@@ -1,70 +1,26 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'api_service.dart';
 
-/// Service for handling web searches using Tavily API
+/// Service for handling web searches — routed through backend.
 class WebSearchService {
-  static const String _apiKey = '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';
-  static const String _baseUrl = 'https://api.tavily.com/search';
-
-  /// Performs a web search using Tavily API
-  ///
-  /// Returns a formatted string containing search results
-  /// that can be used to enhance AI responses
+  /// Performs a web search by delegating to the backend. The backend
+  /// can call Tavily or other search providers securely.
   Future<String> search({required String query, int maxResults = 5}) async {
     try {
-      final response = await http.post(
-        Uri.parse(_baseUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'api_key': _apiKey,
-          'query': query,
-          'max_results': maxResults,
-          'search_depth': 'basic',
-          'include_answer': true,
-          'include_raw_content': false,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return _formatSearchResults(data);
-      } else {
-        throw Exception('Search failed: ${response.statusCode}');
-      }
+      final input = jsonEncode({
+        'query': query,
+        'max_results': maxResults,
+        'search_depth': 'basic',
+        'include_answer': true,
+      });
+      final resp = await ApiService.send('openai', 'generate', input);
+      return resp;
     } catch (e) {
       throw Exception('Web search error: $e');
     }
   }
 
-  /// Formats search results into a readable string
-  String _formatSearchResults(Map<String, dynamic> data) {
-    final buffer = StringBuffer();
-
-    // Add the answer if available
-    if (data['answer'] != null && data['answer'].toString().isNotEmpty) {
-      buffer.writeln('📋 Quick Answer:\n${data['answer']}\n');
-      buffer.writeln('---\n');
-    }
-
-    // Add search results
-    final results = data['results'] as List<dynamic>?;
-    if (results != null && results.isNotEmpty) {
-      buffer.writeln('🔍 Web Search Results:\n');
-
-      for (var i = 0; i < results.length; i++) {
-        final result = results[i];
-        final title = result['title'] ?? 'No title';
-        final url = result['url'] ?? '';
-        final content = result['content'] ?? 'No content';
-
-        buffer.writeln('${i + 1}. **$title**');
-        buffer.writeln('   Source: $url');
-        buffer.writeln('   $content\n');
-      }
-    }
-
-    return buffer.toString();
-  }
+  // Formatting moved to backend; keep method removed to avoid unused declaration.
 
   /// Checks if the query requires web search based on keywords
   bool shouldSuggestWebSearch(String query) {

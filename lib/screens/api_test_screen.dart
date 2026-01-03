@@ -1,6 +1,5 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import '../services/api_service.dart';
 import '../utils/theme.dart';
 
 class ApiTestScreen extends StatefulWidget {
@@ -11,11 +10,7 @@ class ApiTestScreen extends StatefulWidget {
 }
 
 class _ApiTestScreenState extends State<ApiTestScreen> {
-  static const String groqApiKey =
-      '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';
-  static const String openRouterApiKey =
-      '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';
-  static const String deepSeekApiKey = 'sk-8d17e5b0c355485da07af11f552e37f9';
+  // Keys removed — requests go through backend
 
   String _groqStatus = 'Not tested';
   String _openRouterStatus = 'Not tested';
@@ -29,47 +24,14 @@ class _ApiTestScreenState extends State<ApiTestScreen> {
     });
 
     try {
-      final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
-      final response = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $groqApiKey',
-        },
-        body: jsonEncode({
-          'model': 'llama-3.3-70b-versatile',
-          'messages': [
-            {
-              'role': 'user',
-              'content': 'Say "Groq is working!" in one sentence.',
-            },
-          ],
-        }),
+      final resp = await ApiService.send(
+        'openai',
+        'chat',
+        'Say "Groq is working!"',
       );
-
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body) as Map<String, dynamic>;
-        final choices = json['choices'] as List<dynamic>?;
-        if (choices != null && choices.isNotEmpty) {
-          final message = choices[0]['message'] as Map<String, dynamic>?;
-          final content = message?['content'] as String?;
-          setState(() {
-            _groqStatus = '✅ Working!\nResponse: ${content ?? "Success"}';
-          });
-        } else {
-          setState(() {
-            _groqStatus = '⚠️ Connected but no response';
-          });
-        }
-      } else {
-        setState(() {
-          _groqStatus = '❌ Error: ${response.statusCode}\n${response.body}';
-        });
-      }
+      setState(() => _groqStatus = '✅ Working!\nResponse: $resp');
     } catch (e) {
-      setState(() {
-        _groqStatus = '❌ Exception: $e';
-      });
+      setState(() => _groqStatus = '❌ Exception: $e');
     } finally {
       setState(() => _testing = false);
     }
@@ -82,48 +44,14 @@ class _ApiTestScreenState extends State<ApiTestScreen> {
     });
 
     try {
-      final uri = Uri.parse('https://openrouter.ai/api/v1/chat/completions');
-      final response = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $openRouterApiKey',
-        },
-        body: jsonEncode({
-          'model': 'meta-llama/llama-3.1-8b-instruct:free',
-          'messages': [
-            {
-              'role': 'user',
-              'content': 'Say "OpenRouter is working!" in one sentence.',
-            },
-          ],
-        }),
+      final resp = await ApiService.send(
+        'openai',
+        'chat',
+        'Say "OpenRouter is working!"',
       );
-
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body) as Map<String, dynamic>;
-        final choices = json['choices'] as List<dynamic>?;
-        if (choices != null && choices.isNotEmpty) {
-          final message = choices[0]['message'] as Map<String, dynamic>?;
-          final content = message?['content'] as String?;
-          setState(() {
-            _openRouterStatus = '✅ Working!\nResponse: ${content ?? "Success"}';
-          });
-        } else {
-          setState(() {
-            _openRouterStatus = '⚠️ Connected but no response';
-          });
-        }
-      } else {
-        setState(() {
-          _openRouterStatus =
-              '❌ Error: ${response.statusCode}\n${response.body}';
-        });
-      }
+      setState(() => _openRouterStatus = '✅ Working!\nResponse: $resp');
     } catch (e) {
-      setState(() {
-        _openRouterStatus = '❌ Exception: $e';
-      });
+      setState(() => _openRouterStatus = '❌ Exception: $e');
     } finally {
       setState(() => _testing = false);
     }
@@ -136,47 +64,14 @@ class _ApiTestScreenState extends State<ApiTestScreen> {
     });
 
     try {
-      final uri = Uri.parse('https://api.deepseek.com/v1/chat/completions');
-      final response = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $deepSeekApiKey',
-        },
-        body: jsonEncode({
-          'model': 'deepseek-chat',
-          'messages': [
-            {
-              'role': 'user',
-              'content': 'Say "DeepSeek is working!" in one sentence.',
-            },
-          ],
-        }),
+      final resp = await ApiService.send(
+        'openai',
+        'chat',
+        'Say "DeepSeek is working!"',
       );
-
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body) as Map<String, dynamic>;
-        final choices = json['choices'] as List<dynamic>?;
-        if (choices != null && choices.isNotEmpty) {
-          final message = choices[0]['message'] as Map<String, dynamic>?;
-          final content = message?['content'] as String?;
-          setState(() {
-            _deepSeekStatus = '✅ Working!\nResponse: ${content ?? "Success"}';
-          });
-        } else {
-          setState(() {
-            _deepSeekStatus = '⚠️ Connected but no response';
-          });
-        }
-      } else {
-        setState(() {
-          _deepSeekStatus = '❌ Error: ${response.statusCode}\n${response.body}';
-        });
-      }
+      setState(() => _deepSeekStatus = '✅ Working!\nResponse: $resp');
     } catch (e) {
-      setState(() {
-        _deepSeekStatus = '❌ Exception: $e';
-      });
+      setState(() => _deepSeekStatus = '❌ Exception: $e');
     } finally {
       setState(() => _testing = false);
     }
