@@ -6,68 +6,230 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Global error handler middleware - catches all async errors
+app.use((err, req, res, next) => {
+  console.error("[Global Error Handler]", {
+    message: err.message,
+    stack: err.stack,
+    timestamp: new Date().toISOString(),
+  });
+  res.status(err.status || 500).json({
+    error: err.message || "Internal Server Error",
+    details: process.env.NODE_ENV === "development" ? err.stack : undefined,
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.get("/", (req, res) => {
-  res.send("Backend alive");
+  try {
+    res.send("Backend alive");
+  } catch (error) {
+    console.error("[GET /] Error:", error.message);
+    res.status(500).json({
+      error: "Root endpoint failed",
+      message: error.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
 });
 
 app.get("/test-env", (req, res) => {
-  res.json({ test: process.env.TEST_VAR });
+  try {
+    const testVar = process.env.TEST_VAR || "TEST_VAR not set";
+    res.json({
+      test: testVar,
+      timestamp: new Date().toISOString(),
+      status: "success",
+    });
+  } catch (error) {
+    console.error("[GET /test-env] Error:", error.message);
+    res.status(500).json({
+      error: "Environment test failed",
+      message: error.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log("Server running on", PORT);
+  console.log(
+    `[Server Started] Running on port ${PORT} at ${new Date().toISOString()}`
+  );
 });
+
 app.post("/api/ask", async (req, res) => {
-  const { type, data } = req.body;
+  try {
+    console.log("[POST /api/ask] Request received:", {
+      body: req.body,
+      timestamp: new Date().toISOString(),
+    });
 
-  if (!type || !data) {
-    return res.status(400).json({ error: "Invalid request format" });
-  }
+    const { type, data } = req.body;
 
-  switch (type) {
-    case "chat":
-      console.log("Received chat request:", data);
-      const userMessage = data.message || "Hello, how can I help you?";
-      if (userMessage) {
-        return res
-          .status(400)
-          .json({ error: "Chat functionality not implemented yet" });
-      }
-      try {
-        const response = await fetch(
-          "https://api.groq.com/openai/v1/chat/completions",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-            },
-            body: JSON.stringify({ message: userMessage }),
+    // Validation
+    if (!type || !data) {
+      console.warn("[POST /api/ask] Invalid request - missing type or data");
+      return res.status(400).json({
+        error: "Invalid request format",
+        message: "Both 'type' and 'data' fields are required",
+        receivedType: typeof type,
+        receivedData: typeof data,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    switch (type) {
+      case "chat":
+        console.log("[Chat Case] Processing chat request:", data);
+        const userMessage = data.message || "Hello, how can I help you?";
+
+        // Fixed logic: process if message exists (removed inverted condition)
+        if (!userMessage) {
+          return res.status(400).json({
+            error: "Invalid chat request",
+            message: "Message field cannot be empty",
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        try {
+          // Check if API key exists
+          if (!process.env.GROQ_API_KEY) {
+            console.error("[Chat] GROQ_API_KEY not configured");
+            return res.status(500).json({
+              error: "API configuration error",
+              message: "GROQ_API_KEY not configured",
+              provider: "groq",
+              timestamp: new Date().toISOString(),
+            });
           }
-        );
-        const result = await response.json();
-        return res.json({ provider: "groq", reply: result.reply });
-      } catch (error) {
-        return res
-          .status(500)
-          .json({ error: "Failed to process chat request" });
-      }
 
-    case "search":
-      return res.json({
-        provider: "tavily",
-        results: ["Mock search result 1", "Mock search result 2"],
-      });
+          console.log("[Chat] Calling Groq API...");
+          const response = await fetch(
+            "https://api.groq.com/openai/v1/chat/completions",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+              },
+              body: JSON.stringify({
+                messages: [{ role: "user", content: userMessage }],
+                model: "mixtral-8x7b-32768",
+              }),
+              timeout: 30000,
+            }
+          );
 
-    case "image":
-      return res.json({
-        provider: "gemini",
-        analysis: "Mock image analysis",
-      });
+          // Check response status
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error("[Chat] Groq API error response:", {
+              status: response.status,
+              statusText: response.statusText,
+              body: errorText,
+            });
+            return res.status(response.status).json({
+              error: "Groq API request failed",
+              message: errorText || response.statusText,
+              status: response.status,
+              provider: "groq",
+              timestamp: new Date().toISOString(),
+            });
+          }
 
-    default:
-      return res.status(400).json({ error: "Unknown request type" });
+          const result = await response.json();
+          console.log("[Chat] Groq API success:", result);
+
+          return res.json({
+            provider: "groq",
+            reply:
+              result.choices?.[0]?.message?.content || "No response from API",
+            fullResponse: result,
+            timestamp: new Date().toISOString(),
+            status: "success",
+          });
+        } catch (chatError) {
+          console.error("[Chat] Exception caught:", {
+            message: chatError.message,
+            stack: chatError.stack,
+            name: chatError.name,
+          });
+          return res.status(500).json({
+            error: "Failed to process chat request",
+            message: chatError.message,
+            provider: "groq",
+            errorType: chatError.name,
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+      case "search":
+        console.log("[Search Case] Processing search request:", data);
+        try {
+          // This is a mock response - replace with real Tavily API call
+          return res.json({
+            provider: "tavily",
+            results: ["Mock search result 1", "Mock search result 2"],
+            message:
+              "This is a mock response. Configure TAVILY_API_KEY to enable real searches.",
+            timestamp: new Date().toISOString(),
+            status: "success",
+          });
+        } catch (searchError) {
+          console.error("[Search] Error:", searchError.message);
+          return res.status(500).json({
+            error: "Search request failed",
+            message: searchError.message,
+            provider: "tavily",
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+      case "image":
+        console.log("[Image Case] Processing image request:", data);
+        try {
+          // This is a mock response - replace with real Gemini API call
+          return res.json({
+            provider: "gemini",
+            analysis: "Mock image analysis",
+            message:
+              "This is a mock response. Configure GEMINI_API_KEY to enable real analysis.",
+            timestamp: new Date().toISOString(),
+            status: "success",
+          });
+        } catch (imageError) {
+          console.error("[Image] Error:", imageError.message);
+          return res.status(500).json({
+            error: "Image request failed",
+            message: imageError.message,
+            provider: "gemini",
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+      default:
+        console.warn("[api/ask] Unknown request type:", type);
+        return res.status(400).json({
+          error: "Unknown request type",
+          message: `Type '${type}' is not supported. Supported types: chat, search, image`,
+          receivedType: type,
+          timestamp: new Date().toISOString(),
+        });
+    }
+  } catch (mainError) {
+    console.error("[POST /api/ask] Main exception:", {
+      message: mainError.message,
+      stack: mainError.stack,
+      name: mainError.name,
+    });
+    return res.status(500).json({
+      error: "Request processing failed",
+      message: mainError.message,
+      errorType: mainError.name,
+      timestamp: new Date().toISOString(),
+    });
   }
 });
 /*require("dotenv").config();
