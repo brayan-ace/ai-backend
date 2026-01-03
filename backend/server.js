@@ -1,4 +1,3 @@
-const fetch = require("node-fetch");
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
@@ -28,6 +27,7 @@ app.post("/api/ask", async (req, res) => {
 
   switch (type) {
     case "chat":
+      console.log("Received chat request:", data);
       const userMessage = data.message || "Hello, how can I help you?";
       if (userMessage) {
         return res
