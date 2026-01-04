@@ -1,4 +1,3 @@
-import 'dart:convert';
 import '../utils/ai_constants.dart';
 import 'api_service.dart';
 
@@ -6,8 +5,8 @@ class GeminiService {
   Future<String?> generateContent(String prompt) async {
     // Route all LLM chat requests through the backend
     try {
-      final input = {'prompt': prompt, 'system': AiConstants.systemPrompt};
-      final resp = await ApiService.send('groq', 'chat', input);
+      final input = {'message': prompt};
+      final resp = await ApiService.send('chat', input);
       return _cleanResponse(resp);
     } catch (e) {
       return '[[GEMINI SERVICE ERROR]] $e';
@@ -19,9 +18,9 @@ class GeminiService {
     String userMessage,
     String systemContext,
   ) async {
-    final input = {'prompt': userMessage, 'system': systemContext};
+    final input = {'message': userMessage};
     try {
-      final resp = await ApiService.send('groq', 'chat', input);
+      final resp = await ApiService.send('chat', input);
       return _cleanResponse(resp);
     } catch (e) {
       return '[[GEMINI SERVICE ERROR]] $e';
@@ -67,15 +66,7 @@ class GeminiService {
     return text.trim();
   }
 
-  Future<String?> _callOpenRouter(String prompt) async {
-    try {
-      final input = {'prompt': prompt, 'system': AiConstants.systemPrompt};
-      final resp = await ApiService.send('openrouter', 'chat', input);
-      return _cleanResponse(resp);
-    } catch (e) {
-      return '[[OPENROUTER EXCEPTION]] $e';
-    }
-  }
+  // _callOpenRouter was removed as it's not used; routing goes via generateContent
   // Fallback methods removed; all calls are routed via generateContent()/generateContentWithContext
 
   /// Generate a quiz based on the context and topic
@@ -150,7 +141,7 @@ Make the questions clear, educational, and at an appropriate level for learning.
     };
 
     try {
-      final resp = await ApiService.send('gemini', 'image', payload);
+      final resp = await ApiService.send('image', payload);
       return _cleanResponse(resp);
     } catch (e) {
       return '⚠️ Gemini image analysis failed: $e';

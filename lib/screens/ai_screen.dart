@@ -18,6 +18,7 @@ class _AiScreenState extends State<AiScreen> {
   final List<_Message> _messages = [];
   final TextEditingController _controller = TextEditingController();
   bool _isWaiting = false;
+  bool _detailedMode = false;
 
   @override
   void initState() {
@@ -119,9 +120,22 @@ class _AiScreenState extends State<AiScreen> {
                 shape: BoxShape.circle,
                 gradient: LinearGradient(colors: AppTheme.glassGradient),
               ),
-              child: IconButton(
-                icon: Icon(Icons.more_vert, color: AppTheme.textPrimary),
-                onPressed: () => _notImplemented('More options'),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      _detailedMode ? Icons.menu_book : Icons.article,
+                      color: AppTheme.textPrimary,
+                    ),
+                    tooltip: _detailedMode ? 'Detailed mode' : 'Concise mode',
+                    onPressed: () =>
+                        setState(() => _detailedMode = !_detailedMode),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.more_vert, color: AppTheme.textPrimary),
+                    onPressed: () => _notImplemented('More options'),
+                  ),
+                ],
               ),
             ),
           ],
@@ -141,6 +155,7 @@ class _AiScreenState extends State<AiScreen> {
                       gradientColors: m.fromUser
                           ? AppTheme.accentGradient
                           : AppTheme.surfaceGradient,
+                      detailedByDefault: _detailedMode,
                     );
                   },
                 ),

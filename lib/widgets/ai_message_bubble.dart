@@ -4,13 +4,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../services/api_service.dart';
 import '../utils/theme.dart';
 
-class AiMessageBubble extends StatelessWidget {
+class AiMessageBubble extends StatefulWidget {
   final String text;
   final bool fromUser;
   final List<Color> gradientColors;
   final String? imagePath; // Add image path support
+  final bool detailedByDefault;
 
   const AiMessageBubble({
     super.key,
@@ -18,10 +20,26 @@ class AiMessageBubble extends StatelessWidget {
     required this.fromUser,
     required this.gradientColors,
     this.imagePath,
+    this.detailedByDefault = false,
   });
 
+  @override
+  _AiMessageBubbleState createState() => _AiMessageBubbleState();
+}
+
+class _AiMessageBubbleState extends State<AiMessageBubble> {
+  late bool _expanded;
+  late String _displayText;
+
+  @override
+  void initState() {
+    super.initState();
+    _expanded = widget.detailedByDefault;
+    _displayText = widget.text;
+  }
+
   String _formatAiResponse(String text) {
-    if (fromUser) return text;
+    if (widget.fromUser) return text;
 
     // Check if response already has overview/answer structure
     if (text.contains('---') ||
@@ -52,8 +70,39 @@ class AiMessageBubble extends StatelessWidget {
     return '**Overview:** $overview\n\n---\n\n**Answer:**\n\n$answer';
   }
 
+  Future<void> _regenerateSummary({required bool concise}) async {
+    try {
+      final mode = concise ? 'concise' : 'detailed';
+      final resp = await ApiService.send('chat', {
+        'message': widget.text,
+        'action': 'summarize',
+        'mode': mode,
+      });
+      if (resp != null) {
+        setState(() {
+          _displayText = resp;
+          // If user requested detailed, expand automatically
+          if (!concise) _expanded = true;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Regenerated ($mode)'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Regenerate failed: $e'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
   void _copyToClipboard(BuildContext context) {
-    Clipboard.setData(ClipboardData(text: text));
+    Clipboard.setData(ClipboardData(text: widget.text));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -74,7 +123,7 @@ class AiMessageBubble extends StatelessWidget {
   }
 
   void _showFullScreenImage(BuildContext context) {
-    if (imagePath == null || imagePath!.isEmpty) return;
+    if (widget.imagePath == null || widget.imagePath!.isEmpty) return;
 
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -92,7 +141,7 @@ class AiMessageBubble extends StatelessWidget {
             child: InteractiveViewer(
               minScale: 0.5,
               maxScale: 4.0,
-              child: Image.file(File(imagePath!), fit: BoxFit.contain),
+              child: Image.file(File(widget.imagePath!), fit: BoxFit.contain),
             ),
           ),
         ),
@@ -188,6 +237,45 @@ class AiMessageBubble extends StatelessWidget {
   // Parse markdown formatting (bold, italic, code, etc.) and URLs
   List<InlineSpan> _parseMarkdown(String text) {
     final List<InlineSpan> spans = [];
+
+    // Handle triple-backtick code blocks first: split by ```
+    if (text.contains('```')) {
+      final parts = text.split('```');
+      for (var i = 0; i < parts.length; i++) {
+        final part = parts[i];
+        if (i.isEven) {
+          // plain markdown in even parts
+          spans.addAll(_parseMarkdown(part));
+        } else {
+          // code block
+          spans.add(
+            WidgetSpan(
+              child: Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(8),
+                margin: EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceElevated.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                ),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SelectableText(
+                    part.trim(),
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 13,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+      }
+      return spans;
+    }
 
     // Pattern for URLs, **bold**, *italic*, `code`, and other markdown
     final markdownPattern = RegExp(
@@ -319,10 +407,10 @@ class AiMessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final formattedText = _formatAiResponse(text);
+    final formattedText = _formatAiResponse(_displayText);
 
     return Align(
-      alignment: fromUser ? Alignment.centerRight : Alignment.centerLeft,
+      alignment: widget.fromUser ? Alignment.centerRight : Alignment.centerLeft,
       child: GestureDetector(
         onLongPress: () => _copyToClipboard(context),
         child: Container(
@@ -330,8 +418,8 @@ class AiMessageBubble extends StatelessWidget {
             maxWidth: MediaQuery.of(context).size.width * 0.8,
           ),
           margin: EdgeInsets.only(
-            left: fromUser ? 48 : 0,
-            right: fromUser ? 0 : 48,
+            left: widget.fromUser ? 48 : 0,
+            right: widget.fromUser ? 0 : 48,
             bottom: AppTheme.spaceSm,
           ),
           padding: EdgeInsets.all(AppTheme.spaceMd),
@@ -339,31 +427,33 @@ class AiMessageBubble extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: gradientColors,
+              colors: widget.gradientColors,
             ),
             borderRadius: BorderRadius.only(
               topLeft: Radius.circular(AppTheme.radiusLg),
               topRight: Radius.circular(AppTheme.radiusLg),
-              bottomLeft: fromUser
+              bottomLeft: widget.fromUser
                   ? Radius.circular(AppTheme.radiusLg)
                   : Radius.circular(4),
-              bottomRight: fromUser
+              bottomRight: widget.fromUser
                   ? Radius.circular(4)
                   : Radius.circular(AppTheme.radiusLg),
             ),
             border: Border.all(
-              color: fromUser
+              color: widget.fromUser
                   ? AppTheme.primaryBlue.withOpacity(0.5)
                   : AppTheme.surfaceElevated.withOpacity(0.5),
               width: 1,
             ),
-            boxShadow: fromUser ? AppTheme.glowShadow : AppTheme.cardShadow,
+            boxShadow: widget.fromUser
+                ? AppTheme.glowShadow
+                : AppTheme.cardShadow,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Show image if available
-              if (imagePath != null && imagePath!.isNotEmpty) ...[
+              if (widget.imagePath != null && widget.imagePath!.isNotEmpty) ...[
                 GestureDetector(
                   onTap: () => _showFullScreenImage(context),
                   child: Container(
@@ -371,7 +461,7 @@ class AiMessageBubble extends StatelessWidget {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(AppTheme.radiusMd),
                       child: Image.file(
-                        File(imagePath!),
+                        File(widget.imagePath!),
                         fit: BoxFit.cover,
                         width: double.infinity,
                         height: 200,
@@ -405,27 +495,87 @@ class AiMessageBubble extends StatelessWidget {
                   ),
                 ),
               ],
-              // Show text
-              fromUser
-                  ? Text(
-                      text,
-                      style: AppTheme.bodyLarge.copyWith(
-                        color: Colors.black,
-                        fontSize: 15,
+              // Show text with concise/detailed toggle for AI responses
+              if (widget.fromUser)
+                Text(
+                  widget.text,
+                  style: AppTheme.bodyLarge.copyWith(
+                    color: Colors.black,
+                    fontSize: 15,
+                  ),
+                )
+              else ...[
+                // Controls: regenerate/summarize and concise/detailed toggle
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        Icons.refresh,
+                        size: 18,
+                        color: AppTheme.textTertiary,
                       ),
-                    )
-                  : SelectableText.rich(
-                      TextSpan(children: _parseText(formattedText)),
-                      style: AppTheme.bodyLarge.copyWith(
-                        color: AppTheme.textPrimary,
-                        fontSize: 15,
-                        height: 1.5,
+                      tooltip: 'Regenerate (detailed)',
+                      onPressed: () => _regenerateSummary(concise: false),
+                    ),
+                    IconButton(
+                      icon: Icon(
+                        Icons.short_text,
+                        size: 18,
+                        color: AppTheme.textTertiary,
+                      ),
+                      tooltip: 'Summarize (concise)',
+                      onPressed: () => _regenerateSummary(concise: true),
+                    ),
+                    TextButton(
+                      onPressed: () => setState(() => _expanded = !_expanded),
+                      child: Text(_expanded ? 'Concise' : 'Details'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppTheme.primaryBlue,
+                        textStyle: TextStyle(fontSize: 12),
+                        minimumSize: Size(0, 0),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                       ),
                     ),
+                  ],
+                ),
+                SelectableText.rich(
+                  TextSpan(
+                    children: _parseText(
+                      _expanded ? formattedText : _conciseVersion(_displayText),
+                    ),
+                  ),
+                  style: AppTheme.bodyLarge.copyWith(
+                    color: AppTheme.textPrimary,
+                    fontSize: 15,
+                    height: 1.5,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
       ),
     );
+  }
+
+  String _conciseVersion(String text) {
+    if (text.trim().isEmpty) return text;
+    // Prefer first paragraph
+    final parts = text.split(RegExp(r'\n\s*\n'));
+    final first = parts.first.trim();
+    if (first.length <= 200) return first;
+    // Fallback to first sentence (up to 200 chars)
+    final sentences = first.split(RegExp(r'(?<=[.!?])\s+'));
+    if (sentences.isNotEmpty) {
+      final candidate = sentences.first;
+      return candidate.length <= 200
+          ? candidate
+          : candidate.substring(0, 200) + '...';
+    }
+    return first.substring(0, 200) + '...';
   }
 }

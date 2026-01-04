@@ -24,11 +24,9 @@ class _ApiTestScreenState extends State<ApiTestScreen> {
     });
 
     try {
-      final resp = await ApiService.send(
-        'openai',
-        'chat',
-        'Say "Groq is working!"',
-      );
+      final resp = await ApiService.send('chat', {
+        'message': 'Say "Groq is working!"',
+      });
       setState(() => _groqStatus = '✅ Working!\nResponse: $resp');
     } catch (e) {
       setState(() => _groqStatus = '❌ Exception: $e');
@@ -44,11 +42,9 @@ class _ApiTestScreenState extends State<ApiTestScreen> {
     });
 
     try {
-      final resp = await ApiService.send(
-        'openai',
-        'chat',
-        'Say "OpenRouter is working!"',
-      );
+      final resp = await ApiService.send('chat', {
+        'message': 'Say "OpenRouter is working!"',
+      });
       setState(() => _openRouterStatus = '✅ Working!\nResponse: $resp');
     } catch (e) {
       setState(() => _openRouterStatus = '❌ Exception: $e');
@@ -64,11 +60,9 @@ class _ApiTestScreenState extends State<ApiTestScreen> {
     });
 
     try {
-      final resp = await ApiService.send(
-        'openai',
-        'chat',
-        'Say "DeepSeek is working!"',
-      );
+      final resp = await ApiService.send('chat', {
+        'message': 'Say "DeepSeek is working!"',
+      });
       setState(() => _deepSeekStatus = '✅ Working!\nResponse: $resp');
     } catch (e) {
       setState(() => _deepSeekStatus = '❌ Exception: $e');

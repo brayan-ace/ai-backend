@@ -24,6 +24,7 @@ dependencies:
   markdown: ^7.0.0
   image_picker: ^1.0.7
   url_launcher: ^6.2.5
+  intl: ^0.18.0
 
 dev_dependencies:
   flutter_test:

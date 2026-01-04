@@ -7,6 +7,44 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Helper: structure free-text responses into overview, bullets, code blocks
+function structureTextResponse(text) {
+  if (!text) {
+    return { overview: "", answer: "", bullets: [], code: [], concise: "" };
+  }
+
+  // Extract code blocks fenced by triple backticks
+  const codeBlocks = [];
+  const codeRegex = /```([\s\S]*?)```/g;
+  let m;
+  while ((m = codeRegex.exec(text)) !== null) {
+    codeBlocks.push(m[1].trim());
+  }
+
+  // Extract bullet lines
+  const bullets = [];
+  const bulletRegex = /^\s*(?:[-*]|\d+\.)\s+(.+)$/gm;
+  while ((m = bulletRegex.exec(text)) !== null) {
+    bullets.push(m[1].trim());
+  }
+
+  // Build a plain-text version without code blocks for sentence splitting
+  const plain = text.replace(codeRegex, "");
+  const sentenceMatch = plain.match(/[^.!?]+[.!?]+/g) || [plain];
+  const overview = sentenceMatch.slice(0, 2).join(" ").trim();
+
+  const concise =
+    overview || (plain.split(/\n\s*\n/)[0] || plain).trim().slice(0, 400);
+
+  return {
+    overview: overview,
+    answer: text,
+    bullets: bullets,
+    code: codeBlocks,
+    concise: concise,
+  };
+}
+
 // Global error handler middleware - catches all async errors
 app.use((err, req, res, next) => {
   console.error("[Global Error Handler]", {
@@ -143,10 +181,26 @@ app.post("/api/ask", async (req, res) => {
           const result = await response.json();
           console.log("[Chat] Groq API success:", result);
 
+          const rawText =
+            result.choices?.[0]?.message?.content || "No response from API";
+          const structured = structureTextResponse(rawText);
+
+          // If client requested a summarize action, return the concise form
+          if (data?.action === "summarize" && data?.mode === "concise") {
+            return res.json({
+              provider: "groq",
+              reply: structured.concise,
+              structured: structured,
+              fullResponse: result,
+              timestamp: new Date().toISOString(),
+              status: "success",
+            });
+          }
+
           return res.json({
             provider: "groq",
-            reply:
-              result.choices?.[0]?.message?.content || "No response from API",
+            reply: rawText,
+            structured: structured,
             fullResponse: result,
             timestamp: new Date().toISOString(),
             status: "success",
@@ -202,9 +256,18 @@ app.post("/api/ask", async (req, res) => {
             }
           );
 
+          // Build a text representation of results for structuring
+          const resultsText =
+            typeof resp.data === "string"
+              ? resp.data
+              : JSON.stringify(resp.data, null, 2);
+          const structured = structureTextResponse(resultsText);
+
           return res.json({
             provider: "tavily",
             results: resp.data,
+            reply: resultsText,
+            structured: structured,
             timestamp: new Date().toISOString(),
             status: "success",
           });
@@ -315,11 +378,15 @@ app.post("/api/ask", async (req, res) => {
 
           console.log("[Image] Gemini API success:", geminiResponse.data);
 
+          const analysisText =
+            geminiResponse.data?.candidates?.[0]?.content?.parts?.[0]?.text ||
+            "No analysis returned";
+          const structured = structureTextResponse(analysisText);
+
           return res.json({
             provider: "gemini",
-            analysis:
-              geminiResponse.data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-              "No analysis returned",
+            analysis: analysisText,
+            structured: structured,
             fullResponse: geminiResponse.data,
             timestamp: new Date().toISOString(),
             status: "success",

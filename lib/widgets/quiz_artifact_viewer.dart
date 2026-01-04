@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../utils/theme.dart';
-import '../screens/study_plan_chat_screen.dart';
+import '../models/quiz_models.dart';
 
 class QuizArtifactViewer extends StatefulWidget {
   final QuizArtifact artifact;

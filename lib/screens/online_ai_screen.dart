@@ -1,11 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:image_picker/image_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../utils/theme.dart';
-import '../utils/ai_constants.dart';
 import '../widgets/ai_message_bubble.dart';
 import '../widgets/typing_indicator.dart';
 import '../services/gemini_services.dart';
@@ -25,6 +26,8 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
   final TextEditingController _searchController = TextEditingController();
   final stt.SpeechToText _speech = stt.SpeechToText();
   final ImagePicker _imagePicker = ImagePicker();
+  late final Stream<User?> _authStateStream;
+  late final StreamSubscription<User?> _authSub;
 
   bool _speechAvailable = false;
   bool _isListening = false;
@@ -54,6 +57,18 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
     _geminiService = GeminiService();
     _webSearchService = WebSearchService();
     _chatStorage = ChatStorageService();
+    // Initialize saving enabled based on auth state
+    _isSavingEnabled = FirebaseAuth.instance.currentUser != null;
+    _authStateStream = FirebaseAuth.instance.authStateChanges();
+    _authSub = _authStateStream.listen((user) {
+      setState(() {
+        _isSavingEnabled = user != null;
+        if (user == null) {
+          // Clear current chat when signed out
+          _currentChatId = null;
+        }
+      });
+    });
     _messages.add(
       _Message(
         text: 'Welcome — type a message and press send to chat with Sirri AI.',
@@ -679,6 +694,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
 
   @override
   void dispose() {
+    _authSub.cancel();
     _controller.dispose();
     _searchController.dispose();
     super.dispose();
@@ -2163,9 +2179,29 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
                 shape: BoxShape.circle,
                 gradient: LinearGradient(colors: AppTheme.glassGradient),
               ),
-              child: IconButton(
-                icon: Icon(Icons.more_vert, color: AppTheme.textPrimary),
-                onPressed: _openMenu,
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      _responseMode == 'detailed'
+                          ? Icons.menu_book
+                          : Icons.article,
+                      color: AppTheme.textPrimary,
+                    ),
+                    tooltip: _responseMode == 'detailed'
+                        ? 'Detailed mode'
+                        : 'Concise mode',
+                    onPressed: () => setState(
+                      () => _responseMode = _responseMode == 'detailed'
+                          ? 'concise'
+                          : 'detailed',
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.more_vert, color: AppTheme.textPrimary),
+                    onPressed: _openMenu,
+                  ),
+                ],
               ),
             ),
           ],
@@ -2210,6 +2246,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
                                 fromUser: m.fromUser,
                                 imagePath: m.imagePath,
                                 gradientColors: AppTheme.surfaceGradient,
+                                detailedByDefault: _responseMode == 'detailed',
                               ),
                             ),
                             Padding(
@@ -2228,6 +2265,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
                       gradientColors: m.fromUser
                           ? AppTheme.primaryGradient
                           : AppTheme.surfaceGradient,
+                      detailedByDefault: _responseMode == 'detailed',
                     );
                   },
                 ),
@@ -2564,17 +2602,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
     );
   }
 
-  Widget _buildGlassButton({
-    required IconData icon,
-    required VoidCallback onPressed,
-  }) {
-    // Previously used helper removed; leave a minimal placeholder
-    return IconButton(
-      icon: Icon(icon, color: AppTheme.textSecondary),
-      onPressed: onPressed,
-      iconSize: 22,
-    );
-  }
+  // helper removed; UI uses specific buttons in this screen.
 
   Widget _buildSendButton() {
     return Container(

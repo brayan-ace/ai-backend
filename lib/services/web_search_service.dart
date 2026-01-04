@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'api_service.dart';
 
 /// Service for handling web searches — routed through backend.
@@ -17,7 +16,7 @@ class WebSearchService {
         'searchDepth': searchDepth,
         'includeAnswer': true,
       };
-      final resp = await ApiService.send('tavily', 'search', input);
+      final resp = await ApiService.send('search', input);
       return resp;
     } catch (e) {
       return 'Error during web search: $e. Please try again.';
