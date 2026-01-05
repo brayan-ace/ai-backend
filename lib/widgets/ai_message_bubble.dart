@@ -73,28 +73,28 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
     });
   }
 
-  Widget _buildReactionButton(String emoji) {
+  Widget _buildReactionButton(String emoji, IconData icon) {
     final isSelected = _reactions.contains(emoji);
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: () => _toggleReaction(emoji),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(6),
         child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+          padding: EdgeInsets.all(6),
           decoration: BoxDecoration(
             color: isSelected
-                ? AppTheme.primaryBlue.withOpacity(0.2)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isSelected
-                  ? AppTheme.primaryBlue
-                  : AppTheme.textTertiary.withOpacity(0.15),
-              width: 0.5,
-            ),
+                ? AppTheme.primaryBlue.withOpacity(0.15)
+                : AppTheme.surfaceElevated.withOpacity(0.3),
+            borderRadius: BorderRadius.circular(6),
           ),
-          child: Text(emoji, style: TextStyle(fontSize: 13)),
+          child: Icon(
+            icon,
+            size: 14,
+            color: isSelected
+                ? AppTheme.primaryBlue
+                : AppTheme.textSecondary.withOpacity(0.7),
+          ),
         ),
       ),
     );
@@ -105,20 +105,48 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
       color: Colors.transparent,
       child: InkWell(
         onTap: () => _copyToClipboard(context),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(6),
         child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+          padding: EdgeInsets.all(6),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: AppTheme.textTertiary.withOpacity(0.15),
-              width: 0.5,
-            ),
+            color: AppTheme.surfaceElevated.withOpacity(0.3),
+            borderRadius: BorderRadius.circular(6),
           ),
           child: Icon(
-            Icons.content_copy,
-            size: 12,
-            color: AppTheme.textSecondary,
+            Icons.content_copy_rounded,
+            size: 14,
+            color: AppTheme.textSecondary.withOpacity(0.7),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRegenerateButton() {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          // TODO: Implement regenerate functionality
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Regenerate coming soon'),
+              duration: Duration(seconds: 1),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          padding: EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceElevated.withOpacity(0.3),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Icon(
+            Icons.refresh_rounded,
+            size: 14,
+            color: AppTheme.textSecondary.withOpacity(0.7),
           ),
         ),
       ),
@@ -904,18 +932,20 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
             ),
           ),
         ),
-        // Show reactions only for AI messages (but not welcome message)
+        // Action buttons attached directly to AI message bubble
         if (!widget.fromUser && !widget.text.contains('Welcome —'))
           Padding(
-            padding: EdgeInsets.only(left: 48, top: 4),
+            padding: EdgeInsets.only(left: 16, top: 6, bottom: 8),
             child: Row(
               mainAxisSize: MainAxisSize.min,
-              spacing: 4,
               children: [
-                _buildReactionButton('👍'),
-                _buildReactionButton('👎'),
-                SizedBox(width: 2),
                 _buildCopyButton(),
+                SizedBox(width: 6),
+                _buildReactionButton('👍', Icons.thumb_up_rounded),
+                SizedBox(width: 6),
+                _buildReactionButton('👎', Icons.thumb_down_rounded),
+                SizedBox(width: 6),
+                _buildRegenerateButton(),
               ],
             ),
           ),
