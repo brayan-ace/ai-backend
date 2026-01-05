@@ -85,7 +85,7 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
           decoration: BoxDecoration(
             color: isSelected
                 ? AppTheme.primaryBlue.withOpacity(0.15)
-                : AppTheme.surfaceElevated.withOpacity(0.3),
+                : AppTheme.backgroundGradientEnd.withOpacity(0.5),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Icon(
@@ -93,7 +93,7 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
             size: 14,
             color: isSelected
                 ? AppTheme.primaryBlue
-                : AppTheme.textSecondary.withOpacity(0.7),
+                : AppTheme.textTertiary.withOpacity(0.6),
           ),
         ),
       ),
@@ -109,13 +109,13 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
         child: Container(
           padding: EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: AppTheme.surfaceElevated.withOpacity(0.3),
+            color: AppTheme.backgroundGradientEnd.withOpacity(0.5),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Icon(
             Icons.content_copy_rounded,
             size: 14,
-            color: AppTheme.textSecondary.withOpacity(0.7),
+            color: AppTheme.textTertiary.withOpacity(0.6),
           ),
         ),
       ),
@@ -140,13 +140,13 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
         child: Container(
           padding: EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: AppTheme.surfaceElevated.withOpacity(0.3),
+            color: AppTheme.backgroundGradientEnd.withOpacity(0.5),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Icon(
             Icons.refresh_rounded,
             size: 14,
-            color: AppTheme.textSecondary.withOpacity(0.7),
+            color: AppTheme.textTertiary.withOpacity(0.6),
           ),
         ),
       ),
