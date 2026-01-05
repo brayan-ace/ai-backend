@@ -149,11 +149,11 @@ app.post("/api/ask", async (req, res) => {
           let systemPrompt;
           if (responseMode === "detailed") {
             systemPrompt =
-              "You are a helpful AI assistant. Provide comprehensive, detailed explanations with context, examples, and thorough analysis. Break down complex topics step-by-step and explain the reasoning behind your answers. Include relevant background information and multiple perspectives when appropriate.";
+              "You are a helpful AI assistant. Provide comprehensive, detailed explanations with context, examples, and thorough analysis. Break down complex topics step-by-step and explain the reasoning behind your answers. Include relevant background information and multiple perspectives when appropriate. IMPORTANT: Never use tables, charts, or tabular formats in your responses. Use bullet points, numbered lists, or paragraphs instead. Your responses should be rich in content and can be lengthy when needed to fully explain the topic.";
           } else {
             // quick/straight mode
             systemPrompt =
-              "You are a helpful AI assistant. Provide direct, concise answers. Get straight to the point without unnecessary elaboration. Keep responses brief and focused on exactly what was asked.";
+              "You are a helpful AI assistant. Provide clear, conversational answers that are informative but not overly brief. Give enough context to be helpful while staying focused on the question. Aim for 2-4 well-formed sentences or a short paragraph. Avoid being too terse or too verbose.";
           }
 
           console.log(`[Chat] Using ${responseMode} mode with Groq API...`);
