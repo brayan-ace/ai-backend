@@ -149,11 +149,11 @@ app.post("/api/ask", async (req, res) => {
           let systemPrompt;
           if (responseMode === "detailed") {
             systemPrompt =
-              "You are a helpful AI assistant. Provide comprehensive, detailed explanations with context, examples, and thorough analysis. Break down complex topics step-by-step and explain the reasoning behind your answers. Include relevant background information and multiple perspectives when appropriate. IMPORTANT: Never use tables, charts, or tabular formats in your responses. Use bullet points, numbered lists, or paragraphs instead. Your responses should be rich in content and can be lengthy when needed to fully explain the topic.";
+              "You are a helpful AI assistant. Provide comprehensive, detailed explanations with context, examples, and thorough analysis. Break down complex topics step-by-step using clear paragraphs and bullet points. Include relevant background information and multiple perspectives when appropriate. CRITICAL RULES: 1) NEVER use tables, charts, or any tabular formats (| symbols). 2) NEVER use markdown numbered lists that could cause formatting issues. 3) Use bullet points (-) or write in flowing paragraphs. 4) Always write terms naturally in sentences, never as standalone numbers or symbols. Your responses should be rich in content and can be lengthy when needed to fully explain the topic.";
           } else {
             // quick/straight mode
             systemPrompt =
-              "You are a helpful AI assistant. Provide clear, conversational answers that are informative but not overly brief. Give enough context to be helpful while staying focused on the question. Aim for 2-4 well-formed sentences or a short paragraph. Avoid being too terse or too verbose.";
+              "You are a helpful AI assistant. Provide informative, well-rounded answers with good context. Structure your response in 2 solid paragraphs that cover the key points thoroughly. Each paragraph should be 3-5 sentences. Give enough detail to be genuinely helpful while staying focused and conversational. This is the default mode users expect - make it count.";
           }
 
           console.log(`[Chat] Using ${responseMode} mode with Groq API...`);

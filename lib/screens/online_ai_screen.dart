@@ -37,7 +37,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
   late Animation<double> _greetingFadeAnimation;
 
   bool _webSearchEnabled = false;
-  String _responseMode = 'detailed';
+  String _responseMode = 'straight';
   bool _showGreeting = true;
 
   File? _selectedImage;
