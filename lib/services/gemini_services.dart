@@ -2,10 +2,13 @@ import '../utils/ai_constants.dart';
 import 'api_service.dart';
 
 class GeminiService {
-  Future<String?> generateContent(String prompt) async {
+  Future<String?> generateContent(String prompt, {String? responseMode}) async {
     // Route all LLM chat requests through the backend
     try {
-      final input = {'message': prompt};
+      final input = {
+        'message': prompt,
+        if (responseMode != null) 'mode': responseMode,
+      };
       final resp = await ApiService.send('chat', input);
       return _cleanResponse(resp);
     } catch (e) {

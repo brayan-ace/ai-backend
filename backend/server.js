@@ -122,6 +122,7 @@ app.post("/api/ask", async (req, res) => {
       case "chat":
         console.log("[Chat Case] Processing chat request:", data);
         const userMessage = data.message || "Hello, how can I help you?";
+        const responseMode = data.mode || "quick"; // Default to quick mode
 
         // Fixed logic: process if message exists (removed inverted condition)
         if (!userMessage) {
@@ -144,7 +145,18 @@ app.post("/api/ask", async (req, res) => {
             });
           }
 
-          console.log("[Chat] Calling Groq API...");
+          // Create system prompt based on mode
+          let systemPrompt;
+          if (responseMode === "detailed") {
+            systemPrompt =
+              "You are a helpful AI assistant. Provide comprehensive, detailed explanations with context, examples, and thorough analysis. Break down complex topics step-by-step and explain the reasoning behind your answers. Include relevant background information and multiple perspectives when appropriate.";
+          } else {
+            // quick/straight mode
+            systemPrompt =
+              "You are a helpful AI assistant. Provide direct, concise answers. Get straight to the point without unnecessary elaboration. Keep responses brief and focused on exactly what was asked.";
+          }
+
+          console.log(`[Chat] Using ${responseMode} mode with Groq API...`);
           const response = await fetch(
             "https://api.groq.com/openai/v1/chat/completions",
             {
@@ -154,7 +166,10 @@ app.post("/api/ask", async (req, res) => {
                 Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
               },
               body: JSON.stringify({
-                messages: [{ role: "user", content: userMessage }],
+                messages: [
+                  { role: "system", content: systemPrompt },
+                  { role: "user", content: userMessage },
+                ],
                 model: "openai/gpt-oss-20b",
               }),
               timeout: 30000,

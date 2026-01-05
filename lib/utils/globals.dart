@@ -8,3 +8,5 @@ final GlobalKey<ScaffoldState> homeScaffoldKey = GlobalKey<ScaffoldState>();
 // Toggle to hide the top overlay (menu + Get Plus). Use a ValueNotifier so
 // UI can listen and rebuild when the value changes.
 final ValueNotifier<bool> hideTopOverlay = ValueNotifier<bool>(false);
+
+bool isTesting = false; // Add global flag for testing environment

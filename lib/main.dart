@@ -12,6 +12,8 @@ import 'screens/online_ai_screen.dart';
 import 'screens/study_plan_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/api_test_screen.dart';
+import 'screens/notes_screen.dart';
+import 'screens/chat_history_screen.dart';
 import 'utils/globals.dart';
 import 'utils/theme.dart';
 import 'utils/theme_provider.dart';
@@ -77,6 +79,8 @@ class MyApp extends StatelessWidget {
         '/settings': (_) => const SettingsScreen(),
         '/home': (_) => const HomeScreen(),
         '/api-test': (_) => const ApiTestScreen(),
+        '/notes': (_) => const NotesScreen(),
+        '/chat-history': (_) => const ChatHistoryScreen(),
       },
     );
   }

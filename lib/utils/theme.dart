@@ -67,37 +67,39 @@ class AppTheme {
   // Shadows & Glows
   static List<BoxShadow> get glowShadow => [
     BoxShadow(
-      color: primaryBlue.withOpacity(0.25),
-      blurRadius: 20,
+      color: primaryBlue.withOpacity(0.15),
+      blurRadius: 16,
       spreadRadius: 0,
+      offset: Offset(0, 2),
     ),
   ];
 
   static List<BoxShadow> get accentGlow => [
     BoxShadow(
-      color: accentBlue.withOpacity(0.3),
-      blurRadius: 24,
+      color: accentBlue.withOpacity(0.2),
+      blurRadius: 20,
       spreadRadius: 0,
+      offset: Offset(0, 3),
     ),
   ];
 
   static List<BoxShadow> get cardShadow => [
     BoxShadow(
-      color: Colors.black.withOpacity(0.4),
-      blurRadius: 16,
-      offset: Offset(0, 8),
+      color: Colors.black.withOpacity(0.08),
+      blurRadius: 12,
+      offset: Offset(0, 2),
     ),
   ];
 
   static List<BoxShadow> get elevatedShadow => [
     BoxShadow(
-      color: primaryBlue.withOpacity(0.15),
-      blurRadius: 12,
-      offset: Offset(0, 4),
+      color: primaryBlue.withOpacity(0.08),
+      blurRadius: 8,
+      offset: Offset(0, 2),
     ),
     BoxShadow(
-      color: Colors.black.withOpacity(0.5),
-      blurRadius: 24,
+      color: Colors.black.withOpacity(0.12),
+      blurRadius: 16,
       offset: Offset(0, 12),
     ),
   ];
@@ -119,6 +121,14 @@ class AppTheme {
     color: textPrimary,
     letterSpacing: -0.3,
     height: 1.25,
+  );
+
+  static TextStyle get displaySmall => TextStyle(
+    fontSize: 24,
+    fontWeight: FontWeight.w500,
+    color: textPrimary,
+    letterSpacing: -0.2,
+    height: 1.3,
   );
 
   static TextStyle get headlineLarge => TextStyle(

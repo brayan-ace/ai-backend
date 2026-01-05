@@ -3,15 +3,20 @@ import 'dart:io';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../utils/theme.dart';
+import '../utils/greeting_utils.dart';
 import '../widgets/ai_message_bubble.dart';
 import '../widgets/typing_indicator.dart';
+import '../widgets/greeting_icon.dart';
+import '../widgets/voice_input_dialog.dart';
 import '../services/gemini_services.dart';
 import '../services/web_search_service.dart';
 import '../services/chat_storage_service.dart';
+import 'notes_screen.dart';
+import 'chat_history_screen.dart';
 
 class OnlineAiScreen extends StatefulWidget {
   const OnlineAiScreen({Key? key}) : super(key: key);
@@ -20,20 +25,20 @@ class OnlineAiScreen extends StatefulWidget {
   _OnlineAiScreenState createState() => _OnlineAiScreenState();
 }
 
-class _OnlineAiScreenState extends State<OnlineAiScreen> {
+class _OnlineAiScreenState extends State<OnlineAiScreen>
+    with SingleTickerProviderStateMixin {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final TextEditingController _controller = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
-  final stt.SpeechToText _speech = stt.SpeechToText();
   final ImagePicker _imagePicker = ImagePicker();
   late final Stream<User?> _authStateStream;
   late final StreamSubscription<User?> _authSub;
+  late AnimationController _greetingAnimationController;
+  late Animation<double> _greetingFadeAnimation;
 
-  bool _speechAvailable = false;
-  bool _isListening = false;
   bool _webSearchEnabled = false;
   String _responseMode = 'detailed';
-  bool _showResponseModeChip = false;
+  bool _showGreeting = true;
 
   File? _selectedImage;
   String? _selectedFileName;
@@ -48,7 +53,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
   late final WebSearchService _webSearchService;
   late final ChatStorageService _chatStorage;
 
-  String _selectedModel = 'Ace';
+  String _selectedModel = 'Groq';
   String _searchQuery = '';
 
   @override
@@ -57,6 +62,18 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
     _geminiService = GeminiService();
     _webSearchService = WebSearchService();
     _chatStorage = ChatStorageService();
+
+    // Initialize animation controller
+    _greetingAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _greetingFadeAnimation = CurvedAnimation(
+      parent: _greetingAnimationController,
+      curve: Curves.easeInOut,
+    );
+    _greetingAnimationController.forward();
+
     // Initialize saving enabled based on auth state
     _isSavingEnabled = FirebaseAuth.instance.currentUser != null;
     _authStateStream = FirebaseAuth.instance.authStateChanges();
@@ -69,22 +86,6 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
         }
       });
     });
-    _messages.add(
-      _Message(
-        text: 'Welcome — type a message and press send to chat with Sirri AI.',
-        fromUser: false,
-      ),
-    );
-    _checkSpeechAvailability();
-  }
-
-  Future<void> _checkSpeechAvailability() async {
-    try {
-      final available = await _speech.initialize();
-      setState(() => _speechAvailable = available);
-    } catch (_) {
-      setState(() => _speechAvailable = false);
-    }
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -123,149 +124,106 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
             return Container(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.75,
-              ),
               decoration: BoxDecoration(
-                gradient: LinearGradient(colors: AppTheme.surfaceGradient),
+                color: AppTheme.backgroundDeep,
                 borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(AppTheme.radiusXl),
-                  topRight: Radius.circular(AppTheme.radiusXl),
-                ),
-                border: Border.all(
-                  color: AppTheme.surfaceElevated.withOpacity(0.3),
-                  width: 1,
+                  topLeft: Radius.circular(AppTheme.radiusLg),
+                  topRight: Radius.circular(AppTheme.radiusLg),
                 ),
               ),
               child: SafeArea(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.all(AppTheme.spaceLg),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Handle bar
+                      // Drag handle bar
                       Container(
-                        width: 40,
+                        margin: EdgeInsets.only(top: 12),
+                        width: 36,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: AppTheme.textTertiary.withOpacity(0.3),
+                          color: AppTheme.textTertiary.withOpacity(0.4),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
-                      SizedBox(height: AppTheme.spaceLg),
+                      SizedBox(height: 28),
 
-                      // Title
-                      Row(
-                        children: [
-                          Container(
-                            padding: EdgeInsets.all(AppTheme.spaceSm),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: AppTheme.primaryGradient,
+                      // Header with close button and title
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 20),
+                        child: Row(
+                          children: [
+                            // Close button
+                            IconButton(
+                              icon: Icon(
+                                Icons.close,
+                                color: AppTheme.textPrimary,
+                                size: 24,
                               ),
-                              borderRadius: BorderRadius.circular(
-                                AppTheme.radiusSm,
-                              ),
+                              onPressed: () => Navigator.pop(context),
+                              padding: EdgeInsets.zero,
+                              constraints: BoxConstraints(),
                             ),
-                            child: Icon(
-                              Icons.add_circle_outline,
-                              color: Colors.black,
-                              size: 20,
-                            ),
-                          ),
-                          SizedBox(width: AppTheme.spaceSm),
-                          Text(
-                            'Message Options',
-                            style: AppTheme.headlineSmall.copyWith(
-                              color: AppTheme.textPrimary,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: AppTheme.spaceLg),
-
-                      // Settings Section
-                      _buildSectionHeader('AI Settings'),
-                      SizedBox(height: AppTheme.spaceSm),
-
-                      // Response Mode
-                      _buildSettingCard(
-                        icon: _responseMode == 'detailed'
-                            ? Icons.article
-                            : Icons.flash_on,
-                        title: 'Response Mode',
-                        subtitle: _responseMode == 'detailed'
-                            ? 'Detailed explanations'
-                            : 'Quick & concise',
-                        trailing: Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: _responseMode == 'detailed'
-                                  ? AppTheme.primaryGradient
-                                  : AppTheme.accentGradient,
-                            ),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                _responseMode == 'detailed'
-                                    ? 'Detailed'
-                                    : 'Quick',
-                                style: AppTheme.bodySmall.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
+                            Expanded(
+                              child: Text(
+                                'Add to chat',
+                                textAlign: TextAlign.center,
+                                style: AppTheme.headlineMedium.copyWith(
+                                  color: AppTheme.textPrimary,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                              SizedBox(width: 4),
-                              Icon(
-                                Icons.swap_horiz,
-                                size: 14,
-                                color: Colors.white,
-                              ),
-                            ],
-                          ),
+                            ),
+                            // Spacer to balance close button
+                            SizedBox(width: 40),
+                          ],
                         ),
-                        onTap: () {
-                          setModalState(() {
-                            setState(() {
-                              _responseMode = _responseMode == 'detailed'
-                                  ? 'straight'
-                                  : 'detailed';
-                              _showResponseModeChip = true;
-                            });
-                          });
-                        },
                       ),
-                      SizedBox(height: AppTheme.spaceSm),
+                      SizedBox(height: 32),
+
+                      // Attachment Options - Horizontal Cards
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 20),
+                        child: Row(
+                          children: [
+                            // Camera Card
+                            Expanded(
+                              child: _buildAttachmentCard(
+                                icon: Icons.camera_alt_outlined,
+                                label: 'Camera',
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _pickImage(ImageSource.camera);
+                                },
+                              ),
+                            ),
+                            SizedBox(width: 16),
+                            // Photos Card
+                            Expanded(
+                              child: _buildAttachmentCard(
+                                icon: Icons.image_outlined,
+                                label: 'Photos',
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _pickImage(ImageSource.gallery);
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 28),
+
+                      // Divider
+                      Divider(
+                        color: AppTheme.surfaceElevated.withOpacity(0.3),
+                        height: 1,
+                        thickness: 1,
+                      ),
 
                       // Web Search Toggle
-                      _buildSettingCard(
-                        icon: Icons.search,
-                        title: 'Web Search',
-                        subtitle: _webSearchEnabled
-                            ? 'Search the web for answers'
-                            : 'Use AI knowledge only',
-                        trailing: Switch(
-                          value: _webSearchEnabled,
-                          onChanged: (value) {
-                            setModalState(() {
-                              setState(() {
-                                _webSearchEnabled = value;
-                              });
-                            });
-                          },
-                          activeColor: AppTheme.primaryBlue,
-                          activeTrackColor: AppTheme.primaryBlue.withOpacity(
-                            0.3,
-                          ),
-                        ),
+                      InkWell(
                         onTap: () {
                           setModalState(() {
                             setState(() {
@@ -273,48 +231,99 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
                             });
                           });
                         },
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 20,
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.language,
+                                color: AppTheme.textPrimary,
+                                size: 24,
+                              ),
+                              SizedBox(width: 12),
+                              Text(
+                                'Web search',
+                                style: AppTheme.bodyLarge.copyWith(
+                                  color: AppTheme.textPrimary,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                              Spacer(),
+                              Switch(
+                                value: _webSearchEnabled,
+                                onChanged: (value) {
+                                  setModalState(() {
+                                    setState(() {
+                                      _webSearchEnabled = value;
+                                    });
+                                  });
+                                },
+                                activeColor: AppTheme.primaryBlue,
+                                activeTrackColor: AppTheme.primaryBlue
+                                    .withOpacity(0.5),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
 
-                      SizedBox(height: AppTheme.spaceLg),
+                      // Divider
+                      Divider(
+                        color: AppTheme.surfaceElevated.withOpacity(0.3),
+                        height: 1,
+                        thickness: 1,
+                      ),
 
-                      // Attachments Section
-                      _buildSectionHeader('Add Attachments'),
-                      SizedBox(height: AppTheme.spaceSm),
+                      // Use Style Selector
+                      InkWell(
+                        onTap: () {
+                          Navigator.pop(context);
+                          _showStyleSelector();
+                        },
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 20,
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.edit_outlined,
+                                color: AppTheme.textPrimary,
+                                size: 24,
+                              ),
+                              SizedBox(width: 12),
+                              Text(
+                                'Use style',
+                                style: AppTheme.bodyLarge.copyWith(
+                                  color: AppTheme.textPrimary,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                              Spacer(),
+                              Text(
+                                _responseMode == 'detailed'
+                                    ? 'Detailed'
+                                    : 'Quick',
+                                style: AppTheme.bodyMedium.copyWith(
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                              Icon(
+                                Icons.chevron_right,
+                                color: AppTheme.textSecondary,
+                                size: 20,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
 
-                      // Options
-                      _buildBottomSheetOption(
-                        icon: Icons.mic,
-                        title: 'Audio Input',
-                        subtitle: 'Speak your message',
-                        gradient: AppTheme.accentGradient,
-                        onTap: () {
-                          Navigator.pop(context);
-                          _toggleListening();
-                        },
-                      ),
-                      SizedBox(height: AppTheme.spaceSm),
-                      _buildBottomSheetOption(
-                        icon: Icons.image_outlined,
-                        title: 'Photo Library',
-                        subtitle: 'Choose an image',
-                        gradient: AppTheme.primaryGradient,
-                        onTap: () {
-                          Navigator.pop(context);
-                          _pickImage(ImageSource.gallery);
-                        },
-                      ),
-                      SizedBox(height: AppTheme.spaceSm),
-                      _buildBottomSheetOption(
-                        icon: Icons.camera_alt_outlined,
-                        title: 'Camera',
-                        subtitle: 'Take a photo',
-                        gradient: AppTheme.primaryGradient,
-                        onTap: () {
-                          Navigator.pop(context);
-                          _pickImage(ImageSource.camera);
-                        },
-                      ),
-                      SizedBox(height: AppTheme.spaceSm),
+                      SizedBox(height: 32),
                     ],
                   ),
                 ),
@@ -326,86 +335,199 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
     );
   }
 
-  Widget _buildSectionHeader(String title) {
-    return Row(
-      children: [
-        Container(
-          width: 3,
-          height: 16,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(colors: AppTheme.primaryGradient),
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        SizedBox(width: AppTheme.spaceXs),
-        Text(
-          title,
-          style: AppTheme.bodyMedium.copyWith(
-            color: AppTheme.textSecondary,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.5,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSettingCard({
+  // New helper method for attachment cards
+  Widget _buildAttachmentCard({
     required IconData icon,
-    required String title,
-    required String subtitle,
-    required Widget trailing,
+    required String label,
     required VoidCallback onTap,
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: EdgeInsets.all(AppTheme.spaceMd),
+        padding: EdgeInsets.symmetric(vertical: 32),
         decoration: BoxDecoration(
-          gradient: LinearGradient(colors: AppTheme.glassGradient),
-          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+          color: AppTheme.surfaceCard,
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: AppTheme.surfaceElevated.withOpacity(0.5),
             width: 1,
           ),
         ),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              padding: EdgeInsets.all(AppTheme.spaceXs),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceElevated,
-                borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-              ),
-              child: Icon(icon, color: AppTheme.primaryBlue, size: 20),
-            ),
-            SizedBox(width: AppTheme.spaceSm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: AppTheme.bodyLarge.copyWith(
-                      color: AppTheme.textPrimary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: AppTheme.bodySmall.copyWith(
-                      color: AppTheme.textTertiary,
-                    ),
-                  ),
-                ],
+            Icon(icon, color: AppTheme.textPrimary, size: 36),
+            SizedBox(height: 14),
+            Text(
+              label,
+              style: AppTheme.bodyMedium.copyWith(
+                color: AppTheme.textPrimary,
+                fontWeight: FontWeight.w500,
               ),
             ),
-            trailing,
           ],
         ),
       ),
+    );
+  }
+
+  // New method for style selector bottom sheet
+  void _showStyleSelector() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return Container(
+          decoration: BoxDecoration(
+            color: AppTheme.backgroundDeep,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(AppTheme.radiusLg),
+              topRight: Radius.circular(AppTheme.radiusLg),
+            ),
+          ),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Drag handle bar
+                Container(
+                  margin: EdgeInsets.only(top: 12),
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppTheme.textTertiary.withOpacity(0.4),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                SizedBox(height: 20),
+
+                // Title
+                Text(
+                  'Use style',
+                  style: AppTheme.headlineMedium.copyWith(
+                    color: AppTheme.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                SizedBox(height: 24),
+
+                // Detailed Option
+                InkWell(
+                  onTap: () {
+                    setState(() => _responseMode = 'detailed');
+                    Navigator.pop(context);
+                  },
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    color: _responseMode == 'detailed'
+                        ? AppTheme.primaryBlue.withOpacity(0.1)
+                        : Colors.transparent,
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.article_outlined,
+                          color: _responseMode == 'detailed'
+                              ? AppTheme.primaryBlue
+                              : AppTheme.textPrimary,
+                          size: 24,
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Detailed',
+                                style: AppTheme.bodyLarge.copyWith(
+                                  color: _responseMode == 'detailed'
+                                      ? AppTheme.primaryBlue
+                                      : AppTheme.textPrimary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Complete explanations and context',
+                                style: AppTheme.bodySmall.copyWith(
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (_responseMode == 'detailed')
+                          Icon(
+                            Icons.check_circle,
+                            color: AppTheme.primaryBlue,
+                            size: 24,
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // Quick Option
+                InkWell(
+                  onTap: () {
+                    setState(() => _responseMode = 'straight');
+                    Navigator.pop(context);
+                  },
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    color: _responseMode == 'straight'
+                        ? AppTheme.primaryBlue.withOpacity(0.1)
+                        : Colors.transparent,
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.flash_on_outlined,
+                          color: _responseMode == 'straight'
+                              ? AppTheme.primaryBlue
+                              : AppTheme.textPrimary,
+                          size: 24,
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Quick',
+                                style: AppTheme.bodyLarge.copyWith(
+                                  color: _responseMode == 'straight'
+                                      ? AppTheme.primaryBlue
+                                      : AppTheme.textPrimary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Fast and concise answers',
+                                style: AppTheme.bodySmall.copyWith(
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (_responseMode == 'straight')
+                          Icon(
+                            Icons.check_circle,
+                            color: AppTheme.primaryBlue,
+                            size: 24,
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                SizedBox(height: 20),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -455,34 +577,34 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
 
                   // Model Options
                   _buildModelOption(
-                    name: 'Ace',
-                    description: 'Fast & efficient for everyday tasks',
-                    isSelected: _selectedModel == 'Ace',
+                    name: 'Claude Sonnet',
+                    description: 'Fast & intelligent for everyday tasks',
+                    isSelected: _selectedModel == 'Claude Sonnet',
                     gradient: AppTheme.primaryGradient,
                     onTap: () {
-                      setState(() => _selectedModel = 'Ace');
+                      setState(() => _selectedModel = 'Claude Sonnet');
                       Navigator.pop(context);
                     },
                   ),
                   SizedBox(height: AppTheme.spaceSm),
                   _buildModelOption(
-                    name: 'Fortune',
+                    name: 'GPT-4.5',
                     description: 'Advanced reasoning & complex problems',
-                    isSelected: _selectedModel == 'Fortune',
+                    isSelected: _selectedModel == 'GPT-4.5',
                     gradient: AppTheme.accentGradient,
                     onTap: () {
-                      setState(() => _selectedModel = 'Fortune');
+                      setState(() => _selectedModel = 'GPT-4.5');
                       Navigator.pop(context);
                     },
                   ),
                   SizedBox(height: AppTheme.spaceSm),
                   _buildModelOption(
-                    name: 'Sirri AI',
-                    description: 'Balanced performance & accuracy',
-                    isSelected: _selectedModel == 'Sirri AI',
+                    name: 'Groq',
+                    description: 'Ultra-fast reasoning with LLaMA 3.3',
+                    isSelected: _selectedModel == 'Groq',
                     gradient: [AppTheme.primaryBlue, AppTheme.accentBlue],
                     onTap: () {
-                      setState(() => _selectedModel = 'Sirri AI');
+                      setState(() => _selectedModel = 'Groq');
                       Navigator.pop(context);
                     },
                   ),
@@ -581,119 +703,29 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
     );
   }
 
-  Widget _buildBottomSheetOption({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required List<Color> gradient,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-      child: Container(
-        padding: EdgeInsets.all(AppTheme.spaceMd),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(colors: AppTheme.glassGradient),
-          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-          border: Border.all(
-            color: AppTheme.surfaceElevated.withOpacity(0.5),
-            width: 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: EdgeInsets.all(AppTheme.spaceSm),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(colors: gradient),
-                borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-              ),
-              child: Icon(
-                icon,
-                color: gradient == AppTheme.glassGradient
-                    ? AppTheme.textPrimary
-                    : Colors.white,
-                size: 24,
-              ),
-            ),
-            SizedBox(width: AppTheme.spaceMd),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: AppTheme.bodyLarge.copyWith(
-                      color: AppTheme.textPrimary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: AppTheme.bodySmall.copyWith(
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              Icons.arrow_forward_ios,
-              color: AppTheme.textTertiary,
-              size: 16,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   void _toggleListening() async {
-    if (!_speechAvailable) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Speech recognition not available'),
-          backgroundColor: AppTheme.surfaceElevated,
-        ),
-      );
-      return;
-    }
-
-    if (_isListening) {
-      await _speech.stop();
-      setState(() => _isListening = false);
-    } else {
-      setState(() => _isListening = true);
-      _startListening();
-    }
-  }
-
-  void _startListening() async {
-    if (!_isListening || !_speechAvailable) return;
-
-    await _speech.listen(
-      onResult: (result) {
-        setState(() {
-          _controller.text = result.recognizedWords;
-        });
-      },
-      listenFor: Duration(minutes: 10), // Listen for up to 10 minutes
-      pauseFor: Duration(
-        minutes: 2,
-      ), // Wait 2 minutes of silence before stopping
-      partialResults: true, // Show results as user speaks
-      cancelOnError: false, // Don't cancel on errors
-      listenMode: stt.ListenMode.dictation, // Better for longer speech
-      onSoundLevelChange: (level) {
-        // Keep session alive when sound is detected
-      },
+    // Show the new floating voice input dialog
+    final transcribedText = await showDialog<String>(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black54,
+      builder: (context) => const VoiceInputDialog(),
     );
+
+    // If user provided speech input, insert it into the text field
+    if (transcribedText != null && transcribedText.isNotEmpty) {
+      setState(() {
+        _controller.text = transcribedText;
+      });
+      // Optionally auto-send the message
+      // _send();
+    }
   }
 
   @override
+  @override
   void dispose() {
+    _greetingAnimationController.dispose();
     _authSub.cancel();
     _controller.dispose();
     _searchController.dispose();
@@ -707,6 +739,15 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
     final hasImage = _selectedImage != null;
     final imageFile = _selectedImage;
     final imageName = _selectedFileName;
+
+    // Hide greeting on first message with animation
+    if (_showGreeting) {
+      _greetingAnimationController.reverse().then((_) {
+        setState(() {
+          _showGreeting = false;
+        });
+      });
+    }
 
     // INSTANT FEEDBACK: Show user message immediately
     setState(() {
@@ -1037,7 +1078,10 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
   Future<String?> _callWithFallback(String prompt) async {
     // Try Groq first
     try {
-      final resp = await _geminiService.generateContent(prompt);
+      final resp = await _geminiService.generateContent(
+        prompt,
+        responseMode: _responseMode,
+      );
       return resp;
     } catch (e) {
       return '⚠️ All AI services are currently unavailable. ($e)';
@@ -1050,6 +1094,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
       setState(() {
         _messages.clear();
         _currentChatId = chatId;
+        _showGreeting = false; // Hide greeting when loading a chat
       });
 
       // Load messages from Firebase
@@ -1176,6 +1221,15 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
                         _deleteChat(chatId, title);
                       }
                     });
+                  },
+                ),
+                _buildOptionTile(
+                  icon: Icons.share,
+                  title: 'Share Chat',
+                  color: AppTheme.primaryBlue,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _shareChatLink(chatId, title);
                   },
                 ),
               ],
@@ -1398,13 +1452,8 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
         setState(() {
           _currentChatId = null;
           _messages.clear();
-          _messages.add(
-            _Message(
-              text:
-                  'Welcome — type a message and press send to chat with Sirri AI.',
-              fromUser: false,
-            ),
-          );
+          _showGreeting = true;
+          _greetingAnimationController.forward();
         });
       }
     } catch (e) {
@@ -1418,91 +1467,280 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
     }
   }
 
-  void _notImplemented(String what) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('$what not implemented yet')));
+  Future<void> _shareChatLink(String chatId, String title) async {
+    try {
+      // Generate shareable link with chat ID
+      final shareText =
+          '''
+Check out this chat on MyAI: "$title"
+
+Open the app and search for chat ID: $chatId
+
+🤖 MyAI - Your AI Conversation Hub
+'''
+              .trim();
+
+      // Copy to clipboard
+      await Clipboard.setData(ClipboardData(text: shareText));
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white, size: 20),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Chat link copied!',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      Text(
+                        'Share the chat ID: $chatId',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: AppTheme.primaryBlue,
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error sharing chat: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   void _openMenu() {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (ctx) {
         return Container(
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: AppTheme.surfaceGradient,
-            ),
+            color: AppTheme.surfaceElevated.withOpacity(0.95),
             borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(AppTheme.radiusXl),
-              topRight: Radius.circular(AppTheme.radiusXl),
+              topLeft: Radius.circular(24),
+              topRight: Radius.circular(24),
             ),
             border: Border(
               top: BorderSide(
-                color: AppTheme.primaryBlue.withOpacity(0.3),
-                width: 1,
+                color: AppTheme.primaryBlue.withOpacity(0.15),
+                width: 0.5,
               ),
             ),
-            boxShadow: AppTheme.elevatedShadow,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.15),
+                blurRadius: 20,
+                spreadRadius: 0,
+              ),
+            ],
           ),
           child: SafeArea(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                SizedBox(height: AppTheme.spaceSm),
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppTheme.textTertiary,
-                    borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+                // Handle bar
+                Padding(
+                  padding: EdgeInsets.only(top: 12, bottom: 20),
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppTheme.textTertiary.withOpacity(0.4),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-                SizedBox(height: AppTheme.spaceLg),
-                _buildMenuItem(
-                  ctx,
-                  icon: Icons.history,
-                  title: 'Previous Chats',
-                  gradient: AppTheme.accentGradient,
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _notImplemented('Previous chats');
-                  },
-                ),
-                _buildMenuItem(
-                  ctx,
-                  icon: Icons.add_circle_outline,
-                  title: 'New Chat',
-                  gradient: AppTheme.primaryGradient,
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    setState(() {
-                      _messages.clear();
-                      _currentChatId = null; // Start a new chat
-                      _messages.add(
-                        _Message(
-                          text: 'New chat started! How can I help you?',
-                          fromUser: false,
+
+                // Header
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    children: [
+                      Text(
+                        'Chat Options',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textPrimary,
+                          letterSpacing: 0.3,
                         ),
-                      );
-                    });
-                  },
+                      ),
+                      Spacer(),
+                      IconButton(
+                        icon: Icon(Icons.close, color: AppTheme.textTertiary),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
                 ),
-                _buildMenuItem(
-                  ctx,
-                  icon: Icons.settings,
-                  title: 'Settings',
-                  gradient: AppTheme.surfaceGradient,
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    Navigator.pushNamed(context, '/settings');
-                  },
+
+                Divider(
+                  color: AppTheme.surfaceElevated.withOpacity(0.5),
+                  height: 20,
+                  thickness: 0.5,
                 ),
-                SizedBox(height: AppTheme.spaceLg),
+
+                // Menu Items
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Column(
+                    children: [
+                      // Rename
+                      _buildMenuItemAdvanced(
+                        ctx,
+                        icon: Icons.edit_outlined,
+                        title: 'Rename',
+                        subtitle: 'Change chat title',
+                        gradient: AppTheme.primaryGradient,
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          if (_currentChatId != null) {
+                            // Get current chat title
+                            _chatStorage.getChats().first.then((chats) {
+                              final currentChat = chats.firstWhere(
+                                (chat) => chat['id'] == _currentChatId,
+                                orElse: () => {'title': 'Current Chat'},
+                              );
+                              _showRenameDialog(
+                                _currentChatId!,
+                                currentChat['title'] ?? 'Current Chat',
+                              );
+                            });
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Start a conversation first to rename',
+                                ),
+                                backgroundColor: AppTheme.surfaceElevated,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                      SizedBox(height: 8),
+
+                      // Personalize (Coming Soon)
+                      _buildMenuItemAdvanced(
+                        ctx,
+                        icon: Icons.person_outline,
+                        title: 'Personalize',
+                        subtitle: 'Customize chat preferences',
+                        gradient: AppTheme.primaryGradient,
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Row(
+                                children: [
+                                  Icon(
+                                    Icons.info_outline,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                  SizedBox(width: 12),
+                                  Text(
+                                    'Coming Soon',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              backgroundColor: AppTheme.primaryBlue,
+                              behavior: SnackBarBehavior.floating,
+                              duration: Duration(seconds: 2),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      SizedBox(height: 8),
+
+                      // Star
+                      _buildMenuItemAdvanced(
+                        ctx,
+                        icon: Icons.star_outline,
+                        title: 'Star',
+                        subtitle: 'Mark as important',
+                        gradient: [Colors.amber, Colors.orange],
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          if (_currentChatId != null) {
+                            // Check current star status
+                            _chatStorage.getChats().first.then((chats) {
+                              final currentChat = chats.firstWhere(
+                                (chat) => chat['id'] == _currentChatId,
+                                orElse: () => {'isStarred': false},
+                              );
+                              final isStarred =
+                                  currentChat['isStarred'] ?? false;
+                              _toggleStar(_currentChatId!, !isStarred);
+                            });
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Start a conversation first to star',
+                                ),
+                                backgroundColor: AppTheme.surfaceElevated,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                      SizedBox(height: 8),
+
+                      // New Chat
+                      _buildMenuItemAdvanced(
+                        ctx,
+                        icon: Icons.add_circle_outline,
+                        title: 'New Chat',
+                        subtitle: 'Start fresh conversation',
+                        gradient: AppTheme.accentGradient,
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          setState(() {
+                            _messages.clear();
+                            _currentChatId = null;
+                            _showGreeting = true;
+                            _greetingAnimationController.forward();
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+
+                SizedBox(height: 20),
               ],
             ),
           ),
@@ -1511,42 +1749,41 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
     );
   }
 
-  Widget _buildMenuItem(
+  Widget _buildMenuItemAdvanced(
     BuildContext context, {
     required IconData icon,
     required String title,
+    required String subtitle,
     required List<Color> gradient,
     required VoidCallback onTap,
   }) {
-    return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: AppTheme.spaceMd,
-        vertical: AppTheme.spaceSm,
-      ),
+    return Material(
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+        borderRadius: BorderRadius.circular(14),
         child: Container(
-          padding: EdgeInsets.all(AppTheme.spaceMd),
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            gradient: LinearGradient(colors: AppTheme.glassGradient),
-            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+            color: AppTheme.surfaceElevated.withOpacity(0.3),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: AppTheme.surfaceElevated.withOpacity(0.5),
-              width: 1,
+              color: AppTheme.primaryBlue.withOpacity(0.1),
+              width: 0.5,
             ),
           ),
           child: Row(
             children: [
+              // Icon with gradient background
               Container(
-                padding: EdgeInsets.all(AppTheme.spaceSm),
+                padding: EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: gradient,
                   ),
-                  borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                  borderRadius: BorderRadius.circular(10),
                   boxShadow: [
                     BoxShadow(
                       color: gradient[0].withOpacity(0.3),
@@ -1557,17 +1794,38 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
                 ),
                 child: Icon(icon, color: Colors.white, size: 22),
               ),
-              SizedBox(width: AppTheme.spaceMd),
-              Text(
-                title,
-                style: AppTheme.labelLarge.copyWith(
-                  color: AppTheme.textPrimary,
+              SizedBox(width: 14),
+              // Text content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimary,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary,
+                        letterSpacing: 0.1,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              Spacer(),
+              // Arrow icon
               Icon(
-                Icons.arrow_forward_ios,
-                size: 16,
+                Icons.arrow_forward_ios_rounded,
+                size: 14,
                 color: AppTheme.textTertiary,
               ),
             ],
@@ -1631,12 +1889,8 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
                           setState(() {
                             _messages.clear();
                             _currentChatId = null; // Start a new chat
-                            _messages.add(
-                              _Message(
-                                text: 'New chat started! How can I help you?',
-                                fromUser: false,
-                              ),
-                            );
+                            _showGreeting = true;
+                            _greetingAnimationController.forward();
                           });
                         },
                       ),
@@ -1830,38 +2084,27 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
 
                           final allChats = snapshot.data ?? [];
 
-                          // Filter chats based on search query
-                          final filteredChats = _searchQuery.isEmpty
-                              ? allChats
-                              : allChats.where((chat) {
-                                  return chat['title']
-                                      .toString()
-                                      .toLowerCase()
-                                      .contains(_searchQuery.toLowerCase());
-                                }).toList();
-
-                          if (filteredChats.isEmpty) {
-                            return Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    _searchQuery.isEmpty
-                                        ? Icons.chat_bubble_outline
-                                        : Icons.search_off,
-                                    size: 48,
-                                    color: AppTheme.textTertiary,
-                                  ),
-                                  SizedBox(height: AppTheme.spaceSm),
-                                  Text(
-                                    _searchQuery.isEmpty
-                                        ? 'No chats yet'
-                                        : 'No chats found',
-                                    style: AppTheme.bodyMedium.copyWith(
+                          // Filter chats based on search query (title + content)
+                          if (_searchQuery.isEmpty) {
+                            // No search: show all chats
+                            final displayChats = allChats;
+                            if (displayChats.isEmpty) {
+                              return Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.chat_bubble_outline,
+                                      size: 48,
                                       color: AppTheme.textTertiary,
                                     ),
-                                  ),
-                                  if (_searchQuery.isEmpty)
+                                    SizedBox(height: AppTheme.spaceSm),
+                                    Text(
+                                      'No chats yet',
+                                      style: AppTheme.bodyMedium.copyWith(
+                                        color: AppTheme.textTertiary,
+                                      ),
+                                    ),
                                     Padding(
                                       padding: EdgeInsets.only(
                                         top: AppTheme.spaceSm,
@@ -1874,178 +2117,363 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
                                         textAlign: TextAlign.center,
                                       ),
                                     ),
-                                ],
-                              ),
-                            );
-                          }
-
-                          return ListView.builder(
-                            itemCount: filteredChats.length,
-                            itemBuilder: (context, index) {
-                              final chat = filteredChats[index];
-                              final timestamp = chat['updatedAt'];
-                              final timeStr = timestamp != null
-                                  ? _formatTimestamp(timestamp)
-                                  : 'Just now';
-                              final isStarred = chat['isStarred'] ?? false;
-                              final chatId = chat['id'];
-                              final chatTitle = chat['title'];
-
-                              return Padding(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: AppTheme.spaceSm,
-                                  vertical: 2,
+                                  ],
                                 ),
-                                child: Dismissible(
-                                  key: Key(chatId),
-                                  direction: DismissDirection.endToStart,
-                                  confirmDismiss: (direction) async {
-                                    return await _showDeleteConfirmDialog(
-                                      chatTitle,
-                                    );
-                                  },
-                                  onDismissed: (direction) {
-                                    _deleteChat(chatId, chatTitle);
-                                  },
-                                  background: Container(
-                                    alignment: Alignment.centerRight,
-                                    padding: EdgeInsets.only(
-                                      right: AppTheme.spaceMd,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          Colors.red.withOpacity(0.1),
-                                          Colors.red,
-                                        ],
-                                      ),
-                                      borderRadius: BorderRadius.circular(
-                                        AppTheme.radiusSm,
-                                      ),
-                                    ),
-                                    child: Icon(
-                                      Icons.delete,
-                                      color: Colors.white,
-                                      size: 24,
-                                    ),
+                              );
+                            }
+
+                            return ListView.builder(
+                              itemCount: displayChats.length,
+                              itemBuilder: (context, index) {
+                                final chat = displayChats[index];
+                                final isStarred = chat['isStarred'] ?? false;
+                                final chatId = chat['id'];
+                                final chatTitle = chat['title'];
+                                final timeStr = _formatTimestamp(
+                                  chat['timestamp'],
+                                );
+
+                                return Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: AppTheme.spaceSm,
+                                    vertical: 2,
                                   ),
-                                  child: InkWell(
-                                    onTap: () {
-                                      Navigator.pop(context);
-                                      _loadChat(chatId, chatTitle);
-                                    },
-                                    onLongPress: () {
-                                      _showChatOptions(
-                                        chatId,
+                                  child: Dismissible(
+                                    key: Key(chatId),
+                                    direction: DismissDirection.endToStart,
+                                    confirmDismiss: (direction) async {
+                                      return await _showDeleteConfirmDialog(
                                         chatTitle,
-                                        isStarred,
                                       );
                                     },
-                                    borderRadius: BorderRadius.circular(
-                                      AppTheme.radiusSm,
-                                    ),
-                                    child: Container(
-                                      padding: EdgeInsets.all(AppTheme.spaceSm),
+                                    onDismissed: (direction) {
+                                      _deleteChat(chatId, chatTitle);
+                                    },
+                                    background: Container(
+                                      margin: EdgeInsets.symmetric(
+                                        vertical: AppTheme.spaceSm,
+                                      ),
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: AppTheme.spaceMd,
+                                        vertical: AppTheme.spaceSm,
+                                      ),
                                       decoration: BoxDecoration(
                                         gradient: LinearGradient(
-                                          colors: AppTheme.glassGradient,
+                                          colors: [
+                                            Colors.red.withOpacity(0.1),
+                                            Colors.red,
+                                          ],
                                         ),
                                         borderRadius: BorderRadius.circular(
                                           AppTheme.radiusSm,
                                         ),
-                                        border: isStarred
-                                            ? Border.all(
-                                                color: Colors.amber,
-                                                width: 1.5,
-                                              )
-                                            : null,
                                       ),
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            padding: EdgeInsets.all(
-                                              AppTheme.spaceSm,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              gradient: LinearGradient(
-                                                colors:
-                                                    AppTheme.primaryGradient,
+                                      child: Icon(
+                                        Icons.delete,
+                                        color: Colors.white,
+                                        size: 24,
+                                      ),
+                                    ),
+                                    child: InkWell(
+                                      onTap: () {
+                                        Navigator.pop(context);
+                                        _loadChat(chatId, chatTitle);
+                                      },
+                                      onLongPress: () {
+                                        _showChatOptions(
+                                          chatId,
+                                          chatTitle,
+                                          isStarred,
+                                        );
+                                      },
+                                      borderRadius: BorderRadius.circular(
+                                        AppTheme.radiusSm,
+                                      ),
+                                      child: Container(
+                                        padding: EdgeInsets.all(
+                                          AppTheme.spaceSm,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: AppTheme.glassGradient,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            AppTheme.radiusSm,
+                                          ),
+                                          border: isStarred
+                                              ? Border.all(
+                                                  color: Colors.amber,
+                                                  width: 1.5,
+                                                )
+                                              : Border.all(
+                                                  color: AppTheme
+                                                      .surfaceElevated
+                                                      .withOpacity(0.5),
+                                                  width: 1,
+                                                ),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            if (isStarred)
+                                              Padding(
+                                                padding: EdgeInsets.only(
+                                                  right: AppTheme.spaceSm,
+                                                ),
+                                                child: Icon(
+                                                  Icons.star,
+                                                  color: Colors.amber,
+                                                  size: 18,
+                                                ),
                                               ),
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                    AppTheme.radiusSm,
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    chatTitle,
+                                                    style: AppTheme.bodyLarge
+                                                        .copyWith(
+                                                          color: AppTheme
+                                                              .textPrimary,
+                                                        ),
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                  Text(
+                                                    '${chat['messageCount']} messages',
+                                                    style: AppTheme.bodySmall
+                                                        .copyWith(
+                                                          color: AppTheme
+                                                              .textTertiary,
+                                                        ),
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            Text(
+                                              timeStr,
+                                              style: AppTheme.bodySmall
+                                                  .copyWith(
+                                                    color:
+                                                        AppTheme.textTertiary,
                                                   ),
                                             ),
-                                            child: Icon(
-                                              Icons.chat_bubble_outline,
-                                              color: Colors.black,
-                                              size: 16,
-                                            ),
-                                          ),
-                                          SizedBox(width: AppTheme.spaceSm),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Row(
-                                                  children: [
-                                                    if (isStarred)
-                                                      Padding(
-                                                        padding:
-                                                            EdgeInsets.only(
-                                                              right: 4,
-                                                            ),
-                                                        child: Icon(
-                                                          Icons.star,
-                                                          color: Colors.amber,
-                                                          size: 14,
-                                                        ),
-                                                      ),
-                                                    Expanded(
-                                                      child: Text(
-                                                        chatTitle,
-                                                        style: AppTheme
-                                                            .bodyLarge
-                                                            .copyWith(
-                                                              color: AppTheme
-                                                                  .textPrimary,
-                                                            ),
-                                                        maxLines: 1,
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                                Text(
-                                                  '${chat['messageCount']} messages',
-                                                  style: AppTheme.bodySmall
-                                                      .copyWith(
-                                                        color: AppTheme
-                                                            .textTertiary,
-                                                      ),
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          Text(
-                                            timeStr,
-                                            style: AppTheme.bodySmall.copyWith(
-                                              color: AppTheme.textTertiary,
-                                            ),
-                                          ),
-                                        ],
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   ),
+                                );
+                              },
+                            );
+                          } else {
+                            // Search mode: filter by title
+                            final filteredChats = allChats.where((chat) {
+                              return chat['title']
+                                  .toString()
+                                  .toLowerCase()
+                                  .contains(_searchQuery.toLowerCase());
+                            }).toList();
+
+                            if (filteredChats.isEmpty) {
+                              return Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.search_off,
+                                      size: 48,
+                                      color: AppTheme.textTertiary,
+                                    ),
+                                    SizedBox(height: AppTheme.spaceSm),
+                                    Text(
+                                      'No chats found',
+                                      style: AppTheme.bodyMedium.copyWith(
+                                        color: AppTheme.textTertiary,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               );
-                            },
-                          );
+                            }
+
+                            return ListView.builder(
+                              itemCount: filteredChats.length,
+                              itemBuilder: (context, index) {
+                                final chat = filteredChats[index];
+                                final timestamp = chat['updatedAt'];
+                                final timeStr = timestamp != null
+                                    ? _formatTimestamp(timestamp)
+                                    : 'Just now';
+                                final isStarred = chat['isStarred'] ?? false;
+                                final chatId = chat['id'];
+                                final chatTitle = chat['title'];
+
+                                return Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: AppTheme.spaceSm,
+                                    vertical: 2,
+                                  ),
+                                  child: Dismissible(
+                                    key: Key(chatId),
+                                    direction: DismissDirection.endToStart,
+                                    confirmDismiss: (direction) async {
+                                      return await _showDeleteConfirmDialog(
+                                        chatTitle,
+                                      );
+                                    },
+                                    onDismissed: (direction) {
+                                      _deleteChat(chatId, chatTitle);
+                                    },
+                                    background: Container(
+                                      alignment: Alignment.centerRight,
+                                      padding: EdgeInsets.only(
+                                        right: AppTheme.spaceMd,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            Colors.red.withOpacity(0.1),
+                                            Colors.red,
+                                          ],
+                                        ),
+                                        borderRadius: BorderRadius.circular(
+                                          AppTheme.radiusSm,
+                                        ),
+                                      ),
+                                      child: Icon(
+                                        Icons.delete,
+                                        color: Colors.white,
+                                        size: 24,
+                                      ),
+                                    ),
+                                    child: InkWell(
+                                      onTap: () {
+                                        Navigator.pop(context);
+                                        _loadChat(chatId, chatTitle);
+                                      },
+                                      onLongPress: () {
+                                        _showChatOptions(
+                                          chatId,
+                                          chatTitle,
+                                          isStarred,
+                                        );
+                                      },
+                                      borderRadius: BorderRadius.circular(
+                                        AppTheme.radiusSm,
+                                      ),
+                                      child: Container(
+                                        padding: EdgeInsets.all(
+                                          AppTheme.spaceSm,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: AppTheme.glassGradient,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            AppTheme.radiusSm,
+                                          ),
+                                          border: isStarred
+                                              ? Border.all(
+                                                  color: Colors.amber,
+                                                  width: 1.5,
+                                                )
+                                              : null,
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              padding: EdgeInsets.all(
+                                                AppTheme.spaceSm,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                gradient: LinearGradient(
+                                                  colors:
+                                                      AppTheme.primaryGradient,
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(
+                                                      AppTheme.radiusSm,
+                                                    ),
+                                              ),
+                                              child: Icon(
+                                                Icons.chat_bubble_outline,
+                                                color: Colors.black,
+                                                size: 16,
+                                              ),
+                                            ),
+                                            SizedBox(width: AppTheme.spaceSm),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    children: [
+                                                      if (isStarred)
+                                                        Padding(
+                                                          padding:
+                                                              EdgeInsets.only(
+                                                                right: 4,
+                                                              ),
+                                                          child: Icon(
+                                                            Icons.star,
+                                                            color: Colors.amber,
+                                                            size: 14,
+                                                          ),
+                                                        ),
+                                                      Expanded(
+                                                        child: Text(
+                                                          chatTitle,
+                                                          style: AppTheme
+                                                              .bodyLarge
+                                                              .copyWith(
+                                                                color: AppTheme
+                                                                    .textPrimary,
+                                                              ),
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  Text(
+                                                    '${chat['messageCount']} messages',
+                                                    style: AppTheme.bodySmall
+                                                        .copyWith(
+                                                          color: AppTheme
+                                                              .textTertiary,
+                                                        ),
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            Text(
+                                              timeStr,
+                                              style: AppTheme.bodySmall
+                                                  .copyWith(
+                                                    color:
+                                                        AppTheme.textTertiary,
+                                                  ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          }
                         },
                       ),
               ),
@@ -2107,6 +2535,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
         key: _scaffoldKey,
         backgroundColor: Colors.transparent,
         extendBodyBehindAppBar: true,
+        drawerEnableOpenDragGesture: true,
         drawer: _buildDrawer(),
         appBar: AppBar(
           backgroundColor: Colors.transparent,
@@ -2127,7 +2556,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
               gradient: LinearGradient(colors: AppTheme.glassGradient),
               border: Border(
                 bottom: BorderSide(
-                  color: AppTheme.surfaceElevated.withOpacity(0.3),
+                  color: AppTheme.surfaceElevated.withOpacity(0.15),
                   width: 0.5,
                 ),
               ),
@@ -2206,403 +2635,357 @@ class _OnlineAiScreenState extends State<OnlineAiScreen> {
             ),
           ],
         ),
-        body: SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: ListView.builder(
-                  padding: EdgeInsets.all(AppTheme.spaceMd),
-                  itemCount: _messages.length,
-                  itemBuilder: (context, i) {
-                    final m = _messages[i];
+        body: GestureDetector(
+          onHorizontalDragEnd: (details) {
+            // Swipe left -> Notes (velocity.dx < 0)
+            if (details.primaryVelocity! < -300) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const NotesScreen()),
+              );
+            }
+            // Swipe right -> Chat History (velocity.dx > 0)
+            else if (details.primaryVelocity! > 300) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ChatHistoryScreen()),
+              );
+            }
+          },
+          child: SafeArea(
+            child: Column(
+              children: [
+                Expanded(
+                  child: _showGreeting && _messages.isEmpty
+                      ? _buildGreetingUI()
+                      : ListView.builder(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: AppTheme.spaceLg,
+                            vertical: AppTheme.spaceLg,
+                          ),
+                          itemCount: _messages.length,
+                          itemBuilder: (context, i) {
+                            final m = _messages[i];
 
-                    // Show typing indicator for typing messages
-                    if (m.isTyping) {
-                      return Padding(
-                        padding: EdgeInsets.only(bottom: AppTheme.spaceSm),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.start,
-                          children: [
-                            TypingIndicator(
-                              message: _currentStatusMessage.isNotEmpty
-                                  ? _currentStatusMessage
-                                  : 'Generating response...',
-                            ),
-                          ],
+                            // Show typing indicator for typing messages
+                            if (m.isTyping) {
+                              return Padding(
+                                padding: EdgeInsets.only(
+                                  bottom: AppTheme.spaceSm,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.start,
+                                  children: [
+                                    TypingIndicator(
+                                      message: _currentStatusMessage.isNotEmpty
+                                          ? _currentStatusMessage
+                                          : 'Generating response...',
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
+
+                            // Show streaming text with inline typing indicator
+                            if (m.isStreaming) {
+                              return Padding(
+                                padding: EdgeInsets.only(
+                                  bottom: AppTheme.spaceSm,
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: AiMessageBubble(
+                                        text: m.text,
+                                        fromUser: m.fromUser,
+                                        imagePath: m.imagePath,
+                                        gradientColors:
+                                            AppTheme.surfaceGradient,
+                                        detailedByDefault:
+                                            _responseMode == 'detailed',
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: EdgeInsets.only(
+                                        left: 4,
+                                        top: 16,
+                                      ),
+                                      child: TypingIndicator(),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
+
+                            return AiMessageBubble(
+                              text: m.text,
+                              fromUser: m.fromUser,
+                              imagePath: m.imagePath,
+                              gradientColors: m.fromUser
+                                  ? AppTheme.primaryGradient
+                                  : AppTheme.surfaceGradient,
+                              detailedByDefault: _responseMode == 'detailed',
+                            );
+                          },
                         ),
-                      );
-                    }
-
-                    // Show streaming text with inline typing indicator
-                    if (m.isStreaming) {
-                      return Padding(
-                        padding: EdgeInsets.only(bottom: AppTheme.spaceSm),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: AiMessageBubble(
-                                text: m.text,
-                                fromUser: m.fromUser,
-                                imagePath: m.imagePath,
-                                gradientColors: AppTheme.surfaceGradient,
-                                detailedByDefault: _responseMode == 'detailed',
-                              ),
-                            ),
-                            Padding(
-                              padding: EdgeInsets.only(left: 4, top: 16),
-                              child: TypingIndicator(),
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-
-                    return AiMessageBubble(
-                      text: m.text,
-                      fromUser: m.fromUser,
-                      imagePath: m.imagePath,
-                      gradientColors: m.fromUser
-                          ? AppTheme.primaryGradient
-                          : AppTheme.surfaceGradient,
-                      detailedByDefault: _responseMode == 'detailed',
-                    );
-                  },
                 ),
-              ),
 
-              // Recording UI (shows when listening)
-              if (_isListening)
+                // Modern Input Section (Claude-style unified container)
                 Container(
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(colors: AppTheme.accentGradient),
-                    boxShadow: AppTheme.accentGlow,
-                  ),
-                  padding: EdgeInsets.all(AppTheme.spaceMd),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: EdgeInsets.all(AppTheme.spaceSm),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(Icons.mic, color: Colors.white, size: 20),
+                    color: AppTheme.backgroundDeep,
+                    border: Border(
+                      top: BorderSide(
+                        color: AppTheme.surfaceElevated.withOpacity(0.15),
+                        width: 0.5,
                       ),
-                      SizedBox(width: AppTheme.spaceSm),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Listening...',
-                              style: AppTheme.bodyLarge.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            if (_controller.text.isNotEmpty)
-                              Text(
-                                _controller.text,
-                                style: AppTheme.bodySmall.copyWith(
-                                  color: Colors.white.withOpacity(0.9),
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.stop, color: Colors.white),
-                        onPressed: _toggleListening,
-                      ),
-                    ],
-                  ),
-                ),
-
-              // Modern Input Section (Claude-style)
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: AppTheme.glassGradient),
-                  border: Border(
-                    top: BorderSide(
-                      color: AppTheme.surfaceElevated.withOpacity(0.3),
-                      width: 0.5,
                     ),
                   ),
-                ),
-                padding: EdgeInsets.symmetric(
-                  horizontal: AppTheme.spaceMd,
-                  vertical: AppTheme.spaceMd,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Response mode chip (if active)
-                    if (_showResponseModeChip)
-                      Padding(
-                        padding: EdgeInsets.only(bottom: AppTheme.spaceSm),
-                        child: Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: AppTheme.spaceSm,
-                            vertical: 6,
-                          ),
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    12,
+                    16,
+                    12 + MediaQuery.of(context).viewInsets.bottom,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Image Preview (if selected)
+                      if (_selectedImage != null)
+                        Container(
+                          margin: EdgeInsets.only(bottom: 12),
+                          padding: EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: _responseMode == 'detailed'
-                                  ? AppTheme.primaryGradient
-                                  : AppTheme.accentGradient,
-                            ),
+                            color: AppTheme.surfaceCard,
                             borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: AppTheme.surfaceElevated.withOpacity(0.3),
+                              width: 1,
+                            ),
                           ),
                           child: Row(
-                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(
-                                _responseMode == 'detailed'
-                                    ? Icons.article
-                                    : Icons.flash_on,
-                                size: 14,
-                                color: _responseMode == 'detailed'
-                                    ? Colors.black
-                                    : Colors.white,
-                              ),
-                              SizedBox(width: 4),
-                              Text(
-                                _responseMode == 'detailed'
-                                    ? 'Detailed'
-                                    : 'Quick',
-                                style: AppTheme.bodySmall.copyWith(
-                                  color: _responseMode == 'detailed'
-                                      ? Colors.black
-                                      : Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.file(
+                                  _selectedImage!,
+                                  height: 60,
+                                  width: 60,
+                                  fit: BoxFit.cover,
                                 ),
                               ),
-                              SizedBox(width: 4),
-                              InkWell(
-                                onTap: () {
-                                  setState(() => _showResponseModeChip = false);
-                                },
-                                child: Icon(
+                              SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  _selectedFileName ?? 'Image selected',
+                                  style: AppTheme.bodySmall.copyWith(
+                                    color: AppTheme.textSecondary,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              IconButton(
+                                icon: Icon(
                                   Icons.close,
-                                  size: 14,
-                                  color: _responseMode == 'detailed'
-                                      ? Colors.black
-                                      : Colors.white,
+                                  color: AppTheme.textTertiary,
+                                  size: 20,
                                 ),
+                                onPressed: () {
+                                  setState(() {
+                                    _selectedImage = null;
+                                    _selectedFileName = null;
+                                  });
+                                },
                               ),
                             ],
                           ),
                         ),
-                      ),
 
-                    // Image Preview (if selected)
-                    if (_selectedImage != null)
+                      // Unified Input Container (Claude-style)
                       Container(
-                        margin: EdgeInsets.only(bottom: AppTheme.spaceSm),
-                        padding: EdgeInsets.all(AppTheme.spaceSm),
+                        constraints: BoxConstraints(
+                          minHeight: 52,
+                          maxHeight: 140,
+                        ),
                         decoration: BoxDecoration(
-                          color: AppTheme.surfaceElevated.withOpacity(0.5),
-                          borderRadius: BorderRadius.circular(
-                            AppTheme.radiusMd,
+                          color: AppTheme.surfaceCard,
+                          borderRadius: BorderRadius.circular(26),
+                          border: Border.all(
+                            color: AppTheme.surfaceElevated.withOpacity(0.5),
+                            width: 1,
                           ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 8,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
                         ),
                         child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(
-                                AppTheme.radiusSm,
-                              ),
-                              child: Image.file(
-                                _selectedImage!,
-                                height: 60,
-                                width: 60,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                            SizedBox(width: AppTheme.spaceSm),
-                            Expanded(
-                              child: Text(
-                                _selectedFileName ?? 'Image selected',
-                                style: AppTheme.bodySmall.copyWith(
-                                  color: AppTheme.textSecondary,
+                            // Plus Button
+                            Container(
+                              margin: EdgeInsets.only(left: 4, bottom: 4),
+                              child: IconButton(
+                                icon: Icon(
+                                  Icons.add_circle_outline,
+                                  color: AppTheme.textPrimary,
+                                  size: 26,
                                 ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
+                                onPressed: _showInputOptionsBottomSheet,
+                                padding: EdgeInsets.all(8),
+                                constraints: BoxConstraints(),
                               ),
                             ),
-                            IconButton(
-                              icon: Icon(
-                                Icons.close,
-                                color: AppTheme.textTertiary,
-                                size: 20,
+
+                            // Text Input Field
+                            Expanded(
+                              child: TextField(
+                                controller: _controller,
+                                textInputAction: TextInputAction.newline,
+                                maxLines: null,
+                                keyboardType: TextInputType.multiline,
+                                style: AppTheme.bodyLarge.copyWith(
+                                  color: AppTheme.textPrimary,
+                                  fontSize: 16,
+                                ),
+                                onChanged: (value) {
+                                  setState(() {});
+                                },
+                                decoration: InputDecoration(
+                                  hintText: 'Chat with $_selectedModel...',
+                                  hintStyle: AppTheme.bodyMedium.copyWith(
+                                    color: AppTheme.textTertiary,
+                                    fontSize: 16,
+                                  ),
+                                  border: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
+                                  filled: false,
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 16,
+                                  ),
+                                ),
                               ),
-                              onPressed: () {
-                                setState(() {
-                                  _selectedImage = null;
-                                  _selectedFileName = null;
-                                });
-                              },
+                            ),
+
+                            // 3-line indicator or Send Button
+                            if (_controller.text.trim().isEmpty)
+                              Container(
+                                margin: EdgeInsets.only(right: 16, bottom: 16),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    // Three vertical bars of varying heights
+                                    Container(
+                                      width: 3,
+                                      height: 16,
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.textTertiary,
+                                        borderRadius: BorderRadius.circular(
+                                          1.5,
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(width: 3),
+                                    Container(
+                                      width: 3,
+                                      height: 20,
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.textTertiary,
+                                        borderRadius: BorderRadius.circular(
+                                          1.5,
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(width: 3),
+                                    Container(
+                                      width: 3,
+                                      height: 12,
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.textTertiary,
+                                        borderRadius: BorderRadius.circular(
+                                          1.5,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            else
+                              Padding(
+                                padding: EdgeInsets.only(right: 4, bottom: 4),
+                                child: _buildSendButton(),
+                              ),
+
+                            // Microphone Button
+                            Container(
+                              margin: EdgeInsets.only(right: 4, bottom: 4),
+                              child: IconButton(
+                                icon: Icon(
+                                  Icons.mic_none,
+                                  color: AppTheme.textPrimary,
+                                  size: 24,
+                                ),
+                                onPressed: _toggleListening,
+                                padding: EdgeInsets.all(8),
+                                constraints: BoxConstraints(),
+                              ),
                             ),
                           ],
                         ),
                       ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ), // Close SafeArea
+        ), // Close GestureDetector
+      ), // Close Scaffold
+    ); // Close Container
+  }
 
-                    // Main Input Row
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        // Plus Button (Left)
-                        Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              colors: AppTheme.glassGradient,
-                            ),
-                            border: Border.all(
-                              color: AppTheme.surfaceElevated.withOpacity(0.5),
-                              width: 1,
-                            ),
-                          ),
-                          child: IconButton(
-                            icon: Icon(
-                              Icons.add,
-                              color: AppTheme.textPrimary,
-                              size: 24,
-                            ),
-                            onPressed: _showInputOptionsBottomSheet,
-                          ),
-                        ),
+  // helper removed; UI uses specific buttons in this screen.
 
-                        SizedBox(width: AppTheme.spaceSm),
+  Widget _buildGreetingUI() {
+    return FadeTransition(
+      opacity: _greetingFadeAnimation,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Greeting Icon
+            GreetingIcon(timeOfDay: GreetingUtils.getTimeOfDay(), size: 80),
+            SizedBox(height: AppTheme.spaceLg),
 
-                        // Text Input Field (Center)
-                        Expanded(
-                          child: Container(
-                            constraints: BoxConstraints(
-                              minHeight: 48,
-                              maxHeight: 120,
-                            ),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: AppTheme.surfaceGradient,
-                              ),
-                              borderRadius: BorderRadius.circular(24),
-                              border: Border.all(
-                                color: AppTheme.surfaceElevated,
-                                width: 1,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.15),
-                                  blurRadius: 8,
-                                  offset: Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller: _controller,
-                                    textInputAction: TextInputAction.newline,
-                                    maxLines: null,
-                                    keyboardType: TextInputType.multiline,
-                                    style: AppTheme.bodyLarge.copyWith(
-                                      color: AppTheme.textPrimary,
-                                    ),
-                                    onChanged: (value) {
-                                      setState(() {});
-                                    },
-                                    decoration: InputDecoration(
-                                      hintText: 'Chat with Sirri AI...',
-                                      hintStyle: AppTheme.bodyMedium.copyWith(
-                                        color: AppTheme.textTertiary,
-                                      ),
-                                      border: InputBorder.none,
-                                      isDense: true,
-                                      contentPadding: EdgeInsets.symmetric(
-                                        horizontal: AppTheme.spaceMd,
-                                        vertical: 14,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-
-                                // Vertical divider line / Send Button (no loading state)
-                                if (_controller.text.trim().isEmpty)
-                                  Container(
-                                    margin: EdgeInsets.only(
-                                      right: AppTheme.spaceMd,
-                                      bottom: 16,
-                                    ),
-                                    width: 2,
-                                    height: 20,
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: AppTheme.primaryGradient,
-                                      ),
-                                      borderRadius: BorderRadius.circular(1),
-                                    ),
-                                  )
-                                else
-                                  Padding(
-                                    padding: EdgeInsets.only(
-                                      right: 6,
-                                      bottom: 6,
-                                    ),
-                                    child: _buildSendButton(),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-
-                        SizedBox(width: AppTheme.spaceSm),
-
-                        // Microphone Button (Right)
-                        Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              colors: _isListening
-                                  ? AppTheme.accentGradient
-                                  : AppTheme.glassGradient,
-                            ),
-                            border: Border.all(
-                              color: AppTheme.surfaceElevated.withOpacity(0.5),
-                              width: 1,
-                            ),
-                            boxShadow: _isListening ? AppTheme.accentGlow : [],
-                          ),
-                          child: IconButton(
-                            icon: Icon(
-                              _isListening ? Icons.mic : Icons.mic_none,
-                              color: _isListening
-                                  ? Colors.white
-                                  : AppTheme.textPrimary,
-                              size: 24,
-                            ),
-                            onPressed: _toggleListening,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+            // Greeting Text
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: AppTheme.space2xl),
+              child: Text(
+                GreetingUtils.getGreeting(),
+                textAlign: TextAlign.center,
+                style: AppTheme.displaySmall.copyWith(
+                  color: AppTheme.textPrimary,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 32,
+                  height: 1.2,
+                  letterSpacing: -0.5,
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
-
-  // helper removed; UI uses specific buttons in this screen.
 
   Widget _buildSendButton() {
     return Container(

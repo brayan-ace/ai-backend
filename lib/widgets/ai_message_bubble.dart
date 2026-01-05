@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../services/api_service.dart';
 import '../utils/theme.dart';
 
 class AiMessageBubble extends StatefulWidget {
@@ -28,77 +27,19 @@ class AiMessageBubble extends StatefulWidget {
 }
 
 class _AiMessageBubbleState extends State<AiMessageBubble> {
-  late bool _expanded;
-  late String _displayText;
+  late Set<String> _reactions; // Track which reactions are selected
 
   @override
   void initState() {
     super.initState();
-    _expanded = widget.detailedByDefault;
-    _displayText = widget.text;
+    _reactions = {};
   }
 
   String _formatAiResponse(String text) {
     if (widget.fromUser) return text;
 
-    // Check if response already has overview/answer structure
-    if (text.contains('---') ||
-        text.contains('**Overview:**') ||
-        text.contains('**Answer:**')) {
-      return text;
-    }
-
-    // For short responses (< 100 chars), don't add structure
-    if (text.length < 100) {
-      return text;
-    }
-
-    // For longer responses, extract first sentence/paragraph as overview
-    final sentences = text.split(RegExp(r'(?<=[.!?])\s+'));
-    if (sentences.length < 2) {
-      return text;
-    }
-
-    // Get first 1-2 sentences as overview
-    final overview = sentences.take(2).join(' ');
-    final answer = sentences.skip(2).join(' ');
-
-    if (answer.trim().isEmpty) {
-      return text;
-    }
-
-    return '**Overview:** $overview\n\n---\n\n**Answer:**\n\n$answer';
-  }
-
-  Future<void> _regenerateSummary({required bool concise}) async {
-    try {
-      final mode = concise ? 'concise' : 'detailed';
-      final resp = await ApiService.send('chat', {
-        'message': widget.text,
-        'action': 'summarize',
-        'mode': mode,
-      });
-      if (resp != null) {
-        setState(() {
-          _displayText = resp;
-          // If user requested detailed, expand automatically
-          if (!concise) _expanded = true;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Regenerated ($mode)'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Regenerate failed: $e'),
-          duration: Duration(seconds: 3),
-        ),
-      );
-    }
+    // Return text as-is for better formatting in _parseText
+    return text;
   }
 
   void _copyToClipboard(BuildContext context) {
@@ -118,6 +59,68 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
           borderRadius: BorderRadius.circular(AppTheme.radiusSm),
         ),
         duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _toggleReaction(String emoji) {
+    setState(() {
+      if (_reactions.contains(emoji)) {
+        _reactions.remove(emoji);
+      } else {
+        _reactions.add(emoji);
+      }
+    });
+  }
+
+  Widget _buildReactionButton(String emoji) {
+    final isSelected = _reactions.contains(emoji);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _toggleReaction(emoji),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? AppTheme.primaryBlue.withOpacity(0.2)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected
+                  ? AppTheme.primaryBlue
+                  : AppTheme.textTertiary.withOpacity(0.15),
+              width: 0.5,
+            ),
+          ),
+          child: Text(emoji, style: TextStyle(fontSize: 13)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCopyButton() {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _copyToClipboard(context),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: AppTheme.textTertiary.withOpacity(0.15),
+              width: 0.5,
+            ),
+          ),
+          child: Icon(
+            Icons.content_copy,
+            size: 12,
+            color: AppTheme.textSecondary,
+          ),
+        ),
       ),
     );
   }
@@ -154,7 +157,12 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
     final List<InlineSpan> spans = [];
 
     // Pattern to match $$...$$ (display math) and $...$ (inline math)
-    final latexPattern = RegExp(r'\$\$(.+?)\$\$|\$(.+?)\$', dotAll: true);
+    // Using non-greedy matching and handling newlines properly
+    final latexPattern = RegExp(
+      r'\$\$(.+?)\$\$|\$([^\$]+?)\$',
+      dotAll: true,
+      multiLine: true,
+    );
     int lastIndex = 0;
 
     for (final match in latexPattern.allMatches(text)) {
@@ -168,7 +176,7 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
       final isDisplayMath = match.group(1) != null;
       final latexCode = (match.group(1) ?? match.group(2) ?? '').trim();
 
-      if (latexCode.isNotEmpty) {
+      if (latexCode.isNotEmpty && !latexCode.contains('\$')) {
         try {
           spans.add(
             WidgetSpan(
@@ -205,11 +213,15 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
             ),
           );
         } catch (e) {
-          // If LaTeX fails, show error
+          // If LaTeX fails, show fallback text instead of error
           spans.add(
             TextSpan(
-              text: '[LaTeX Error: $latexCode]',
-              style: TextStyle(color: Colors.red, fontStyle: FontStyle.italic),
+              text: isDisplayMath ? '\$\$$latexCode\$\$' : '\$$latexCode\$',
+              style: TextStyle(
+                color: AppTheme.primaryBlue,
+                fontFamily: 'monospace',
+                fontSize: 13,
+              ),
             ),
           );
         }
@@ -234,9 +246,51 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
         : spans;
   }
 
-  // Parse markdown formatting (bold, italic, code, etc.) and URLs
+  // Parse markdown formatting (bold, italic, code, lists, headings) and URLs
   List<InlineSpan> _parseMarkdown(String text) {
     final List<InlineSpan> spans = [];
+
+    // Handle tables first: |header|header| format (only in detailed mode)
+    if (widget.detailedByDefault && text.contains('|')) {
+      final tableRegex = RegExp(
+        r'(\|.+\|(?:\n\|[-:\s|]+\|)?\n(?:\|.+\|\n)*)',
+        multiLine: true,
+      );
+
+      if (tableRegex.hasMatch(text)) {
+        int lastIndex = 0;
+
+        for (final match in tableRegex.allMatches(text)) {
+          // Add text before table
+          if (match.start > lastIndex) {
+            spans.addAll(
+              _parseMarkdownContent(text.substring(lastIndex, match.start)),
+            );
+          }
+
+          // Parse table
+          final tableText = match.group(0)!;
+          final tableWidget = _buildTableFromMarkdown(tableText);
+          spans.add(tableWidget);
+
+          lastIndex = match.end;
+        }
+
+        // Add remaining text
+        if (lastIndex < text.length) {
+          spans.addAll(_parseMarkdownContent(text.substring(lastIndex)));
+        }
+
+        return spans.isEmpty
+            ? [
+                TextSpan(
+                  text: text,
+                  style: TextStyle(color: AppTheme.textPrimary, fontSize: 15),
+                ),
+              ]
+            : spans;
+      }
+    }
 
     // Handle triple-backtick code blocks first: split by ```
     if (text.contains('```')) {
@@ -245,29 +299,107 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
         final part = parts[i];
         if (i.isEven) {
           // plain markdown in even parts
-          spans.addAll(_parseMarkdown(part));
+          spans.addAll(_parseMarkdownContent(part));
         } else {
           // code block
+          final lines = part.trim().split('\n');
+          final language = lines.isNotEmpty ? lines[0] : '';
+          final code = lines.length > 1
+              ? lines.skip(1).join('\n')
+              : part.trim();
+
           spans.add(
             WidgetSpan(
               child: Container(
                 width: double.infinity,
-                padding: EdgeInsets.all(8),
-                margin: EdgeInsets.symmetric(vertical: 8),
+                padding: EdgeInsets.all(12),
+                margin: EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
-                  color: AppTheme.surfaceElevated.withOpacity(0.12),
+                  color: AppTheme.surfaceElevated.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                ),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: SelectableText(
-                    part.trim(),
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 13,
-                      color: AppTheme.textPrimary,
-                    ),
+                  border: Border.all(
+                    color: AppTheme.primaryBlue.withOpacity(0.2),
+                    width: 0.5,
                   ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Header with language and copy button
+                    Row(
+                      children: [
+                        if (language.isNotEmpty)
+                          Padding(
+                            padding: EdgeInsets.only(right: 8),
+                            child: Text(
+                              language,
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 11,
+                                color: AppTheme.primaryBlue,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        Spacer(),
+                        Material(
+                          color: Colors.transparent,
+                          child: Tooltip(
+                            message: 'Copy code',
+                            child: InkWell(
+                              onTap: () {
+                                Clipboard.setData(
+                                  ClipboardData(text: code.trim()),
+                                );
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.check_circle,
+                                          color: Colors.white,
+                                          size: 18,
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text('Code copied to clipboard'),
+                                      ],
+                                    ),
+                                    backgroundColor: AppTheme.primaryBlue,
+                                    duration: Duration(seconds: 2),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              },
+                              borderRadius: BorderRadius.circular(4),
+                              child: Padding(
+                                padding: EdgeInsets.all(4),
+                                child: Icon(
+                                  Icons.content_copy,
+                                  size: 16,
+                                  color: AppTheme.primaryBlue.withOpacity(0.6),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (language.isNotEmpty) SizedBox(height: 8),
+                    // Code content
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: SelectableText(
+                        code.trim(),
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 13,
+                          color: AppTheme.textPrimary,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -277,30 +409,116 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
       return spans;
     }
 
-    // Pattern for URLs, **bold**, *italic*, `code`, and other markdown
+    return _parseMarkdownContent(text);
+  }
+
+  List<InlineSpan> _parseMarkdownContent(String text) {
+    final List<InlineSpan> spans = [];
+
+    // Pattern for bullet points, numbered lists, **bold**, *italic*, `code`, headings, URLs
     final markdownPattern = RegExp(
-      r'https?://[^\s]+|\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`|#{1,6}\s+(.+?)(?:\n|$)|---|\n',
+      r'^[\s]*[-•*]\s+(.+?)$|^\s*\d+[\.)]\s+(.+?)$|https?://[^\s]+|\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`|^#{1,6}\s+(.+?)$|---|\n',
+      multiLine: true,
     );
 
     int lastIndex = 0;
 
     for (final match in markdownPattern.allMatches(text)) {
-      // Add plain text before markdown
+      // Add plain text before match
       if (match.start > lastIndex) {
-        spans.add(
-          TextSpan(
-            text: text.substring(lastIndex, match.start),
-            style: TextStyle(color: AppTheme.textPrimary, fontSize: 15),
-          ),
-        );
+        final plainText = text.substring(lastIndex, match.start);
+        if (plainText.trim().isNotEmpty) {
+          spans.add(
+            TextSpan(
+              text: plainText,
+              style: TextStyle(
+                color: AppTheme.textPrimary,
+                fontSize: 15,
+                height: 1.5,
+              ),
+            ),
+          );
+        }
       }
 
-      // Check if this is a URL (starts with http:// or https://)
-      if (match.group(0)?.startsWith('http') ?? false) {
-        final url = match.group(0)!;
+      final matched = match.group(0) ?? '';
+
+      // Bullet point or list item
+      if (match.group(1) != null) {
+        final item = match.group(1)!.trim();
+        spans.add(
+          WidgetSpan(
+            child: Padding(
+              padding: EdgeInsets.only(left: 0, top: 4, bottom: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '• ',
+                    style: TextStyle(
+                      color: AppTheme.primaryBlue,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      item,
+                      style: TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 15,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      } else if (match.group(2) != null) {
+        // Numbered list - preserve the number from original match
+        final fullMatch = match.group(0) ?? '';
+        final item = match.group(2)!.trim();
+        final numberMatch = RegExp(r'^\s*(\d+)[\.)]').firstMatch(fullMatch);
+        final number = numberMatch?.group(1) ?? '•';
+
+        spans.add(
+          WidgetSpan(
+            child: Padding(
+              padding: EdgeInsets.only(left: 0, top: 4, bottom: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$number. ',
+                    style: TextStyle(
+                      color: AppTheme.primaryBlue,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      height: 1.4,
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      item,
+                      style: TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 15,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      } else if (matched.startsWith('http')) {
+        // URL
         spans.add(
           TextSpan(
-            text: url,
+            text: matched,
             style: TextStyle(
               color: AppTheme.primaryBlue,
               fontSize: 15,
@@ -308,30 +526,30 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
             ),
             recognizer: TapGestureRecognizer()
               ..onTap = () async {
-                final uri = Uri.parse(url);
+                final uri = Uri.parse(matched);
                 if (await canLaunchUrl(uri)) {
                   await launchUrl(uri, mode: LaunchMode.externalApplication);
                 }
               },
           ),
         );
-      } else if (match.group(1) != null) {
+      } else if (match.group(3) != null) {
         // **Bold**
         spans.add(
           TextSpan(
-            text: match.group(1),
+            text: match.group(3),
             style: TextStyle(
-              color: AppTheme.primaryBlue,
+              color: AppTheme.textPrimary,
               fontSize: 15,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w700,
             ),
           ),
         );
-      } else if (match.group(2) != null) {
+      } else if (match.group(4) != null) {
         // *Italic*
         spans.add(
           TextSpan(
-            text: match.group(2),
+            text: match.group(4),
             style: TextStyle(
               color: AppTheme.textPrimary,
               fontSize: 15,
@@ -339,243 +557,369 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
             ),
           ),
         );
-      } else if (match.group(3) != null) {
+      } else if (match.group(5) != null) {
         // `code`
         spans.add(
           TextSpan(
-            text: match.group(3),
-            style: TextStyle(
-              color: AppTheme.accentBlueLight,
-              fontSize: 14,
-              fontFamily: 'monospace',
-              backgroundColor: AppTheme.surfaceElevated.withOpacity(0.3),
-            ),
-          ),
-        );
-      } else if (match.group(4) != null) {
-        // # Headers
-        spans.add(
-          TextSpan(
-            text: '\n${match.group(4)}\n',
+            text: match.group(5),
             style: TextStyle(
               color: AppTheme.primaryBlue,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              fontFamily: 'monospace',
+              backgroundColor: AppTheme.surfaceElevated.withOpacity(0.25),
             ),
           ),
         );
-      } else if (match.group(0) == '---') {
-        // Horizontal rule
+      } else if (match.group(6) != null) {
+        // # Headers
+        final headerText = match.group(6)!;
+        final headerMatch = match.group(0)!;
+        int level = 1;
+        for (int i = 0; i < headerMatch.length; i++) {
+          if (headerMatch[i] == '#')
+            level++;
+          else
+            break;
+        }
+        final fontSize = level == 1
+            ? 20.0
+            : level == 2
+            ? 18.0
+            : 16.0;
+
         spans.add(
           WidgetSpan(
-            child: Container(
-              margin: EdgeInsets.symmetric(vertical: 8),
-              height: 2,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(colors: AppTheme.primaryGradient),
+            child: Padding(
+              padding: EdgeInsets.only(top: 12, bottom: 8),
+              child: Text(
+                headerText,
+                style: TextStyle(
+                  color: AppTheme.primaryBlue,
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
         );
-      } else if (match.group(0) == '\n') {
-        // New line
+      } else if (matched == '---') {
+        // Horizontal rule
+        spans.add(
+          WidgetSpan(
+            child: Container(
+              margin: EdgeInsets.symmetric(vertical: 10),
+              height: 1,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppTheme.primaryBlue.withOpacity(0),
+                    AppTheme.primaryBlue.withOpacity(0.3),
+                    AppTheme.primaryBlue.withOpacity(0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      } else if (matched == '\n') {
+        // Preserve newlines
         spans.add(TextSpan(text: '\n'));
       }
 
       lastIndex = match.end;
     }
 
-    // Add remaining plain text
+    // Add remaining text
     if (lastIndex < text.length) {
-      spans.add(
-        TextSpan(
-          text: text.substring(lastIndex),
-          style: TextStyle(color: AppTheme.textPrimary, fontSize: 15),
-        ),
-      );
+      final remaining = text.substring(lastIndex);
+      if (remaining.trim().isNotEmpty) {
+        spans.add(
+          TextSpan(
+            text: remaining,
+            style: TextStyle(
+              color: AppTheme.textPrimary,
+              fontSize: 15,
+              height: 1.5,
+            ),
+          ),
+        );
+      }
     }
 
     return spans.isEmpty
         ? [
             TextSpan(
               text: text,
-              style: TextStyle(color: AppTheme.textPrimary, fontSize: 15),
+              style: TextStyle(
+                color: AppTheme.textPrimary,
+                fontSize: 15,
+                height: 1.5,
+              ),
             ),
           ]
         : spans;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final formattedText = _formatAiResponse(_displayText);
+  WidgetSpan _buildTableFromMarkdown(String tableText) {
+    final lines = tableText.trim().split('\n');
+    final rows = <List<String>>[];
 
-    return Align(
-      alignment: widget.fromUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: GestureDetector(
-        onLongPress: () => _copyToClipboard(context),
-        child: Container(
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.8,
+    for (final line in lines) {
+      if (line.trim().isEmpty || line.contains('---')) continue;
+      final cells = line
+          .split('|')
+          .where((c) => c.trim().isNotEmpty)
+          .map((c) => c.trim())
+          .toList();
+      if (cells.isNotEmpty) {
+        rows.add(cells);
+      }
+    }
+
+    if (rows.isEmpty) {
+      return WidgetSpan(child: SizedBox.shrink());
+    }
+
+    return WidgetSpan(
+      child: Container(
+        width: double.infinity,
+        margin: EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: AppTheme.primaryBlue.withOpacity(0.2),
+            width: 0.5,
           ),
-          margin: EdgeInsets.only(
-            left: widget.fromUser ? 48 : 0,
-            right: widget.fromUser ? 0 : 48,
-            bottom: AppTheme.spaceSm,
-          ),
-          padding: EdgeInsets.all(AppTheme.spaceMd),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: widget.gradientColors,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: DataTable(
+            columnSpacing: 16,
+            dataRowHeight: 40,
+            headingRowHeight: 45,
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceElevated.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
             ),
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(AppTheme.radiusLg),
-              topRight: Radius.circular(AppTheme.radiusLg),
-              bottomLeft: widget.fromUser
-                  ? Radius.circular(AppTheme.radiusLg)
-                  : Radius.circular(4),
-              bottomRight: widget.fromUser
-                  ? Radius.circular(4)
-                  : Radius.circular(AppTheme.radiusLg),
-            ),
-            border: Border.all(
-              color: widget.fromUser
-                  ? AppTheme.primaryBlue.withOpacity(0.5)
-                  : AppTheme.surfaceElevated.withOpacity(0.5),
-              width: 1,
-            ),
-            boxShadow: widget.fromUser
-                ? AppTheme.glowShadow
-                : AppTheme.cardShadow,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Show image if available
-              if (widget.imagePath != null && widget.imagePath!.isNotEmpty) ...[
-                GestureDetector(
-                  onTap: () => _showFullScreenImage(context),
-                  child: Container(
-                    margin: EdgeInsets.only(bottom: AppTheme.spaceSm),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                      child: Image.file(
-                        File(widget.imagePath!),
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        height: 200,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            height: 200,
-                            color: AppTheme.surfaceElevated,
-                            child: Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.image_not_supported,
-                                    color: AppTheme.textTertiary,
-                                    size: 48,
-                                  ),
-                                  SizedBox(height: 8),
-                                  Text(
-                                    'Image not found',
-                                    style: AppTheme.bodySmall.copyWith(
-                                      color: AppTheme.textTertiary,
-                                    ),
-                                  ),
-                                ],
+            columns: rows.isNotEmpty
+                ? rows[0]
+                      .map(
+                        (header) => DataColumn(
+                          label: Expanded(
+                            child: Text(
+                              header,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.primaryBlue,
+                                fontSize: 13,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList()
+                : [],
+            rows: rows.length > 1
+                ? rows.skip(1).map((row) {
+                    return DataRow(
+                      cells: row
+                          .map(
+                            (cell) => DataCell(
+                              Text(
+                                cell,
+                                style: TextStyle(
+                                  color: AppTheme.textPrimary,
+                                  fontSize: 12,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-              // Show text with concise/detailed toggle for AI responses
-              if (widget.fromUser)
-                Text(
-                  widget.text,
-                  style: AppTheme.bodyLarge.copyWith(
-                    color: Colors.black,
-                    fontSize: 15,
-                  ),
-                )
-              else ...[
-                // Controls: regenerate/summarize and concise/detailed toggle
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    IconButton(
-                      icon: Icon(
-                        Icons.refresh,
-                        size: 18,
-                        color: AppTheme.textTertiary,
-                      ),
-                      tooltip: 'Regenerate (detailed)',
-                      onPressed: () => _regenerateSummary(concise: false),
-                    ),
-                    IconButton(
-                      icon: Icon(
-                        Icons.short_text,
-                        size: 18,
-                        color: AppTheme.textTertiary,
-                      ),
-                      tooltip: 'Summarize (concise)',
-                      onPressed: () => _regenerateSummary(concise: true),
-                    ),
-                    TextButton(
-                      onPressed: () => setState(() => _expanded = !_expanded),
-                      child: Text(_expanded ? 'Concise' : 'Details'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppTheme.primaryBlue,
-                        textStyle: TextStyle(fontSize: 12),
-                        minimumSize: Size(0, 0),
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                SelectableText.rich(
-                  TextSpan(
-                    children: _parseText(
-                      _expanded ? formattedText : _conciseVersion(_displayText),
-                    ),
-                  ),
-                  style: AppTheme.bodyLarge.copyWith(
-                    color: AppTheme.textPrimary,
-                    fontSize: 15,
-                    height: 1.5,
-                  ),
-                ),
-              ],
-            ],
+                          )
+                          .toList(),
+                    );
+                  }).toList()
+                : [],
           ),
         ),
       ),
     );
   }
 
-  String _conciseVersion(String text) {
-    if (text.trim().isEmpty) return text;
-    // Prefer first paragraph
-    final parts = text.split(RegExp(r'\n\s*\n'));
-    final first = parts.first.trim();
-    if (first.length <= 200) return first;
-    // Fallback to first sentence (up to 200 chars)
-    final sentences = first.split(RegExp(r'(?<=[.!?])\s+'));
-    if (sentences.isNotEmpty) {
-      final candidate = sentences.first;
-      return candidate.length <= 200
-          ? candidate
-          : candidate.substring(0, 200) + '...';
+  // Only show reactions for AI messages
+  @override
+  Widget build(BuildContext context) {
+    final formattedText = _formatAiResponse(widget.text);
+    final isWelcomeMessage = widget.text.contains('Welcome');
+
+    // Welcome message: centered and large
+    if (isWelcomeMessage) {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                widget.text,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w300,
+                  height: 1.6,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
     }
-    return first.substring(0, 200) + '...';
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: widget.fromUser
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
+      children: [
+        Align(
+          alignment: widget.fromUser
+              ? Alignment.centerRight
+              : Alignment.centerLeft,
+          child: GestureDetector(
+            onLongPress: () => _copyToClipboard(context),
+            child: Container(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.85,
+              ),
+              margin: EdgeInsets.only(
+                left: widget.fromUser ? 56 : 0,
+                right: widget.fromUser ? 0 : 56,
+                bottom: 16,
+              ),
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: widget.fromUser
+                    ? AppTheme.primaryBlue.withOpacity(0.9)
+                    : AppTheme.surfaceElevated.withOpacity(0.4),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                  bottomLeft: widget.fromUser
+                      ? Radius.circular(16)
+                      : Radius.circular(6),
+                  bottomRight: widget.fromUser
+                      ? Radius.circular(6)
+                      : Radius.circular(16),
+                ),
+                border: Border.all(
+                  color: widget.fromUser
+                      ? Colors.transparent
+                      : AppTheme.surfaceElevated.withOpacity(0.3),
+                  width: 0.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Show image if available
+                  if (widget.imagePath != null &&
+                      widget.imagePath!.isNotEmpty) ...[
+                    GestureDetector(
+                      onTap: () => _showFullScreenImage(context),
+                      child: Container(
+                        margin: EdgeInsets.only(bottom: AppTheme.spaceSm),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(
+                            AppTheme.radiusMd,
+                          ),
+                          child: Image.file(
+                            File(widget.imagePath!),
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            height: 200,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                height: 200,
+                                color: AppTheme.surfaceElevated,
+                                child: Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.image_not_supported,
+                                        color: AppTheme.textTertiary,
+                                        size: 48,
+                                      ),
+                                      SizedBox(height: 8),
+                                      Text(
+                                        'Image not found',
+                                        style: AppTheme.bodySmall.copyWith(
+                                          color: AppTheme.textTertiary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                  // Show text with AI responses
+                  if (widget.fromUser)
+                    Text(
+                      widget.text,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        height: 1.5,
+                      ),
+                    )
+                  else ...[
+                    SelectableText.rich(
+                      TextSpan(children: _parseText(formattedText)),
+                      style: TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 15,
+                        height: 1.6,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+        // Show reactions only for AI messages (but not welcome message)
+        if (!widget.fromUser && !widget.text.contains('Welcome —'))
+          Padding(
+            padding: EdgeInsets.only(left: 48, top: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              spacing: 4,
+              children: [
+                _buildReactionButton('👍'),
+                _buildReactionButton('👎'),
+                SizedBox(width: 2),
+                _buildCopyButton(),
+              ],
+            ),
+          ),
+      ],
+    );
   }
 }

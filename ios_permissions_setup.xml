@@ -1,0 +1,14 @@
+<!-- iOS Permissions Configuration -->
+<!-- Add these entries to ios/Runner/Info.plist before the closing </dict> tag -->
+
+<key>NSMicrophoneUsageDescription</key>
+<string>We need access to your microphone for voice input in chat conversations.</string>
+
+<key>NSSpeechRecognitionUsageDescription</key>
+<string>We need speech recognition to convert your voice to text.</string>
+
+<!-- Optional: For background audio processing -->
+<key>UIBackgroundModes</key>
+<array>
+    <string>audio</string>
+</array>

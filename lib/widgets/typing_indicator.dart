@@ -46,12 +46,13 @@ class _TypingIndicatorState extends State<TypingIndicator>
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          _buildDot(0),
-          SizedBox(width: 6),
-          _buildDot(1),
-          SizedBox(width: 6),
-          _buildDot(2),
+          _buildLine(0, 0.6),
+          SizedBox(width: 4),
+          _buildLine(1, 0.8),
+          SizedBox(width: 4),
+          _buildLine(2, 0.5),
           if (widget.message != null) ...[
             SizedBox(width: AppTheme.spaceMd),
             Text(
@@ -67,33 +68,33 @@ class _TypingIndicatorState extends State<TypingIndicator>
     );
   }
 
-  Widget _buildDot(int index) {
+  Widget _buildLine(int index, double baseHeight) {
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
-        final delay = index * 0.2;
+        final delay = index * 0.15;
         final value = (_controller.value - delay) % 1.0;
-        final scale = value < 0.5
-            ? 1.0 + (value * 0.6)
-            : 1.3 - ((value - 0.5) * 0.6);
-        final opacity = value < 0.5 ? 0.4 + (value * 1.2) : 1.0 - (value * 0.6);
 
-        return Transform.scale(
-          scale: scale,
-          child: Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(colors: AppTheme.primaryGradient),
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.primaryBlue.withOpacity(opacity * 0.5),
-                  blurRadius: 8,
-                  spreadRadius: 1,
-                ),
-              ],
+        // Animate height: small -> large -> small
+        final animatedHeight = baseHeight * (0.5 + (value.abs() - 0.5).abs());
+
+        return Container(
+          width: 3,
+          height: 14 * animatedHeight,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: AppTheme.accentGradient,
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
             ),
+            borderRadius: BorderRadius.circular(2),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.accentBlue.withOpacity(0.3),
+                blurRadius: 4,
+                spreadRadius: 0,
+              ),
+            ],
           ),
         );
       },
