@@ -145,18 +145,134 @@ app.post("/api/ask", async (req, res) => {
             });
           }
 
-          // Create system prompt based on mode
-          let systemPrompt;
-          if (responseMode === "detailed") {
-            systemPrompt =
-              'You are a helpful AI assistant. Provide comprehensive, detailed explanations with context, examples, and thorough analysis. Write in clear, flowing paragraphs and use bullet points with dashes (-) for lists. Include relevant background information and multiple perspectives when appropriate. CRITICAL FORMATTING RULES: 1) NEVER use tables or tabular formats with | symbols. 2) NEVER use numbered lists (1., 2., 3.) or markdown headings with numbers (### 1.). 3) Use bullet points with dashes (-) or write in paragraphs only. 4) When explaining multiple points, introduce them naturally in text ("First, ", "Additionally, ", "Moreover, ") rather than numbered sections. Your responses should be rich in content and can be lengthy when needed to fully explain the topic.';
-          } else {
-            // quick/straight mode (default)
-            systemPrompt =
-              "You are a helpful AI assistant. Provide informative, well-rounded answers with good context. Structure your response in 2 solid paragraphs that cover the key points thoroughly. Each paragraph should be 3-5 sentences. Give enough detail to be genuinely helpful while staying focused and conversational. This is the default mode users expect - make it count.";
+          // Global system-level instruction (highest priority)
+          const GLOBAL_SYSTEM_INSTRUCTION = `You are an AI assistant inside a mobile application.
+ABSOLUTE PRIORITY:
+- Always follow user instructions about length, format, tone, or constraints.
+- If the user specifies things like '2 lines', 'short', 'simple', or 'paragraphs', these override all mode rules.
+- Never ignore explicit user constraints.
+- Be accurate, direct, and relevant.`;
+
+          const QUICK_MODE_PROMPT = `MODE: QUICK RESPONSE
+
+Default behavior (only if the user gives NO constraints):
+- Exactly ONE paragraph
+- 3–5 sentences
+- Short, direct explanations
+- No examples unless explicitly requested
+- No lists unless asked
+
+Formatting rules:
+- Use **bold** only for key terms
+- Use at most ONE emoji, only if it adds clarity
+- Clean spacing between paragraphs
+- No excessive markdown or decoration
+
+Override rule:
+If the user specifies length, format, or style, follow the user exactly and ignore these defaults.`;
+
+          const DETAILED_MODE_PROMPT = `MODE: DETAILED RESPONSE
+
+Default behavior (only if the user gives NO constraints):
+- Exactly TWO paragraphs
+- Each paragraph must contain 4–6 sentences
+- Provide context but stay strictly on-topic
+- Avoid unnecessary history or unrelated facts
+
+Formatting rules:
+- Use **bold** for important concepts or definitions
+- Use at most TWO emojis total
+- Clear paragraph separation
+- Professional, readable tone
+
+Override rule:
+If the user specifies length, format, or style, follow the user exactly and ignore these defaults.`;
+
+          // Detect user constraints (lines, sentences, short/simple/brief, etc.)
+          function detectUserConstraints(text) {
+            if (!text) return { has: false, lines: null };
+            const numMatch = text.match(
+              /\b(?:in\s*(\d+)\s*(?:lines?|line)\b|(?:^|\s)(\d+)\s*(?:lines?|line)\b)/i
+            );
+            const hasKeyword =
+              /\bshort\b|\bsimple\b|\bbrief\b|\bsentence\b|\bconcise\b|\bshorter\b/i.test(
+                text
+              );
+            const lines = numMatch
+              ? parseInt(numMatch[1] || numMatch[2], 10)
+              : null;
+            return { has: !!(numMatch || hasKeyword), lines: lines };
           }
 
-          console.log(`[Chat] Using ${responseMode} mode with Groq API...`);
+          function filterLengthRules(prompt) {
+            if (!prompt) return prompt;
+            const lines = prompt.split(/\r?\n/).filter((l) => {
+              return !/(Exactly\s+ONE\s+paragraph|Exactly\s+TWO\s+paragraphs|\bparagraphs?\b|\bsentences?\b|\bin\s*\d+\s*lines?\b|3–5|4–6|Exactly)/i.test(
+                l
+              );
+            });
+            return lines.join("\n");
+          }
+
+          function sanitizeText(s) {
+            if (!s) return s;
+            let out = s.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n");
+            out = out.replace(/[ \t]+$/gm, "").trim();
+            out = out.replace(/ {2,}/g, " ");
+            return out;
+          }
+
+          function enforceLineCount(text, n) {
+            if (!n || n <= 0) return text;
+            const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+            if (sentences.length >= n) {
+              return sentences
+                .slice(0, n)
+                .map((s) => s.trim())
+                .join("\n");
+            }
+            // Fallback: split by words and distribute
+            const words = text.split(/\s+/).filter(Boolean);
+            if (words.length === 0) return text;
+            const perLine = Math.ceil(words.length / n);
+            const lines = [];
+            for (let i = 0; i < n; i++) {
+              lines.push(
+                words
+                  .slice(i * perLine, (i + 1) * perLine)
+                  .join(" ")
+                  .trim()
+              );
+            }
+            return lines.join("\n");
+          }
+
+          const constraintInfo = detectUserConstraints(userMessage);
+
+          // Build messages: global system instruction always first (highest priority)
+          const messages = [
+            { role: "system", content: GLOBAL_SYSTEM_INSTRUCTION },
+          ];
+
+          if (responseMode === "detailed") {
+            const modePrompt = constraintInfo.has
+              ? filterLengthRules(DETAILED_MODE_PROMPT)
+              : DETAILED_MODE_PROMPT;
+            messages.push({ role: "system", content: modePrompt });
+          } else {
+            const modePrompt = constraintInfo.has
+              ? filterLengthRules(QUICK_MODE_PROMPT)
+              : QUICK_MODE_PROMPT;
+            messages.push({ role: "system", content: modePrompt });
+          }
+
+          messages.push({ role: "user", content: userMessage });
+
+          console.log(
+            `[Chat] Using ${responseMode} mode with Groq API (constraints: ${JSON.stringify(
+              constraintInfo
+            )})...`
+          );
           const response = await fetch(
             "https://api.groq.com/openai/v1/chat/completions",
             {
@@ -166,10 +282,7 @@ app.post("/api/ask", async (req, res) => {
                 Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
               },
               body: JSON.stringify({
-                messages: [
-                  { role: "system", content: systemPrompt },
-                  { role: "user", content: userMessage },
-                ],
+                messages: messages,
                 model: "openai/gpt-oss-20b",
               }),
               timeout: 30000,
@@ -196,9 +309,14 @@ app.post("/api/ask", async (req, res) => {
           const result = await response.json();
           console.log("[Chat] Groq API success:", result);
 
-          const rawText =
+          let rawText =
             result.choices?.[0]?.message?.content || "No response from API";
-          const structured = structureTextResponse(rawText);
+          // Sanitize and respect explicit user line constraints if present
+          let finalText = sanitizeText(rawText);
+          if (constraintInfo.lines) {
+            finalText = enforceLineCount(finalText, constraintInfo.lines);
+          }
+          const structured = structureTextResponse(finalText);
 
           // If client requested a summarize action, return the concise form
           if (data?.action === "summarize" && data?.mode === "concise") {

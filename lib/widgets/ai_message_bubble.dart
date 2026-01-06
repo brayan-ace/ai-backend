@@ -817,120 +817,110 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
           alignment: widget.fromUser
               ? Alignment.centerRight
               : Alignment.centerLeft,
-          child: GestureDetector(
-            onLongPress: () => _copyToClipboard(context),
-            child: Container(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.85,
-              ),
-              margin: EdgeInsets.only(
-                left: widget.fromUser ? 56 : 0,
-                right: widget.fromUser ? 0 : 56,
-                bottom: 16,
-              ),
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                color: widget.fromUser
-                    ? AppTheme.primaryBlue.withOpacity(0.9)
-                    : AppTheme.surfaceElevated.withOpacity(0.4),
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  topRight: Radius.circular(16),
-                  bottomLeft: widget.fromUser
-                      ? Radius.circular(16)
-                      : Radius.circular(6),
-                  bottomRight: widget.fromUser
-                      ? Radius.circular(6)
-                      : Radius.circular(16),
-                ),
-                border: Border.all(
-                  color: widget.fromUser
-                      ? Colors.transparent
-                      : AppTheme.surfaceElevated.withOpacity(0.3),
-                  width: 0.5,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 8,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Show image if available
-                  if (widget.imagePath != null &&
-                      widget.imagePath!.isNotEmpty) ...[
-                    GestureDetector(
-                      onTap: () => _showFullScreenImage(context),
-                      child: Container(
-                        margin: EdgeInsets.only(bottom: AppTheme.spaceSm),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(
-                            AppTheme.radiusMd,
-                          ),
-                          child: Image.file(
-                            File(widget.imagePath!),
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            height: 200,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                height: 200,
-                                color: AppTheme.surfaceElevated,
-                                child: Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.image_not_supported,
-                                        color: AppTheme.textTertiary,
-                                        size: 48,
-                                      ),
-                                      SizedBox(height: 8),
-                                      Text(
-                                        'Image not found',
-                                        style: AppTheme.bodySmall.copyWith(
-                                          color: AppTheme.textTertiary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+          child: widget.fromUser
+              ? GestureDetector(
+                  onLongPress: () => _copyToClipboard(context),
+                  child: Container(
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.of(context).size.width * 0.85,
+                    ),
+                    margin: EdgeInsets.only(left: 56, right: 0, bottom: 16),
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryBlue.withOpacity(0.9),
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(16),
+                        topRight: Radius.circular(16),
+                        bottomLeft: Radius.circular(16),
+                        bottomRight: Radius.circular(6),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 8,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (widget.imagePath != null &&
+                            widget.imagePath!.isNotEmpty) ...[
+                          GestureDetector(
+                            onTap: () => _showFullScreenImage(context),
+                            child: Container(
+                              margin: EdgeInsets.only(bottom: AppTheme.spaceSm),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(
+                                  AppTheme.radiusMd,
                                 ),
-                              );
-                            },
+                                child: Image.file(
+                                  File(widget.imagePath!),
+                                  fit: BoxFit.cover,
+                                  width: double.infinity,
+                                  height: 200,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                        Text(
+                          widget.text,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            height: 1.5,
                           ),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
-                  // Show text with AI responses
-                  if (widget.fromUser)
-                    Text(
-                      widget.text,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        height: 1.5,
-                      ),
-                    )
-                  else ...[
-                    SelectableText.rich(
-                      TextSpan(children: _parseText(formattedText)),
-                      style: TextStyle(
-                        color: AppTheme.textPrimary,
-                        fontSize: 15,
-                        height: 1.6,
-                        letterSpacing: 0.2,
-                      ),
+                  ),
+                )
+              : GestureDetector(
+                  onLongPress: () => _copyToClipboard(context),
+                  child: Container(
+                    width: double.infinity,
+                    margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: EdgeInsets.symmetric(horizontal: 0, vertical: 6),
+                    // No background, border, or shadow for AI messages
+                    color: Colors.transparent,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (widget.imagePath != null &&
+                            widget.imagePath!.isNotEmpty) ...[
+                          GestureDetector(
+                            onTap: () => _showFullScreenImage(context),
+                            child: Container(
+                              margin: EdgeInsets.only(bottom: AppTheme.spaceSm),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(
+                                  AppTheme.radiusSm,
+                                ),
+                                child: Image.file(
+                                  File(widget.imagePath!),
+                                  fit: BoxFit.cover,
+                                  width: double.infinity,
+                                  height: 200,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                        SelectableText.rich(
+                          TextSpan(children: _parseText(formattedText)),
+                          style: TextStyle(
+                            color: AppTheme.textPrimary,
+                            fontSize: 15,
+                            height: 1.6,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ],
-              ),
-            ),
-          ),
+                  ),
+                ),
         ),
         // Action buttons attached directly to AI message bubble
         if (!widget.fromUser && !widget.text.contains('Welcome —'))

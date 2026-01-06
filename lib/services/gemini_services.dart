@@ -5,9 +5,18 @@ class GeminiService {
   Future<String?> generateContent(String prompt, {String? responseMode}) async {
     // Route all LLM chat requests through the backend
     try {
+      // Normalize client-side mode values to backend-expected values
+      String? normalizedMode;
+      if (responseMode != null) {
+        final rm = responseMode.toLowerCase();
+        if (rm == 'straight' || rm == 'quick') normalizedMode = 'quick';
+        if (rm == 'detailed' || rm == 'long' || rm == 'verbose')
+          normalizedMode = 'detailed';
+      }
+
       final input = {
         'message': prompt,
-        if (responseMode != null) 'mode': responseMode,
+        if (normalizedMode != null) 'mode': normalizedMode,
       };
       final resp = await ApiService.send('chat', input);
       return _cleanResponse(resp);
