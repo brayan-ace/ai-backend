@@ -13,6 +13,7 @@ import '../widgets/typing_indicator.dart';
 import '../widgets/greeting_icon.dart';
 import '../widgets/voice_input_dialog.dart';
 import '../services/gemini_services.dart';
+import '../services/api_service.dart';
 import '../services/web_search_service.dart';
 import '../services/chat_storage_service.dart';
 import 'notes_screen.dart';
@@ -794,6 +795,71 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
     }
 
     String? response;
+
+    // If this is an identity question, handle consent flow via backend local responses
+    bool handledLocally = false;
+    final identityRegex = RegExp(
+      r'\bwho\s+are\s+you\b|\bwhat\s+are\s+you\b|\btell\s+me\s+about\s+yourself\b',
+      caseSensitive: false,
+    );
+    if (identityRegex.hasMatch(text)) {
+      try {
+        final raw = await ApiService.sendRaw('chat', {
+          'message': text,
+          'action': 'identity',
+        });
+        final reply = raw['reply'] ?? raw['response'] ?? raw.toString();
+        setState(() {
+          _messages.add(_Message(text: reply.toString(), fromUser: false));
+        });
+
+        // If backend indicated identityOffered, prompt user for consent via dialog
+        if (raw['identityOffered'] == true) {
+          final consent = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: Text('Show founder?'),
+              content: Text('Would you like to know my founder or my builder?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: Text('No'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: Text('Yes'),
+                ),
+              ],
+            ),
+          );
+
+          if (consent == true) {
+            final raw2 = await ApiService.sendRaw('chat', {
+              'message': 'reveal',
+              'action': 'reveal_founder',
+              'confirm': true,
+            });
+            final reply2 = raw2['reply'] ?? raw2['response'] ?? raw2.toString();
+            setState(() {
+              _messages.add(_Message(text: reply2.toString(), fromUser: false));
+            });
+          }
+        }
+
+        handledLocally = true;
+      } catch (e) {
+        print('Identity flow error: $e');
+      }
+    }
+
+    if (handledLocally) {
+      // Remove typing indicator
+      setState(() {
+        if (_messages.isNotEmpty && _messages.last.isTyping)
+          _messages.removeLast();
+      });
+      return;
+    }
 
     // If image is attached, use Gemini Vision API
     if (hasImage && imageFile != null) {

@@ -58,7 +58,7 @@ class ApiService {
         try {
           final decodedData = jsonDecode(response.body);
           if (decodedData is Map) {
-            // Extract the response content based on type
+            // Preserve backward compatibility by returning the textual reply when present
             if (decodedData.containsKey('reply')) {
               print('💬 [Chat Response] ${decodedData['reply']}');
               return decodedData['reply'].toString(); // Groq chat response
@@ -119,5 +119,38 @@ class ApiService {
       print('❌ [Unknown Error] $e');
       rethrow;
     }
+  }
+
+  /// Send request and return the raw decoded JSON (Map) from the backend.
+  /// Useful for server responses that include structured flags (e.g., identityOffered).
+  static Future<Map<String, dynamic>> sendRaw(
+    String type,
+    Map<String, dynamic> data,
+  ) async {
+    if (type.isEmpty) throw Exception('Request type cannot be empty');
+    if (data.isEmpty) throw Exception('Request data cannot be empty');
+
+    final supportedTypes = ['chat', 'search', 'image'];
+    final requestType = supportedTypes.contains(type) ? type : 'chat';
+    final body = jsonEncode({'type': requestType, 'data': data});
+
+    final response = await http
+        .post(
+          Uri.parse("$baseUrl/api/ask"),
+          headers: <String, String>{'Content-Type': 'application/json'},
+          body: body,
+        )
+        .timeout(const Duration(seconds: 60));
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) return decoded;
+        return {'reply': response.body};
+      } catch (e) {
+        throw Exception('Failed to parse backend response: $e');
+      }
+    }
+    throw Exception('Backend error (${response.statusCode}): ${response.body}');
   }
 }

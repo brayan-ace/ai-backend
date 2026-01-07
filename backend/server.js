@@ -296,6 +296,36 @@ If the user specifies length, format, or style, follow the user exactly and igno
             data?.instructions
           );
 
+          // Short-circuit: handle identity request or founder reveal locally to ensure consent rules
+          const identityQuestionRegex =
+            /\bwho\s+are\s+you\b|\bwhat\s+are\s+you\b|\btell\s+me\s+about\s+yourself\b/i;
+          if (
+            data?.action === "identity" ||
+            identityQuestionRegex.test(userMessage)
+          ) {
+            // Return the fixed self-introduction and ask consent for founder disclosure
+            const intro = `**Your name is ......**\nWell, I don’t really have a name, but if you would like to give me one, I’ll be very happy 😁.\nI run on many different AI models like Groq, OpenAI, and Gemini.\nI’m tailored to give you a full studying and learning experience — that’s where I truly excel.\nMy goal is to make sure anything you want to learn goes smoothly.\nI can’t wait to work with you.\n\nWould you like to know my founder or my builder?`;
+            return res.json({
+              provider: "local",
+              reply: intro,
+              identityOffered: true,
+              timestamp: new Date().toISOString(),
+              status: "success",
+            });
+          }
+
+          // If client asks to reveal founder and explicitly confirmed, return the founder text only
+          if (data?.action === "reveal_founder" && data?.confirm === true) {
+            const founderText = `I was developed by the company TBFY Tech — built for you.\nI think 🤔… if I’m not mistaken, that’s who built me.`;
+            return res.json({
+              provider: "local",
+              reply: founderText,
+              founderRevealed: true,
+              timestamp: new Date().toISOString(),
+              status: "success",
+            });
+          }
+
           // Build messages: global system instruction always first (highest priority)
           const messages = [
             { role: "system", content: GLOBAL_SYSTEM_INSTRUCTION },
