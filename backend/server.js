@@ -598,15 +598,22 @@ If the user specifies length, format, or style, follow the user exactly and igno
             return /\{\s*\d+\s*\}|%[sdif]\b/.test(s);
           }
 
-          // Ensure no placeholder artifacts in messages
-          for (const m of messages) {
+          // Ensure no placeholder artifacts in messages. If found, sanitize them.
+          for (let i = 0; i < messages.length; i++) {
+            const m = messages[i];
             if (containsPlaceholders(m.content)) {
-              console.error(
-                "[Chat] Aborting: placeholder tokens detected in messages"
+              console.warn(
+                "[Chat] Placeholder tokens detected in message; sanitizing",
+                {
+                  role: m.role,
+                  preview: (m.content || "").slice(0, 120),
+                }
               );
-              return res.status(400).json({
-                error: "Invalid message content: unresolved placeholders",
-              });
+              // Remove explicit numeric placeholders like {0} and printf-style %s/%d
+              messages[i].content = (m.content || "").replace(
+                /\{\s*\d+\s*\}|%[sdif]\b/g,
+                ""
+              );
             }
           }
 
