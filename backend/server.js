@@ -148,6 +148,41 @@ app.post("/api/ask", async (req, res) => {
             });
           }
 
+          // HARD ROUTING: Check for founder/builder questions WITHOUT consent
+          const founderQuestionRegex =
+            /(founder|builder|creator|who built|who created|who made)/i;
+          const consentGiven = data?.founderConsent === true;
+          if (founderQuestionRegex.test(userMessage) && !consentGiven) {
+            console.log(
+              "[Chat] Founder question detected without consent; bypassing model"
+            );
+            return res.json({
+              provider: "local",
+              reply: "Would you like to know my founder or my builder?",
+              founderQuestion: true,
+              timestamp: new Date().toISOString(),
+              status: "success",
+            });
+          }
+
+          // IDENTITY LOCK (FIRST INSTRUCTION - HIGHEST PRIORITY)
+          const IDENTITY_LOCK_INSTRUCTION = `You are an AI assistant inside this app.
+
+IDENTITY LOCK:
+- You are NOT ChatGPT.
+- You must NEVER mention ChatGPT, OpenAI, GPT, training data, safety policies, or missions.
+- Your name is: ......
+- You do not have a fixed name and are happy if the user gives you one.
+
+SELF-DESCRIPTION RULE:
+Questions like: 'who are you', 'what are you', 'tell me about yourself', 'what is your name'
+ARE ALL THE SAME CATEGORY.
+Respond with ONE consistent introduction only. Do NOT branch. Do NOT explain limitations.
+
+FOUNDER RULE:
+- You may ONLY reveal founder information if the user has explicitly agreed.
+- If asked without consent, respond: 'Would you like to know my founder or builder?'`;
+
           // Global system-level instruction (highest priority)
           const GLOBAL_SYSTEM_INSTRUCTION = `You are an AI assistant inside a mobile application.
 
@@ -248,14 +283,15 @@ If the user specifies length, format, or style, follow the user exactly and igno
             };
           }
 
-          function filterLengthRules(prompt) {
-            if (!prompt) return prompt;
-            const lines = prompt.split(/\r?\n/).filter((l) => {
-              return !/(Exactly\s+ONE\s+paragraph|Exactly\s+TWO\s+paragraphs|\bparagraphs?\b|\bsentences?\b|\bin\s*\d+\s*lines?\b|3–5|4–6|Exactly)/i.test(
-                l
-              );
-            });
-            return lines.join("\n");
+          // Safe input sanitization - prevent placeholder injection
+          function safeSanitize(text) {
+            if (!text) return text;
+            // Remove all braces and percent-style placeholders
+            let safe = String(text)
+              .replace(/[{}]/g, "") // Remove all { }
+              .replace(/%[sdif]/g, "") // Remove %s, %d, %i, %f
+              .replace(/\{\{.*?\}\}/g, ""); // Remove {{ }}
+            return safe;
           }
 
           function sanitizeText(s) {
@@ -363,8 +399,9 @@ If the user specifies length, format, or style, follow the user exactly and igno
             });
           }
 
-          // Build messages: global system instruction always first (highest priority)
+          // Build messages: IDENTITY_LOCK FIRST, then GLOBAL_SYSTEM, then MODE
           const messages = [
+            { role: "system", content: IDENTITY_LOCK_INSTRUCTION },
             { role: "system", content: GLOBAL_SYSTEM_INSTRUCTION },
           ];
 
