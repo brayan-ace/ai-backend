@@ -594,7 +594,8 @@ If the user specifies length, format, or style, follow the user exactly and igno
           // Pre-call validation
           function containsPlaceholders(s) {
             if (!s) return false;
-            return /\{\s*\d+\s*\}|%[sdif]\b|{{.*?}}/.test(s);
+            // Only detect explicit numeric placeholders like {0}, {1} and printf-style %s/%d
+            return /\{\s*\d+\s*\}|%[sdif]\b/.test(s);
           }
 
           // Ensure no placeholder artifacts in messages
@@ -603,11 +604,9 @@ If the user specifies length, format, or style, follow the user exactly and igno
               console.error(
                 "[Chat] Aborting: placeholder tokens detected in messages"
               );
-              return res
-                .status(400)
-                .json({
-                  error: "Invalid message content: unresolved placeholders",
-                });
+              return res.status(400).json({
+                error: "Invalid message content: unresolved placeholders",
+              });
             }
           }
 
