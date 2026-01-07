@@ -453,7 +453,7 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
 
     // Pattern for bullet points, numbered lists, **bold**, *italic*, `code`, headings, URLs
     final markdownPattern = RegExp(
-      r'^[\s]*[-•*]\s+(.+?)$|^\s*\d+[\.)]\s+(.+?)$|https?://[^\s]+|\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`|^#{1,6}\s+(.+?)$|---|\n',
+      r'\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`|^#{1,6}\s+(.+?)$|https?://[^\s]+|^[\s]*[-•*]\s+(.+?)$|^\s*\d+[\.)]\s+(.+?)$|---|\n',
       multiLine: true,
     );
 
@@ -479,9 +479,9 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
 
       final matched = match.group(0) ?? '';
 
-      // Bullet point or list item
-      if (match.group(1) != null) {
-        final item = match.group(1)!.trim();
+      // Bullet point or list item (group 5)
+      if (match.group(5) != null) {
+        final item = match.group(5)!.trim();
         spans.add(
           WidgetSpan(
             child: Padding(
@@ -512,10 +512,10 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
             ),
           ),
         );
-      } else if (match.group(2) != null) {
-        // Numbered list - preserve the number from original match
+      } else if (match.group(6) != null) {
+        // Numbered list (group 6) - preserve the number from original match
         final fullMatch = match.group(0) ?? '';
-        final item = match.group(2)!.trim();
+        final item = match.group(6)!.trim();
         final numberMatch = RegExp(r'^\s*(\d+)[\.)]').firstMatch(fullMatch);
         final number = numberMatch?.group(1) ?? '•';
 
@@ -569,11 +569,11 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
               },
           ),
         );
-      } else if (match.group(3) != null) {
-        // **Bold**
+      } else if (match.group(1) != null) {
+        // **Bold** (group 1)
         spans.add(
           TextSpan(
-            text: match.group(3),
+            text: match.group(1),
             style: TextStyle(
               color: AppTheme.textPrimary,
               fontSize: 15,
@@ -581,11 +581,11 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
             ),
           ),
         );
-      } else if (match.group(4) != null) {
-        // *Italic*
+      } else if (match.group(2) != null) {
+        // *Italic* (group 2)
         spans.add(
           TextSpan(
-            text: match.group(4),
+            text: match.group(2),
             style: TextStyle(
               color: AppTheme.textPrimary,
               fontSize: 15,
@@ -593,11 +593,11 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
             ),
           ),
         );
-      } else if (match.group(5) != null) {
-        // `code`
+      } else if (match.group(3) != null) {
+        // `code` (group 3)
         spans.add(
           TextSpan(
-            text: match.group(5),
+            text: match.group(3),
             style: TextStyle(
               color: AppTheme.primaryBlue,
               fontSize: 14,
@@ -606,9 +606,9 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
             ),
           ),
         );
-      } else if (match.group(6) != null) {
-        // # Headers
-        final headerText = match.group(6)!;
+      } else if (match.group(4) != null) {
+        // # Headers (group 4)
+        final headerText = match.group(4)!;
         final headerMatch = match.group(0)!;
         int level = 1;
         for (int i = 0; i < headerMatch.length; i++) {
