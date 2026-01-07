@@ -876,15 +876,14 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
         var bytes = await imageFile.readAsBytes();
         print('Image bytes read: ${bytes.length} bytes');
 
-        // Compress image if it's too large (limit to ~500KB to stay under request size limit)
-        if (bytes.length > 500000) {
+        // Compress image if it's too large (limit to ~300KB to stay under request size limit with base64 encoding overhead)
+        if (bytes.length > 300000) {
           print(
             'Image size ${bytes.length} bytes exceeds limit, compressing...',
           );
           try {
-            // Simple JPEG compression by reducing quality
-            // For PNG/other formats, this will just return original
-            bytes = await _compressImage(bytes, quality: 70);
+            // Aggressive compression for large images
+            bytes = await _compressImage(bytes, quality: 50);
             print('Compressed to: ${bytes.length} bytes');
           } catch (e) {
             print('Compression failed: $e, using original image');
@@ -3190,13 +3189,13 @@ Open the app and search for chat ID: $chatId
   }
 
   /// Compress image bytes to reduce request size
-  /// Returns compressed bytes (max ~200KB to stay under request limits)
+  /// Aggressively resizes and reduces quality to keep under 200KB
   Future<Uint8List> _compressImage(
     Uint8List imageBytes, {
-    int quality = 70,
+    int quality = 50,
   }) async {
     // Check file size and return as-is if already small
-    if (imageBytes.length <= 200000) {
+    if (imageBytes.length <= 150000) {
       return imageBytes;
     }
 
@@ -3210,11 +3209,11 @@ Open the app and search for chat ID: $chatId
 
       print('Original image: ${image.width}x${image.height}');
 
-      // Resize to reduce dimensions (max 1024 width)
+      // Resize more aggressively (max 800px width for smaller file size)
       var compressed = image;
-      if (image.width > 1024) {
-        int newHeight = (image.height * 1024 / image.width).toInt();
-        compressed = img.copyResize(image, width: 1024, height: newHeight);
+      if (image.width > 800) {
+        int newHeight = (image.height * 800 / image.width).toInt();
+        compressed = img.copyResize(image, width: 800, height: newHeight);
         print('Resized to: ${compressed.width}x${compressed.height}');
       }
 
@@ -3222,8 +3221,11 @@ Open the app and search for chat ID: $chatId
       final encoded = img.encodeJpg(compressed, quality: quality);
       print('Compressed image size: ${encoded.length} bytes');
 
-      // If still too large, reduce quality further
-      if (encoded.length > 200000 && quality > 30) {
+      // If still too large, reduce quality further or recurse
+      if (encoded.length > 150000 && quality > 20) {
+        print(
+          'Still too large, reducing quality from $quality to ${quality - 10}...',
+        );
         return _compressImage(imageBytes, quality: quality - 10);
       }
 

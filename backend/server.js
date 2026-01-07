@@ -5,7 +5,9 @@ const axios = require("axios");
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+// Increase request size limits to handle large base64-encoded images (default is 100KB)
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // Helper: structure free-text responses into overview, bullets, code blocks
 function structureTextResponse(text) {
