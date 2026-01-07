@@ -1189,10 +1189,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
   }) async {
     // Try Groq first
     try {
-      // Build full conversation messages: include system prompt and all local messages
+      // Build full conversation messages from local chat history.
+      // Do NOT include a client-side system prompt here; backend will enforce system instructions.
       final List<Map<String, String>> convo = [];
-      convo.add({'role': 'system', 'content': AiConstants.systemPrompt});
-
       for (final m in _messages) {
         final role = m.fromUser ? 'user' : 'assistant';
         final content = m.text ?? '';
