@@ -931,7 +931,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
             _currentStatusMessage = 'Generating response...';
           });
           final instructions = _extractInstructionsFromText(text);
-          response = await _callWithFallback(
+          // For web search, use minimal messages (only user's current question + search context)
+          // Don't send full conversation history to avoid confusing the model
+          response = await _callWithSearchResults(
             enhancedPrompt,
             instructions: instructions,
           );
@@ -1208,6 +1210,32 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
         responseMode: _responseMode,
         instructions: instructions,
         messages: convo,
+      );
+
+      return resp;
+    } catch (e) {
+      return '⚠️ All AI services are currently unavailable. ($e)';
+    }
+  }
+
+  /// Call with search results: minimal message array (only current question + search context)
+  /// Prevents model from being confused by previous conversation when answering based on fresh search results
+  Future<String?> _callWithSearchResults(
+    String enhancedPrompt, {
+    Map<String, dynamic>? instructions,
+  }) async {
+    try {
+      // For web search results, use ONLY the enhanced prompt (with search context)
+      // Do NOT include conversation history; let the model focus on the search results
+      final List<Map<String, String>> searchMessages = [
+        {'role': 'user', 'content': enhancedPrompt},
+      ];
+
+      final resp = await _geminiService.generateContent(
+        enhancedPrompt,
+        responseMode: _responseMode,
+        instructions: instructions,
+        messages: searchMessages,
       );
 
       return resp;
