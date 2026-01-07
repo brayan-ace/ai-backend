@@ -267,35 +267,22 @@ If the user specifies length, format, or style, follow the user exactly and igno
 
           // Validate response for broken formatting (numeric placeholders, disallowed emojis)
           function validateResponseQuality(text) {
-            if (!text) return { valid: false, reason: "Empty response" };
-
-            // Check for numeric placeholder artifacts
-            const placeholderRegex =
-              /\{\d+\}|{%[sdif]}|%[sdif]|{{.*?}}|\b[0-9]{1,2}\b(?=\s+is\s+the|\s+are|\s+was)/;
-            if (placeholderRegex.test(text)) {
-              return { valid: false, reason: "Contains numeric placeholders" };
+            if (!text || text.trim().length === 0) {
+              return { valid: false, reason: "Empty response" };
             }
 
-            // Check for disallowed emojis (anything not in whitelist)
-            const whitelistEmojis = /[🙂✅🔬📚✨🚀]/g;
-            const allEmojis = /[\p{Emoji}]/gu;
-            const emojiMatches = text.match(allEmojis) || [];
-            const allowedCount = (text.match(whitelistEmojis) || []).length;
-            const disallowedCount = emojiMatches.length - allowedCount;
-            if (disallowedCount > 0) {
+            // Only check for critical placeholder artifacts that indicate template failure
+            // Pattern: standalone {0}, {1}, %s, %d at word boundaries (not part of normal text)
+            const criticalPlaceholderRegex = /\{\s*\d+\s*\}|%[sdif]\b/;
+            if (criticalPlaceholderRegex.test(text)) {
               return {
                 valid: false,
-                reason: `Contains ${disallowedCount} disallowed emojis`,
+                reason: "Contains unresolved template placeholders",
               };
             }
 
-            // Check response is not just HTML or malformed
-            if (/<[^>]+>/g.test(text) && !text.includes("**")) {
-              return {
-                valid: false,
-                reason: "HTML tags detected instead of Markdown",
-              };
-            }
+            // Allow all emojis; the system prompt handles emoji guidance
+            // This avoids false positives from valid Unicode characters
 
             return { valid: true };
           }
