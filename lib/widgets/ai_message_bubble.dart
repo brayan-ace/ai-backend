@@ -453,7 +453,7 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
 
     // Pattern for bullet points, numbered lists, **bold**, *italic*, `code`, headings, URLs
     final markdownPattern = RegExp(
-      r'\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`|^#{1,6}\s+(.+?)$|https?://[^\s]+|^[\s]*[-•*]\s+(.+?)$|^\s*\d+[\.)]\s+(.+?)$|---|\n',
+      r'\*\*([\s\S]+?)\*\*|\*([\s\S]+?)\*|`([\s\S]+?)`|^#{1,6}\s+(.+?)$|https?://[^\s]+|^[\s]*[-•*]\s+(.+?)$|^\s*\d+[\.)]\s+(.+?)$|---|\n',
       multiLine: true,
     );
 
@@ -570,7 +570,7 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
           ),
         );
       } else if (match.group(1) != null) {
-        // **Bold** (group 1)
+        // **Bold** with newlines (group 1)
         spans.add(
           TextSpan(
             text: match.group(1),
@@ -582,7 +582,7 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
           ),
         );
       } else if (match.group(2) != null) {
-        // *Italic* (group 2)
+        // *Italic* with newlines (group 2)
         spans.add(
           TextSpan(
             text: match.group(2),
@@ -594,7 +594,7 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
           ),
         );
       } else if (match.group(3) != null) {
-        // `code` (group 3)
+        // `code` with newlines (group 3)
         spans.add(
           TextSpan(
             text: match.group(3),
