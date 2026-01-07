@@ -16,6 +16,7 @@ import '../services/gemini_services.dart';
 import '../services/api_service.dart';
 import '../services/web_search_service.dart';
 import '../services/chat_storage_service.dart';
+import '../utils/ai_constants.dart';
 import 'notes_screen.dart';
 import 'chat_history_screen.dart';
 
@@ -1188,11 +1189,23 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
   }) async {
     // Try Groq first
     try {
+      // Build full conversation messages: include system prompt and all local messages
+      final List<Map<String, String>> convo = [];
+      convo.add({'role': 'system', 'content': AiConstants.systemPrompt});
+
+      for (final m in _messages) {
+        final role = m.fromUser ? 'user' : 'assistant';
+        final content = m.text ?? '';
+        convo.add({'role': role, 'content': content});
+      }
+
       final resp = await _geminiService.generateContent(
         prompt,
         responseMode: _responseMode,
         instructions: instructions,
+        messages: convo,
       );
+
       return resp;
     } catch (e) {
       return '⚠️ All AI services are currently unavailable. ($e)';

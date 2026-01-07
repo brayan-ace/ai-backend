@@ -237,8 +237,18 @@ Formatting rules:
 Override rule:
 If the user specifies length, format, or style, follow the user exactly and ignore these defaults.`;
 
-          // Detect user constraints (lines, sentences, short/simple/brief, etc.)
+          // Detect user constraints (length, format, style, emoji directives)
           function detectUserConstraints(text, structuredInstructions) {
+            const out = {
+              has: false,
+              lines: null,
+              sentences: false,
+              short: false,
+              formats: [], // e.g., ['bold','bullets','table','definition']
+              emojiDirective: null, // 'no', 'use', 'minimal', or null
+              userOverride: false,
+            };
+
             // If structured instructions were provided by client, trust them
             if (
               structuredInstructions &&
@@ -248,22 +258,26 @@ If the user specifies length, format, or style, follow the user exactly and igno
                 structuredInstructions.lines ||
                 structuredInstructions.sentences
               ) {
-                return {
-                  has: true,
-                  lines: structuredInstructions.lines || null,
-                  sentences: structuredInstructions.sentences || null,
-                };
+                out.has = true;
+                out.lines = structuredInstructions.lines || null;
+                out.sentences = !!structuredInstructions.sentences;
               }
               if (
                 structuredInstructions.short === true ||
                 structuredInstructions.brief === true
               ) {
-                return { has: true, short: true };
+                out.has = true;
+                out.short = true;
+              }
+              if (structuredInstructions.emojis === false) {
+                out.emojiDirective = "no";
+                out.has = true;
               }
             }
-            if (!text) return { has: false, lines: null };
 
-            // Match 'in X lines', 'X lines', 'in X sentences', 'X sentences'
+            if (!text) return out;
+
+            // Length constraints
             const numMatch = text.match(
               /\b(?:in\s*(\d+)\s*(?:lines?|line|sentences?|sentence)\b|(?:^|\s)(\d+)\s*(?:lines?|line|sentences?|sentence)\b)/i
             );
@@ -274,13 +288,57 @@ If the user specifies length, format, or style, follow the user exactly and igno
             const lines = numMatch
               ? parseInt(numMatch[1] || numMatch[2], 10)
               : null;
-            // If it explicitly says sentences, note that
             const isSentenceReq = /\b(sentences?|sentence)\b/i.test(text);
-            return {
-              has: !!(numMatch || hasKeyword),
-              lines: lines,
-              sentences: isSentenceReq,
-            };
+            if (numMatch || hasKeyword) {
+              out.has = true;
+              out.lines = lines;
+              out.sentences = isSentenceReq;
+              out.short = out.short || hasKeyword;
+            }
+
+            // Format/style directives
+            const formats = [];
+            if (/\bbold\b|\bmake bold\b|\b\*\*\b/.test(text))
+              formats.push("bold");
+            if (/\bbullet|bullets|list\b/i.test(text)) formats.push("bullets");
+            if (/\btable\b/i.test(text)) formats.push("table");
+            if (/\bdefinition\b/i.test(text)) formats.push("definition");
+            if (formats.length) {
+              out.has = true;
+              out.formats = formats;
+            }
+
+            // Emoji directives
+            if (
+              /\bno\s+emojis\b|\bwithout\s+emojis\b|\bno\s+emoji\b/i.test(text)
+            ) {
+              out.emojiDirective = "no";
+              out.has = true;
+            } else if (
+              /\buse\s+emojis\b|\bwith\s+emojis\b|\binclude\s+emoji/i.test(text)
+            ) {
+              out.emojiDirective = "use";
+              out.has = true;
+            } else if (
+              /\bminimal\s+emojis\b|\bminimal\s+emoji\b|\bfew\s+emojis\b/i.test(
+                text
+              )
+            ) {
+              out.emojiDirective = "minimal";
+              out.has = true;
+            }
+
+            // If any strict formatting or length or emoji directive exists, treat as user override
+            if (
+              out.lines ||
+              out.short ||
+              out.formats.length ||
+              out.emojiDirective
+            ) {
+              out.userOverride = true;
+            }
+
+            return out;
           }
 
           // Safe input sanitization - prevent placeholder injection
@@ -399,31 +457,166 @@ If the user specifies length, format, or style, follow the user exactly and igno
             });
           }
 
-          // Build messages: IDENTITY_LOCK FIRST, then GLOBAL_SYSTEM, then MODE
-          const messages = [
+          // Build messages in required order:
+          // 1) System Identity & Rules
+          // 2) Formatting & Emoji defaults
+          // 3) USER CONSTRAINTS (as system message) if present
+          // 4) Conversation history (client-provided)
+          // 5) Mode prompt (only if no strict user override)
+          // 6) Latest user message
+
+          let messages = [
             { role: "system", content: IDENTITY_LOCK_INSTRUCTION },
             { role: "system", content: GLOBAL_SYSTEM_INSTRUCTION },
           ];
 
-          if (responseMode === "detailed") {
-            const modePrompt = constraintInfo.has
-              ? filterLengthRules(DETAILED_MODE_PROMPT)
-              : DETAILED_MODE_PROMPT;
-            messages.push({ role: "system", content: modePrompt });
-          } else {
-            const modePrompt = constraintInfo.has
-              ? filterLengthRules(QUICK_MODE_PROMPT)
-              : QUICK_MODE_PROMPT;
+          // Formatting & Emoji defaults (second)
+          const allowedEmojis = "🙂 ✅ 🔬 📚 ✨ 🚀";
+          let emojiSystem = `Default emoji policy: include at least one emoji from the following set in every response unless the user explicitly requests no emojis. Allowed emojis: ${allowedEmojis}.`;
+          if (constraintInfo.emojiDirective === "no") {
+            emojiSystem = `User requested no emojis: do NOT include any emoji in your response.`;
+          } else if (constraintInfo.emojiDirective === "minimal") {
+            emojiSystem = `User requested minimal emojis: include at most one emoji from the allowed set (${allowedEmojis}).`;
+          }
+          messages.push({ role: "system", content: emojiSystem });
+
+          // USER CONSTRAINTS (third) - high priority
+          if (constraintInfo.userOverride) {
+            const parts = [];
+            if (constraintInfo.lines)
+              parts.push(`lines=${constraintInfo.lines}`);
+            if (constraintInfo.sentences) parts.push(`sentences=true`);
+            if (constraintInfo.short) parts.push(`short=true`);
+            if (constraintInfo.formats && constraintInfo.formats.length)
+              parts.push(`formats=${constraintInfo.formats.join(",")}`);
+            if (constraintInfo.emojiDirective)
+              parts.push(`emoji=${constraintInfo.emojiDirective}`);
+
+            const userConstraintText = `User constraints (ENFORCE STRICTLY): ${parts.join(
+              "; "
+            )}`;
+            messages.push({ role: "system", content: userConstraintText });
+          }
+
+          // Conversation history handling (fourth)
+          let clientMessages =
+            Array.isArray(data.messages) && data.messages.length > 0
+              ? data.messages.slice()
+              : [];
+
+          // MEMORY SAFETY: If history is too long, summarize older messages
+          const MAX_MESSAGES = 30;
+          const KEEP_RECENT = 15;
+          if (clientMessages.length > MAX_MESSAGES) {
+            const older = clientMessages.slice(
+              0,
+              clientMessages.length - KEEP_RECENT
+            );
+            const recent = clientMessages.slice(-KEEP_RECENT);
+            const summarizeText = older
+              .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
+              .join("\n");
+
+            try {
+              const summarizeMessages = [
+                { role: "system", content: IDENTITY_LOCK_INSTRUCTION },
+                { role: "system", content: GLOBAL_SYSTEM_INSTRUCTION },
+                { role: "system", content: QUICK_MODE_PROMPT },
+                {
+                  role: "user",
+                  content: `Summarize the following conversation into a short paragraph. Keep user intents, main facts, and preferences. Do NOT add new facts. Conversation:\n${summarizeText}`,
+                },
+              ];
+
+              const sumResp = await fetch(
+                "https://api.groq.com/openai/v1/chat/completions",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+                  },
+                  body: JSON.stringify({
+                    messages: summarizeMessages,
+                    model: "openai/gpt-oss-20b",
+                  }),
+                  timeout: 30000,
+                }
+              );
+
+              const sumResult = await sumResp.json();
+              let summaryText = sumResult.choices?.[0]?.message?.content || "";
+              summaryText = sanitizeText(summaryText);
+              const summarySystem = {
+                role: "system",
+                content: `Summary so far: ${summaryText}`,
+              };
+
+              clientMessages = [summarySystem, ...recent];
+            } catch (summErr) {
+              console.error("[Chat] Summarization failed:", summErr);
+              clientMessages = clientMessages.slice(-KEEP_RECENT);
+            }
+          }
+
+          if (clientMessages.length > 0) {
+            messages = messages.concat(clientMessages);
+          }
+
+          // Mode prompt (fifth) - only if no strict user override
+          if (!constraintInfo.userOverride) {
+            const modePrompt =
+              responseMode === "detailed"
+                ? constraintInfo.has
+                  ? filterLengthRules(DETAILED_MODE_PROMPT)
+                  : DETAILED_MODE_PROMPT
+                : constraintInfo.has
+                ? filterLengthRules(QUICK_MODE_PROMPT)
+                : QUICK_MODE_PROMPT;
             messages.push({ role: "system", content: modePrompt });
           }
 
-          messages.push({ role: "user", content: userMessage });
+          // Latest user message (sixth) - append only if it isn't already the last client message
+          const lastClient = clientMessages.length
+            ? clientMessages[clientMessages.length - 1]
+            : null;
+          if (
+            !(
+              lastClient &&
+              lastClient.role === "user" &&
+              data.message &&
+              lastClient.content === data.message
+            )
+          ) {
+            messages.push({ role: "user", content: userMessage });
+          }
+
+          // Pre-call validation
+          function containsPlaceholders(s) {
+            if (!s) return false;
+            return /\{\s*\d+\s*\}|%[sdif]\b|{{.*?}}/.test(s);
+          }
+
+          // Ensure no placeholder artifacts in messages
+          for (const m of messages) {
+            if (containsPlaceholders(m.content)) {
+              console.error(
+                "[Chat] Aborting: placeholder tokens detected in messages"
+              );
+              return res
+                .status(400)
+                .json({
+                  error: "Invalid message content: unresolved placeholders",
+                });
+            }
+          }
 
           console.log(
             `[Chat] Using ${responseMode} mode with Groq API (constraints: ${JSON.stringify(
               constraintInfo
             )})...`
           );
+
           const response = await fetch(
             "https://api.groq.com/openai/v1/chat/completions",
             {
@@ -473,6 +666,139 @@ If the user specifies length, format, or style, follow the user exactly and igno
           } else if (constraintInfo.sentences && constraintInfo.lines) {
             // prefer sentences if explicitly requested
             finalText = enforceLineCount(finalText, constraintInfo.lines);
+          }
+
+          // Post-response validation for emoji and line constraints
+          function containsAllowedEmoji(s) {
+            if (!s) return false;
+            const allowed = /[🙂✅🔬📚✨🚀]/;
+            return allowed.test(s);
+          }
+
+          function validateResponseConstraints(text, info) {
+            // Check placeholders
+            if (containsPlaceholders(text))
+              return { ok: false, reason: "Placeholders present" };
+
+            // Emoji checks
+            if (info.emojiDirective === "no") {
+              if (containsAllowedEmoji(text))
+                return {
+                  ok: false,
+                  reason: "Emoji present but user requested none",
+                };
+            } else {
+              // Default: ensure at least one allowed emoji
+              if (!containsAllowedEmoji(text))
+                return { ok: false, reason: "Missing required emoji" };
+            }
+
+            // Line count
+            if (info.lines) {
+              const lines = text.split(/\r?\n/).filter(Boolean);
+              if (lines.length > info.lines)
+                return { ok: false, reason: "Line count mismatch" };
+            }
+
+            return { ok: true };
+          }
+
+          let postValidation = validateResponseConstraints(
+            finalText,
+            constraintInfo
+          );
+          if (!postValidation.ok) {
+            console.warn(
+              "[Chat] Post-response validation failed:",
+              postValidation.reason
+            );
+            // Try once to regenerate with enforced constraints
+            try {
+              const enforceParts = [];
+              if (constraintInfo.lines)
+                enforceParts.push(`lines=${constraintInfo.lines}`);
+              if (constraintInfo.sentences) enforceParts.push(`sentences=true`);
+              if (constraintInfo.short) enforceParts.push("short=true");
+              if (constraintInfo.formats && constraintInfo.formats.length)
+                enforceParts.push(
+                  `formats=${constraintInfo.formats.join(",")}`
+                );
+              if (constraintInfo.emojiDirective)
+                enforceParts.push(`emoji=${constraintInfo.emojiDirective}`);
+
+              const enforceMsg = {
+                role: "system",
+                content: `ENFORCE STRICTLY: ${enforceParts.join(
+                  "; "
+                )}. If impossible, state so briefly without extra text.`,
+              };
+
+              const regenMessages = [
+                { role: "system", content: IDENTITY_LOCK_INSTRUCTION },
+                { role: "system", content: GLOBAL_SYSTEM_INSTRUCTION },
+                { role: "system", content: emojiSystem },
+                ...(constraintInfo.userOverride
+                  ? [
+                      {
+                        role: "system",
+                        content: `User constraints (ENFORCE): ${enforceParts.join(
+                          "; "
+                        )}`,
+                      },
+                    ]
+                  : []),
+                ...clientMessages,
+                ...(!constraintInfo.userOverride
+                  ? [
+                      {
+                        role: "system",
+                        content:
+                          responseMode === "detailed"
+                            ? DETAILED_MODE_PROMPT
+                            : QUICK_MODE_PROMPT,
+                      },
+                    ]
+                  : []),
+                { role: "system", content: enforceMsg.content },
+                { role: "user", content: userMessage },
+              ];
+
+              const regenResp = await fetch(
+                "https://api.groq.com/openai/v1/chat/completions",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+                  },
+                  body: JSON.stringify({
+                    messages: regenMessages,
+                    model: "openai/gpt-oss-20b",
+                  }),
+                  timeout: 30000,
+                }
+              );
+              const regenResult = await regenResp.json();
+              let regenText = regenResult.choices?.[0]?.message?.content || "";
+              regenText = sanitizeText(regenText);
+              if (constraintInfo.lines)
+                regenText = enforceLineCount(regenText, constraintInfo.lines);
+
+              const regenValidation = validateResponseConstraints(
+                regenText,
+                constraintInfo
+              );
+              if (regenValidation.ok) {
+                finalText = regenText;
+              } else {
+                // fallback
+                finalText =
+                  "Oops — something went wrong. Please try rephrasing.";
+              }
+            } catch (regenErr) {
+              console.error("[Chat] Regeneration failed:", regenErr);
+              finalText = "Oops — something went wrong. Please try rephrasing.";
+            }
           }
 
           // Validate response quality; if broken, log but still return it (model outputs are generally good)

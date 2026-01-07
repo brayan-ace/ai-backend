@@ -6,6 +6,7 @@ class GeminiService {
     String prompt, {
     String? responseMode,
     Map<String, dynamic>? instructions,
+    List<Map<String, String>>? messages,
   }) async {
     // Route all LLM chat requests through the backend
     try {
@@ -18,8 +19,11 @@ class GeminiService {
           normalizedMode = 'detailed';
       }
 
+      // If a pre-built messages array is provided, send that (preferred).
+      // Otherwise fall back to the legacy single-message contract.
       final input = {
-        'message': prompt,
+        if (messages != null) 'messages': messages,
+        if (messages == null) 'message': prompt,
         if (normalizedMode != null) 'mode': normalizedMode,
         if (instructions != null) 'instructions': instructions,
       };
