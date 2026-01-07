@@ -95,6 +95,9 @@ app.listen(PORT, () => {
   console.log(
     `[Server Started] Running on port ${PORT} at ${new Date().toISOString()}`
   );
+  console.log(
+    "[Server] AI identity, formatting rules, and validation system active"
+  );
 });
 
 app.post("/api/ask", async (req, res) => {
@@ -338,7 +341,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
             identityQuestionRegex.test(userMessage)
           ) {
             // Return the fixed self-introduction and ask consent for founder disclosure
-            const intro = `**Your name is ......**\nWell, I don’t really have a name, but if you would like to give me one, I’ll be very happy 😁.\nI run on many different AI models like Groq, OpenAI, and Gemini.\nI’m tailored to give you a full studying and learning experience — that’s where I truly excel.\nMy goal is to make sure anything you want to learn goes smoothly.\nI can’t wait to work with you.\n\nWould you like to know my founder or my builder?`;
+            const intro = `**My name is ......**\nWell, I don’t really have a name, but if you would like to give me one, I’ll be very happy 😁.\nI run on many different AI models like Groq, OpenAI, and Gemini.\nI’m tailored to give you a full studying and learning experience — that’s where I truly excel.\nMy goal is to make sure anything you want to learn goes smoothly.\nI can’t wait to work with you.\n\nWould you like to know my founder or my builder?`;
             return res.json({
               provider: "local",
               reply: intro,
@@ -350,7 +353,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
 
           // If client asks to reveal founder and explicitly confirmed, return the founder text only
           if (data?.action === "reveal_founder" && data?.confirm === true) {
-            const founderText = `I was developed by the company TBFY Tech — built for you.\nI think 🤔… if I’m not mistaken, that’s who built me.`;
+            const founderText = `I was developed by the company TBFY Tech — built for you.\nI think 🤔… if I’m not mistaken, It's them who built me.`;
             return res.json({
               provider: "local",
               reply: founderText,
