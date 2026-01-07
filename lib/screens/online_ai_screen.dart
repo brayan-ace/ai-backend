@@ -1191,11 +1191,16 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
     try {
       // Build full conversation messages from local chat history.
       // Do NOT include a client-side system prompt here; backend will enforce system instructions.
+      // Filter out unwanted assistant intro messages to avoid repetition.
       final List<Map<String, String>> convo = [];
       for (final m in _messages) {
         final role = m.fromUser ? 'user' : 'assistant';
         final content = m.text ?? '';
-        convo.add({'role': role, 'content': content});
+
+        // Skip default assistant intros to prevent repetition
+        if (!role.contains('assistant') || !_isDefaultIntroMessage(content)) {
+          convo.add({'role': role, 'content': content});
+        }
       }
 
       final resp = await _geminiService.generateContent(
@@ -1209,6 +1214,16 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
     } catch (e) {
       return '⚠️ All AI services are currently unavailable. ($e)';
     }
+  }
+
+  bool _isDefaultIntroMessage(String text) {
+    if (text.isEmpty) return false;
+    // Check if message is a default intro (contains these patterns)
+    final lower = text.toLowerCase();
+    return (lower.contains('assistant introduction') ||
+        lower.contains('ai assistant') && lower.contains('here to help') ||
+        lower.contains('no fixed name') ||
+        lower.contains('ai helper'));
   }
 
   /// Load a chat from history
