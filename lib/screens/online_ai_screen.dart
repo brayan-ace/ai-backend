@@ -863,17 +863,23 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
           setState(() {
             _currentStatusMessage = 'Generating response...';
           });
-          response = await _callWithFallback(enhancedPrompt);
+          final instructions = _extractInstructionsFromText(text);
+          response = await _callWithFallback(
+            enhancedPrompt,
+            instructions: instructions,
+          );
         } catch (e) {
           setState(() {
             _currentStatusMessage = 'Generating response...';
           });
           response = '⚠️ Web search error: $e\n\nTrying AI database...';
-          response = await _callWithFallback(text);
+          final instructions = _extractInstructionsFromText(text);
+          response = await _callWithFallback(text, instructions: instructions);
         }
       } else {
         // Try AI database first
-        response = await _callWithFallback(text);
+        final instructions = _extractInstructionsFromText(text);
+        response = await _callWithFallback(text, instructions: instructions);
 
         // Check if response suggests lack of information
         if (response != null && _shouldSuggestWebSearch(response, text)) {
@@ -901,7 +907,11 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                 searchResults,
               );
 
-              response = await _callWithFallback(enhancedPrompt);
+              final instructions = _extractInstructionsFromText(text);
+              response = await _callWithFallback(
+                enhancedPrompt,
+                instructions: instructions,
+              );
 
               // Remove search indicator
               setState(() {
@@ -1075,12 +1085,47 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
     );
   }
 
-  Future<String?> _callWithFallback(String prompt) async {
+  // Extract structured instructions from free-text (e.g., 'in 2 lines', 'short', 'brief', '2 sentences')
+  Map<String, dynamic>? _extractInstructionsFromText(String text) {
+    if (text.isEmpty) return null;
+    final lower = text.toLowerCase();
+    final linesMatch = RegExp(
+      r'in\s*(\d+)\s*lines?|^(\d+)\s*lines?',
+      caseSensitive: false,
+    ).firstMatch(lower);
+    final sentencesMatch = RegExp(
+      r'in\s*(\d+)\s*sentences?|^(\d+)\s*sentences?',
+      caseSensitive: false,
+    ).firstMatch(lower);
+    final short =
+        lower.contains('short') ||
+        lower.contains('brief') ||
+        lower.contains('simple');
+
+    final Map<String, dynamic> out = {};
+    if (linesMatch != null)
+      out['lines'] = int.tryParse(
+        linesMatch.group(1) ?? linesMatch.group(2) ?? '',
+      );
+    if (sentencesMatch != null)
+      out['sentences'] = int.tryParse(
+        sentencesMatch.group(1) ?? sentencesMatch.group(2) ?? '',
+      );
+    if (short) out['short'] = true;
+
+    return out.isEmpty ? null : out;
+  }
+
+  Future<String?> _callWithFallback(
+    String prompt, {
+    Map<String, dynamic>? instructions,
+  }) async {
     // Try Groq first
     try {
       final resp = await _geminiService.generateContent(
         prompt,
         responseMode: _responseMode,
+        instructions: instructions,
       );
       return resp;
     } catch (e) {

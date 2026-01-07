@@ -38,8 +38,16 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
   String _formatAiResponse(String text) {
     if (widget.fromUser) return text;
 
-    // Return text as-is for better formatting in _parseText
-    return text;
+    // If AI response looks like a short numbered definition (e.g., "1. The study of ..."),
+    // remove the leading numbering to render naturally in-flow.
+    String out = text;
+    final preview = out.trim().split('\n').take(3).join(' ');
+    final numbered = RegExp(r'^\s*\d+[.)]\s*').hasMatch(preview);
+    if (numbered && preview.length < 200) {
+      out = out.replaceAll(RegExp(r'^\s*\d+[.)]\s*', multiLine: true), '');
+    }
+
+    return out;
   }
 
   void _copyToClipboard(BuildContext context) {

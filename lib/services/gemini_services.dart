@@ -2,7 +2,11 @@ import '../utils/ai_constants.dart';
 import 'api_service.dart';
 
 class GeminiService {
-  Future<String?> generateContent(String prompt, {String? responseMode}) async {
+  Future<String?> generateContent(
+    String prompt, {
+    String? responseMode,
+    Map<String, dynamic>? instructions,
+  }) async {
     // Route all LLM chat requests through the backend
     try {
       // Normalize client-side mode values to backend-expected values
@@ -17,6 +21,7 @@ class GeminiService {
       final input = {
         'message': prompt,
         if (normalizedMode != null) 'mode': normalizedMode,
+        if (instructions != null) 'instructions': instructions,
       };
       final resp = await ApiService.send('chat', input);
       return _cleanResponse(resp);

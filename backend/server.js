@@ -151,7 +151,8 @@ ABSOLUTE PRIORITY:
 - Always follow user instructions about length, format, tone, or constraints.
 - If the user specifies things like '2 lines', 'short', 'simple', or 'paragraphs', these override all mode rules.
 - Never ignore explicit user constraints.
-- Be accurate, direct, and relevant.`;
+- Be accurate, direct, and relevant.
+- Always begin responses with a one-line bold heading that summarizes the answer (for example: **Definition:**). Bold important phrases or lines in the response. Use emojis sparingly (at most 1 in Quick, 2 in Detailed) only if they add clarity.`;
 
           const QUICK_MODE_PROMPT = `MODE: QUICK RESPONSE
 
@@ -189,10 +190,34 @@ Override rule:
 If the user specifies length, format, or style, follow the user exactly and ignore these defaults.`;
 
           // Detect user constraints (lines, sentences, short/simple/brief, etc.)
-          function detectUserConstraints(text) {
+          function detectUserConstraints(text, structuredInstructions) {
+            // If structured instructions were provided by client, trust them
+            if (
+              structuredInstructions &&
+              typeof structuredInstructions === "object"
+            ) {
+              if (
+                structuredInstructions.lines ||
+                structuredInstructions.sentences
+              ) {
+                return {
+                  has: true,
+                  lines: structuredInstructions.lines || null,
+                  sentences: structuredInstructions.sentences || null,
+                };
+              }
+              if (
+                structuredInstructions.short === true ||
+                structuredInstructions.brief === true
+              ) {
+                return { has: true, short: true };
+              }
+            }
             if (!text) return { has: false, lines: null };
+
+            // Match 'in X lines', 'X lines', 'in X sentences', 'X sentences'
             const numMatch = text.match(
-              /\b(?:in\s*(\d+)\s*(?:lines?|line)\b|(?:^|\s)(\d+)\s*(?:lines?|line)\b)/i
+              /\b(?:in\s*(\d+)\s*(?:lines?|line|sentences?|sentence)\b|(?:^|\s)(\d+)\s*(?:lines?|line|sentences?|sentence)\b)/i
             );
             const hasKeyword =
               /\bshort\b|\bsimple\b|\bbrief\b|\bsentence\b|\bconcise\b|\bshorter\b/i.test(
@@ -201,7 +226,13 @@ If the user specifies length, format, or style, follow the user exactly and igno
             const lines = numMatch
               ? parseInt(numMatch[1] || numMatch[2], 10)
               : null;
-            return { has: !!(numMatch || hasKeyword), lines: lines };
+            // If it explicitly says sentences, note that
+            const isSentenceReq = /\b(sentences?|sentence)\b/i.test(text);
+            return {
+              has: !!(numMatch || hasKeyword),
+              lines: lines,
+              sentences: isSentenceReq,
+            };
           }
 
           function filterLengthRules(prompt) {
@@ -247,7 +278,23 @@ If the user specifies length, format, or style, follow the user exactly and igno
             return lines.join("\n");
           }
 
-          const constraintInfo = detectUserConstraints(userMessage);
+          // Convert short numbered definition lists into natural sentences
+          function reformatLeadingNumberedDefinition(text) {
+            // If text starts with a single numbered item like '1. The study of ...' or '1) The study of...'
+            const singleLine = text.trim().split("\n").slice(0, 3).join(" ");
+            const match = singleLine.match(/^\s*(?:1[.)]|\d+[.)])\s*(.+)$/);
+            if (match && match[1]) {
+              // Remove leading numbering from entire text
+              const cleaned = text.replace(/^\s*\d+[.)]\s*/gm, "").trim();
+              return cleaned;
+            }
+            return text;
+          }
+
+          const constraintInfo = detectUserConstraints(
+            userMessage,
+            data?.instructions
+          );
 
           // Build messages: global system instruction always first (highest priority)
           const messages = [
@@ -311,11 +358,19 @@ If the user specifies length, format, or style, follow the user exactly and igno
 
           let rawText =
             result.choices?.[0]?.message?.content || "No response from API";
-          // Sanitize and respect explicit user line constraints if present
+
+          // Reformat numbered definition style if needed
+          rawText = reformatLeadingNumberedDefinition(rawText);
+
+          // Sanitize and respect explicit user line/sentence constraints if present
           let finalText = sanitizeText(rawText);
           if (constraintInfo.lines) {
             finalText = enforceLineCount(finalText, constraintInfo.lines);
+          } else if (constraintInfo.sentences && constraintInfo.lines) {
+            // prefer sentences if explicitly requested
+            finalText = enforceLineCount(finalText, constraintInfo.lines);
           }
+
           const structured = structureTextResponse(finalText);
 
           // If client requested a summarize action, return the concise form
@@ -332,7 +387,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
 
           return res.json({
             provider: "groq",
-            reply: rawText,
+            reply: finalText,
             structured: structured,
             fullResponse: result,
             timestamp: new Date().toISOString(),
