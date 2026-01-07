@@ -576,18 +576,8 @@ If the user specifies length, format, or style, follow the user exactly and igno
             messages.push({ role: "system", content: modePrompt });
           }
 
-          // Latest user message (sixth) - append only if it isn't already the last client message
-          const lastClient = clientMessages.length
-            ? clientMessages[clientMessages.length - 1]
-            : null;
-          if (
-            !(
-              lastClient &&
-              lastClient.role === "user" &&
-              data.message &&
-              lastClient.content === data.message
-            )
-          ) {
+          // Latest user message (sixth) - append only when client did NOT send a messages array
+          if (!Array.isArray(data.messages) || data.messages.length === 0) {
             messages.push({ role: "user", content: userMessage });
           }
 
