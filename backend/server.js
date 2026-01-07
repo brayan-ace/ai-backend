@@ -567,11 +567,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
           if (!constraintInfo.userOverride) {
             const modePrompt =
               responseMode === "detailed"
-                ? constraintInfo.has
-                  ? filterLengthRules(DETAILED_MODE_PROMPT)
-                  : DETAILED_MODE_PROMPT
-                : constraintInfo.has
-                ? filterLengthRules(QUICK_MODE_PROMPT)
+                ? DETAILED_MODE_PROMPT
                 : QUICK_MODE_PROMPT;
             messages.push({ role: "system", content: modePrompt });
           }
