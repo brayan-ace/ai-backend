@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
+import 'dart:typed_data';
+import 'package:image/image.dart' as img;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -3188,29 +3190,48 @@ Open the app and search for chat ID: $chatId
   }
 
   /// Compress image bytes to reduce request size
-  /// Returns compressed bytes (max ~500KB to stay under request limits)
+  /// Returns compressed bytes (max ~200KB to stay under request limits)
   Future<Uint8List> _compressImage(
     Uint8List imageBytes, {
     int quality = 70,
   }) async {
-    // For now, simple approach: if image is JPEG, we'd need the image package
-    // As a fallback, just return original if we can't compress
-    // In production, consider using the 'image' package for actual compression
-    // or implementing native compression
-
     // Check file size and return as-is if already small
-    if (imageBytes.length <= 300000) {
+    if (imageBytes.length <= 200000) {
       return imageBytes;
     }
 
-    // TODO: If image package is added to pubspec.yaml, implement actual compression:
-    // final image = img.decodeImage(imageBytes);
-    // if (image != null) {
-    //   final resized = img.copyResize(image, width: 1024);
-    //   return img.encodeJpg(resized, quality: quality);
-    // }
+    try {
+      // Decode image
+      final image = img.decodeImage(imageBytes);
+      if (image == null) {
+        print('Failed to decode image, returning original');
+        return imageBytes;
+      }
 
-    return imageBytes;
+      print('Original image: ${image.width}x${image.height}');
+
+      // Resize to reduce dimensions (max 1024 width)
+      var compressed = image;
+      if (image.width > 1024) {
+        int newHeight = (image.height * 1024 / image.width).toInt();
+        compressed = img.copyResize(image, width: 1024, height: newHeight);
+        print('Resized to: ${compressed.width}x${compressed.height}');
+      }
+
+      // Encode as JPEG with quality setting
+      final encoded = img.encodeJpg(compressed, quality: quality);
+      print('Compressed image size: ${encoded.length} bytes');
+
+      // If still too large, reduce quality further
+      if (encoded.length > 200000 && quality > 30) {
+        return _compressImage(imageBytes, quality: quality - 10);
+      }
+
+      return Uint8List.fromList(encoded);
+    } catch (e) {
+      print('Image compression failed: $e, returning original');
+      return imageBytes;
+    }
   }
 }
 
