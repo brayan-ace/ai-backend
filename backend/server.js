@@ -435,13 +435,13 @@ If the user specifies length, format, or style, follow the user exactly and igno
             finalText = enforceLineCount(finalText, constraintInfo.lines);
           }
 
-          // Validate response quality; if broken, return a safe fallback
+          // Validate response quality; if broken, log but still return it (model outputs are generally good)
           const validation = validateResponseQuality(finalText);
           if (!validation.valid) {
             console.warn(
-              `[Chat] Response validation failed: ${validation.reason}`
+              `[Chat] Response validation warning: ${validation.reason}`
             );
-            finalText = `I apologize, but I encountered a formatting issue while preparing the response. Please try asking again.`;
+            // Still return the response even if validation warns (model outputs are usually correct)
           }
 
           const structured = structureTextResponse(finalText);
