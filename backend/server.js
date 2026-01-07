@@ -147,12 +147,20 @@ app.post("/api/ask", async (req, res) => {
 
           // Global system-level instruction (highest priority)
           const GLOBAL_SYSTEM_INSTRUCTION = `You are an AI assistant inside a mobile application.
+
+FORMATTING & PLACEHOLDER RULES (MUST BE OBEYED):
+- Use Markdown for emphasis. Use **like this** for bold; do NOT use HTML tags or numeric placeholders.
+- Allowed emojis only: 🙂 ✅ 🔬 📚 ✨ 🚀. Maximum 2 emojis per response, only if they improve clarity.
+- NEVER output numeric placeholders like "1", "{0}", "{1}", "{{var}}", "%s" in user-visible text.
+- If a value is unknown, say nothing rather than emitting placeholders.
+- If the user asks for an exact number of lines (e.g., 'in 2 lines'), return exactly that many newline-separated sentences.
+
 ABSOLUTE PRIORITY:
 - Always follow user instructions about length, format, tone, or constraints.
 - If the user specifies things like '2 lines', 'short', 'simple', or 'paragraphs', these override all mode rules.
 - Never ignore explicit user constraints.
 - Be accurate, direct, and relevant.
-- Always begin responses with a one-line bold heading that summarizes the answer (for example: **Definition:**). Bold important phrases or lines in the response. Use emojis sparingly (at most 1 in Quick, 2 in Detailed) only if they add clarity.`;
+- Always begin responses with a one-line bold heading that summarizes the answer (e.g., **Definition:**). Bold important phrases or lines.`;
 
           const QUICK_MODE_PROMPT = `MODE: QUICK RESPONSE
 
@@ -164,10 +172,11 @@ Default behavior (only if the user gives NO constraints):
 - No lists unless asked
 
 Formatting rules:
-- Use **bold** only for key terms
-- Use at most ONE emoji, only if it adds clarity
+- Begin with a one-line **bold heading** summarizing the answer
+- Use **bold** for key terms and important concepts
+- Use at most ONE emoji from whitelist (🙂 ✅ 🔬 📚 ✨ 🚀), only if it adds clarity
 - Clean spacing between paragraphs
-- No excessive markdown or decoration
+- NO numeric placeholders, HTML tags, or decoration
 
 Override rule:
 If the user specifies length, format, or style, follow the user exactly and ignore these defaults.`;
@@ -181,10 +190,11 @@ Default behavior (only if the user gives NO constraints):
 - Avoid unnecessary history or unrelated facts
 
 Formatting rules:
-- Use **bold** for important concepts or definitions
-- Use at most TWO emojis total
-- Clear paragraph separation
-- Professional, readable tone
+- Begin with a one-line **bold heading** summarizing the answer
+- Use **bold** for important concepts, definitions, and key points
+- Use at most TWO emojis from whitelist (🙂 ✅ 🔬 📚 ✨ 🚀), only if they enhance clarity
+- Clear paragraph separation with blank lines
+- Professional, readable tone; NO numeric placeholders or HTML
 
 Override rule:
 If the user specifies length, format, or style, follow the user exactly and ignore these defaults.`;
@@ -250,7 +260,44 @@ If the user specifies length, format, or style, follow the user exactly and igno
             let out = s.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n");
             out = out.replace(/[ \t]+$/gm, "").trim();
             out = out.replace(/ {2,}/g, " ");
+            // Remove stray numeric placeholders like "{0}", "{1}", "%s", etc.
+            out = out.replace(/\{\d+\}|\{%[sdif]\}|%[sdif]|{{.*?}}/g, "");
             return out;
+          }
+
+          // Validate response for broken formatting (numeric placeholders, disallowed emojis)
+          function validateResponseQuality(text) {
+            if (!text) return { valid: false, reason: "Empty response" };
+
+            // Check for numeric placeholder artifacts
+            const placeholderRegex =
+              /\{\d+\}|{%[sdif]}|%[sdif]|{{.*?}}|\b[0-9]{1,2}\b(?=\s+is\s+the|\s+are|\s+was)/;
+            if (placeholderRegex.test(text)) {
+              return { valid: false, reason: "Contains numeric placeholders" };
+            }
+
+            // Check for disallowed emojis (anything not in whitelist)
+            const whitelistEmojis = /[🙂✅🔬📚✨🚀]/g;
+            const allEmojis = /[\p{Emoji}]/gu;
+            const emojiMatches = text.match(allEmojis) || [];
+            const allowedCount = (text.match(whitelistEmojis) || []).length;
+            const disallowedCount = emojiMatches.length - allowedCount;
+            if (disallowedCount > 0) {
+              return {
+                valid: false,
+                reason: `Contains ${disallowedCount} disallowed emojis`,
+              };
+            }
+
+            // Check response is not just HTML or malformed
+            if (/<[^>]+>/g.test(text) && !text.includes("**")) {
+              return {
+                valid: false,
+                reason: "HTML tags detected instead of Markdown",
+              };
+            }
+
+            return { valid: true };
           }
 
           function enforceLineCount(text, n) {
@@ -399,6 +446,15 @@ If the user specifies length, format, or style, follow the user exactly and igno
           } else if (constraintInfo.sentences && constraintInfo.lines) {
             // prefer sentences if explicitly requested
             finalText = enforceLineCount(finalText, constraintInfo.lines);
+          }
+
+          // Validate response quality; if broken, return a safe fallback
+          const validation = validateResponseQuality(finalText);
+          if (!validation.valid) {
+            console.warn(
+              `[Chat] Response validation failed: ${validation.reason}`
+            );
+            finalText = `I apologize, but I encountered a formatting issue while preparing the response. Please try asking again.`;
           }
 
           const structured = structureTextResponse(finalText);
