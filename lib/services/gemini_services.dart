@@ -44,7 +44,8 @@ class GeminiService {
     }
   }
 
-  /// Clean up AI response by removing unwanted formatting and asterisks
+  /// Clean up AI response by removing only unwanted formatting (math, prefixes)
+  /// PRESERVE Markdown bold (**), italic (*), and other formatting for UI rendering
   String _cleanResponse(String text) {
     // Remove "Final Answer:" prefix
     text = text.replaceFirst(RegExp(r'Final Answer:\s*'), '');
@@ -55,11 +56,9 @@ class GeminiService {
     // Remove extra "The final answer is" phrases
     text = text.replaceAll(RegExp(r'The final answer is\s*'), '');
 
-    // Replace bold markdown (**text**) with plain text
-    text = text.replaceAll(RegExp(r'\*\*([^*]+)\*\*'), r'$1');
-
-    // Replace italic markdown (*text*) with plain text
-    text = text.replaceAll(RegExp(r'(?<!\*)\*([^*]+)\*(?!\*)'), r'$1');
+    // DO NOT remove markdown bold (**text**) - UI needs it for rendering!
+    // DO NOT remove markdown italic (*text*) - UI needs it for rendering!
+    // These are now handled by ai_message_bubble.dart markdown parser
 
     // Unwrap display math $$...$$ and inline math $...$
     text = text.replaceAllMapped(
