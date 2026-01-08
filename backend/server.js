@@ -992,7 +992,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
           };
 
           const geminiResponse = await axios.post(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-image:generateContent?key=${GEMINI_KEY}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`,
             {
               contents: [
                 {
