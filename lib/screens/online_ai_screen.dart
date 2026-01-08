@@ -592,12 +592,12 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                   ),
                   SizedBox(height: AppTheme.spaceSm),
                   _buildModelOption(
-                    name: 'GPT-4.5',
-                    description: 'Advanced reasoning & complex problems',
-                    isSelected: _selectedModel == 'GPT-4.5',
+                    name: 'Gemini',
+                    description: 'Google Gemini — conversational text model',
+                    isSelected: _selectedModel == 'Gemini',
                     gradient: AppTheme.accentGradient,
                     onTap: () {
-                      setState(() => _selectedModel = 'GPT-4.5');
+                      setState(() => _selectedModel = 'Gemini');
                       Navigator.pop(context);
                     },
                   ),
@@ -1226,6 +1226,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
         responseMode: _responseMode,
         instructions: instructions,
         messages: convo,
+        model: _selectedModel,
       );
 
       return resp;
@@ -1252,6 +1253,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
         responseMode: _responseMode,
         instructions: instructions,
         messages: searchMessages,
+        model: _selectedModel,
       );
 
       return resp;

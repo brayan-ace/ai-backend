@@ -7,6 +7,7 @@ class GeminiService {
     String? responseMode,
     Map<String, dynamic>? instructions,
     List<Map<String, String>>? messages,
+    String? model,
   }) async {
     // Route all LLM chat requests through the backend
     try {
@@ -26,6 +27,7 @@ class GeminiService {
         if (messages == null) 'message': prompt,
         if (normalizedMode != null) 'mode': normalizedMode,
         if (instructions != null) 'instructions': instructions,
+        if (model != null) 'model': model.toLowerCase(),
       };
       final resp = await ApiService.send('chat', input);
       return _cleanResponse(resp);
