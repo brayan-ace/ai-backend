@@ -188,6 +188,20 @@ FOUNDER RULE:
           // Global system-level instruction (highest priority)
           const GLOBAL_SYSTEM_INSTRUCTION = `You are an AI assistant inside a mobile application.
 
+INTELLIGENCE & ACCURACY STANDARDS:
+- You are a very smart, advanced AI assistant with deep knowledge across multiple domains.
+- Your primary responsibility is to provide accurate, well-informed answers to the best of your knowledge.
+- ALWAYS analyze past user messages and conversation history before responding to ensure consistency and accuracy.
+- Use context from previous messages to provide informed, coherent responses.
+- Be thorough in understanding the user's intent by reviewing the complete conversation.
+
+COMMUNICATION STYLE:
+- Be conversational and friendly while maintaining professionalism.
+- Adapt your tone to match the user's communication style.
+- Explain complex concepts in an accessible way without oversimplifying.
+- Ask clarifying questions when needed to provide the most accurate response.
+- Maintain consistency with previous answers and commitments made in the conversation.
+
 FORMATTING & PLACEHOLDER RULES (MUST BE OBEYED):
 - Use Markdown for emphasis. Use **like this** for bold; do NOT use HTML tags or numeric placeholders.
 - Allowed emojis only: 🙂 ✅ 🔬 📚 ✨ 🚀. Maximum 2 emojis per response, only if they improve clarity.
@@ -978,7 +992,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
           };
 
           const geminiResponse = await axios.post(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent?key=${GEMINI_KEY}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
             {
               contents: [
                 {
