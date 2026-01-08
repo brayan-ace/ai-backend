@@ -18,7 +18,6 @@ import '../services/gemini_services.dart';
 import '../services/api_service.dart';
 import '../services/web_search_service.dart';
 import '../services/chat_storage_service.dart';
-import '../utils/ai_constants.dart';
 import 'notes_screen.dart';
 import 'chat_history_screen.dart';
 
@@ -60,12 +59,21 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
   String _selectedModel = 'Groq';
   String _searchQuery = '';
 
+  // Scroll to latest message button
+  late ScrollController _messageScrollController;
+  bool _showScrollButton = false;
+  static const double _scrollThreshold = 100.0;
+
   @override
   void initState() {
     super.initState();
     _geminiService = GeminiService();
     _webSearchService = WebSearchService();
     _chatStorage = ChatStorageService();
+
+    // Initialize scroll controller for chat messages
+    _messageScrollController = ScrollController();
+    _messageScrollController.addListener(_onScrollListener);
 
     // Initialize animation controller
     _greetingAnimationController = AnimationController(
@@ -733,7 +741,76 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
     _authSub.cancel();
     _controller.dispose();
     _searchController.dispose();
+    _messageScrollController.removeListener(_onScrollListener);
+    _messageScrollController.dispose();
     super.dispose();
+  }
+
+  // Scroll listener to track if user is at bottom
+  void _onScrollListener() {
+    if (!mounted) return;
+
+    final scrollHeight = _messageScrollController.position.maxScrollExtent;
+    final scrollTop = _messageScrollController.position.pixels;
+    final clientHeight = _messageScrollController.position.viewportDimension;
+
+    // Show button if we're not at the bottom (with threshold)
+    final isAtBottom =
+        (scrollTop + clientHeight >= scrollHeight - _scrollThreshold);
+
+    if (!isAtBottom && !_showScrollButton) {
+      setState(() => _showScrollButton = true);
+    } else if (isAtBottom && _showScrollButton) {
+      setState(() => _showScrollButton = false);
+    }
+  }
+
+  // Smooth scroll to latest message
+  Future<void> _scrollToLatestMessage() async {
+    if (!mounted || _messageScrollController.positions.isEmpty) return;
+
+    try {
+      final maxScroll = _messageScrollController.position.maxScrollExtent;
+      await _messageScrollController.animateTo(
+        maxScroll,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeOutCubic,
+      );
+    } catch (e) {
+      print('[Scroll Button] Error scrolling: $e');
+    }
+  }
+
+  // Build floating scroll button
+  Widget _buildScrollButton() {
+    return AnimatedOpacity(
+      opacity: _showScrollButton ? 1.0 : 0.0,
+      duration: const Duration(milliseconds: 300),
+      child: _showScrollButton
+          ? Positioned(
+              bottom: 20,
+              right: 20,
+              child: GestureDetector(
+                onTap: _scrollToLatestMessage,
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppTheme.primaryBlue,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.primaryBlue.withOpacity(0.4),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.all(12),
+                  child: Icon(Icons.expand_more, color: Colors.white, size: 24),
+                ),
+              ),
+            )
+          : const SizedBox.shrink(),
+    );
   }
 
   Future<void> _send() async {
@@ -1205,7 +1282,6 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
     String prompt, {
     Map<String, dynamic>? instructions,
   }) async {
-    // Try Groq first
     try {
       // Build full conversation messages from local chat history.
       // Do NOT include a client-side system prompt here; backend will enforce system instructions.
@@ -1213,23 +1289,60 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
       final List<Map<String, String>> convo = [];
       for (final m in _messages) {
         final role = m.fromUser ? 'user' : 'assistant';
-        final content = m.text ?? '';
+        final content = m.text;
 
         // Skip default assistant intros to prevent repetition
-        if (!role.contains('assistant') || !_isDefaultIntroMessage(content)) {
-          convo.add({'role': role, 'content': content});
+        if (content.isNotEmpty) {
+          if (!role.contains('assistant') || !_isDefaultIntroMessage(content)) {
+            convo.add({'role': role, 'content': content});
+          }
         }
       }
 
-      final resp = await _geminiService.generateContent(
-        prompt,
-        responseMode: _responseMode,
-        instructions: instructions,
-        messages: convo,
-        model: _selectedModel,
-      );
+      // Build request data
+      final input = {
+        'messages': convo,
+        'message': prompt,
+        'mode': _responseMode,
+        'model': _selectedModel.toLowerCase(),
+        if (instructions != null) 'instructions': instructions,
+      };
 
-      return resp;
+      // Use sendRaw to get full response including backend flags
+      final fullResp = await ApiService.sendRaw('chat', input);
+
+      // Check if backend auto-triggered web search (detected time-sensitive query)
+      if (fullResp['webSearchAutoTriggered'] == true && !_webSearchEnabled) {
+        print('[AUTO WEB SEARCH] Backend detected time-sensitive query');
+        setState(() {
+          _webSearchEnabled = true;
+        });
+
+        // Auto-trigger web search
+        try {
+          final searchResults = await _webSearchService.search(query: prompt);
+          final enhancedPrompt = _webSearchService.createEnhancedPrompt(
+            prompt,
+            searchResults,
+          );
+
+          // Get response with search context
+          return await _callWithSearchResults(
+            enhancedPrompt,
+            instructions: instructions,
+          );
+        } catch (e) {
+          print('[AUTO WEB SEARCH ERROR] Failed to search: $e');
+          // Fall back to non-search response
+          setState(() {
+            _webSearchEnabled = false;
+          });
+        }
+      }
+
+      // Return the regular response
+      final reply = fullResp['reply'] ?? fullResp['response'] ?? '';
+      return reply.isEmpty ? null : reply.toString();
     } catch (e) {
       return '⚠️ All AI services are currently unavailable. ($e)';
     }
@@ -2840,79 +2953,89 @@ Open the app and search for chat ID: $chatId
             child: Column(
               children: [
                 Expanded(
-                  child: _showGreeting && _messages.isEmpty
-                      ? _buildGreetingUI()
-                      : ListView.builder(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: AppTheme.spaceLg,
-                            vertical: AppTheme.spaceLg,
-                          ),
-                          itemCount: _messages.length,
-                          itemBuilder: (context, i) {
-                            final m = _messages[i];
+                  child: Stack(
+                    children: [
+                      _showGreeting && _messages.isEmpty
+                          ? _buildGreetingUI()
+                          : ListView.builder(
+                              controller: _messageScrollController,
+                              padding: EdgeInsets.symmetric(
+                                horizontal: AppTheme.spaceLg,
+                                vertical: AppTheme.spaceLg,
+                              ),
+                              itemCount: _messages.length,
+                              itemBuilder: (context, i) {
+                                final m = _messages[i];
 
-                            // Show typing indicator for typing messages
-                            if (m.isTyping) {
-                              return Padding(
-                                padding: EdgeInsets.only(
-                                  bottom: AppTheme.spaceSm,
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.start,
-                                  children: [
-                                    TypingIndicator(
-                                      message: _currentStatusMessage.isNotEmpty
-                                          ? _currentStatusMessage
-                                          : 'Generating response...',
+                                // Show typing indicator for typing messages
+                                if (m.isTyping) {
+                                  return Padding(
+                                    padding: EdgeInsets.only(
+                                      bottom: AppTheme.spaceSm,
                                     ),
-                                  ],
-                                ),
-                              );
-                            }
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.start,
+                                      children: [
+                                        TypingIndicator(
+                                          message:
+                                              _currentStatusMessage.isNotEmpty
+                                              ? _currentStatusMessage
+                                              : 'Generating response...',
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }
 
-                            // Show streaming text with inline typing indicator
-                            if (m.isStreaming) {
-                              return Padding(
-                                padding: EdgeInsets.only(
-                                  bottom: AppTheme.spaceSm,
-                                ),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                      child: AiMessageBubble(
-                                        text: m.text,
-                                        fromUser: m.fromUser,
-                                        imagePath: m.imagePath,
-                                        gradientColors:
-                                            AppTheme.surfaceGradient,
-                                        detailedByDefault:
-                                            _responseMode == 'detailed',
-                                      ),
+                                // Show streaming text with inline typing indicator
+                                if (m.isStreaming) {
+                                  return Padding(
+                                    padding: EdgeInsets.only(
+                                      bottom: AppTheme.spaceSm,
                                     ),
-                                    Padding(
-                                      padding: EdgeInsets.only(
-                                        left: 4,
-                                        top: 16,
-                                      ),
-                                      child: TypingIndicator(),
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Expanded(
+                                          child: AiMessageBubble(
+                                            text: m.text,
+                                            fromUser: m.fromUser,
+                                            imagePath: m.imagePath,
+                                            gradientColors:
+                                                AppTheme.surfaceGradient,
+                                            detailedByDefault:
+                                                _responseMode == 'detailed',
+                                          ),
+                                        ),
+                                        Padding(
+                                          padding: EdgeInsets.only(
+                                            left: 4,
+                                            top: 16,
+                                          ),
+                                          child: TypingIndicator(),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
-                              );
-                            }
+                                  );
+                                }
 
-                            return AiMessageBubble(
-                              text: m.text,
-                              fromUser: m.fromUser,
-                              imagePath: m.imagePath,
-                              gradientColors: m.fromUser
-                                  ? AppTheme.primaryGradient
-                                  : AppTheme.surfaceGradient,
-                              detailedByDefault: _responseMode == 'detailed',
-                            );
-                          },
-                        ),
+                                return AiMessageBubble(
+                                  text: m.text,
+                                  fromUser: m.fromUser,
+                                  imagePath: m.imagePath,
+                                  gradientColors: m.fromUser
+                                      ? AppTheme.primaryGradient
+                                      : AppTheme.surfaceGradient,
+                                  detailedByDefault:
+                                      _responseMode == 'detailed',
+                                );
+                              },
+                            ),
+                      _buildScrollButton(),
+                    ],
+                  ),
                 ),
 
                 // Modern Input Section (Claude-style unified container)
@@ -2939,35 +3062,33 @@ Open the app and search for chat ID: $chatId
                       if (_selectedImage != null)
                         Container(
                           margin: EdgeInsets.only(bottom: 12),
-                          padding: EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppTheme.surfaceCard,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: AppTheme.surfaceElevated.withOpacity(0.3),
-                              width: 1,
-                            ),
-                          ),
                           child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                                 child: Image.file(
                                   _selectedImage!,
-                                  height: 60,
-                                  width: 60,
+                                  height: 64,
+                                  width: 64,
                                   fit: BoxFit.cover,
                                 ),
                               ),
                               SizedBox(width: 12),
                               Expanded(
-                                child: Text(
-                                  _selectedFileName ?? 'Image selected',
-                                  style: AppTheme.bodySmall.copyWith(
-                                    color: AppTheme.textSecondary,
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      _selectedFileName ?? 'Image selected',
+                                      style: AppTheme.bodySmall.copyWith(
+                                        color: AppTheme.textSecondary,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
                                 ),
                               ),
                               IconButton(
@@ -2982,6 +3103,8 @@ Open the app and search for chat ID: $chatId
                                     _selectedFileName = null;
                                   });
                                 },
+                                padding: EdgeInsets.all(4),
+                                constraints: BoxConstraints(),
                               ),
                             ],
                           ),
@@ -3015,10 +3138,9 @@ Open the app and search for chat ID: $chatId
                             Container(
                               margin: EdgeInsets.only(left: 4, bottom: 4),
                               child: IconButton(
-                                icon: Icon(
-                                  Icons.add_circle_outline,
+                                icon: EqualizerIcon(
                                   color: AppTheme.textPrimary,
-                                  size: 26,
+                                  size: 24,
                                 ),
                                 onPressed: _showInputOptionsBottomSheet,
                                 padding: EdgeInsets.all(8),
@@ -3061,46 +3183,57 @@ Open the app and search for chat ID: $chatId
 
                             // 3-line indicator or Send Button
                             if (_controller.text.trim().isEmpty)
-                              Container(
-                                margin: EdgeInsets.only(right: 16, bottom: 16),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    // Three vertical bars of varying heights
-                                    Container(
-                                      width: 3,
-                                      height: 16,
-                                      decoration: BoxDecoration(
-                                        color: AppTheme.textTertiary,
-                                        borderRadius: BorderRadius.circular(
-                                          1.5,
-                                        ),
-                                      ),
+                              AnimatedOpacity(
+                                opacity: 1.0,
+                                duration: const Duration(milliseconds: 180),
+                                child: Transform.scale(
+                                  scale: 1.0,
+                                  child: Container(
+                                    margin: EdgeInsets.only(
+                                      right: 16,
+                                      bottom: 16,
                                     ),
-                                    SizedBox(width: 3),
-                                    Container(
-                                      width: 3,
-                                      height: 20,
-                                      decoration: BoxDecoration(
-                                        color: AppTheme.textTertiary,
-                                        borderRadius: BorderRadius.circular(
-                                          1.5,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      children: [
+                                        // Three vertical bars of varying heights
+                                        Container(
+                                          width: 3,
+                                          height: 16,
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.textTertiary,
+                                            borderRadius: BorderRadius.circular(
+                                              1.5,
+                                            ),
+                                          ),
                                         ),
-                                      ),
-                                    ),
-                                    SizedBox(width: 3),
-                                    Container(
-                                      width: 3,
-                                      height: 12,
-                                      decoration: BoxDecoration(
-                                        color: AppTheme.textTertiary,
-                                        borderRadius: BorderRadius.circular(
-                                          1.5,
+                                        SizedBox(width: 3),
+                                        Container(
+                                          width: 3,
+                                          height: 20,
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.textTertiary,
+                                            borderRadius: BorderRadius.circular(
+                                              1.5,
+                                            ),
+                                          ),
                                         ),
-                                      ),
+                                        SizedBox(width: 3),
+                                        Container(
+                                          width: 3,
+                                          height: 12,
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.textTertiary,
+                                            borderRadius: BorderRadius.circular(
+                                              1.5,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
+                                  ),
                                 ),
                               )
                             else
@@ -3236,6 +3369,58 @@ Open the app and search for chat ID: $chatId
       print('Image compression failed: $e, returning original');
       return imageBytes;
     }
+  }
+}
+
+/// Custom widget displaying 3 vertical bars (equalizer/audio style)
+/// Heights vary: tall, medium, short for visual interest
+class EqualizerIcon extends StatelessWidget {
+  final Color color;
+  final double size;
+
+  const EqualizerIcon({Key? key, this.color = Colors.white, this.size = 24})
+    : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final barWidth = size / 12; // ~2px at size 24
+    final spacing = size / 8; // ~3px at size 24
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // First bar - tallest (70% of size)
+        Container(
+          width: barWidth,
+          height: size * 0.7,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(barWidth / 2),
+          ),
+        ),
+        SizedBox(width: spacing),
+        // Second bar - medium (65% of size)
+        Container(
+          width: barWidth,
+          height: size * 0.65,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(barWidth / 2),
+          ),
+        ),
+        SizedBox(width: spacing),
+        // Third bar - shortest (50% of size)
+        Container(
+          width: barWidth,
+          height: size * 0.5,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(barWidth / 2),
+          ),
+        ),
+      ],
+    );
   }
 }
 

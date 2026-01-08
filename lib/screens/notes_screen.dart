@@ -95,6 +95,18 @@ class _NotesScreenState extends State<NotesScreen> {
                 padding: EdgeInsets.all(AppTheme.spaceMd),
                 child: Row(
                   children: [
+                    // Back button to return to main chat
+                    IconButton(
+                      icon: Icon(
+                        Icons.arrow_back,
+                        color: AppTheme.textPrimary,
+                        size: 24,
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                      padding: EdgeInsets.zero,
+                      constraints: BoxConstraints(),
+                    ),
+                    SizedBox(width: AppTheme.spaceSm),
                     Expanded(
                       child: ShaderMask(
                         shaderCallback: (bounds) => LinearGradient(

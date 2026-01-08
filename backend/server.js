@@ -9,6 +9,90 @@ app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+// ============= UTILITY FUNCTIONS =============
+
+// Detect if a user message requires web search (current events, live data, etc.)
+function shouldAutoTriggerWebSearch(message) {
+  if (!message) return false;
+  const msg = message.toLowerCase();
+
+  // Keywords that indicate time-sensitive or real-time information needs
+  const timeKeywords = [
+    "today",
+    "now",
+    "current",
+    "latest",
+    "recent",
+    "this week",
+    "this month",
+    "this year",
+    "2024",
+    "2025",
+    "2026",
+    "tomorrow",
+    "yesterday",
+  ];
+
+  const eventKeywords = [
+    "news",
+    "stock",
+    "weather",
+    "score",
+    "game",
+    "match",
+    "event",
+    "happening",
+    "trending",
+    "breaking",
+    "live",
+    "real-time",
+  ];
+
+  const queryKeywords = [
+    "what is",
+    "who is",
+    "where is",
+    "how much",
+    "how many",
+    "can you find",
+    "search for",
+    "look up",
+  ];
+
+  return (
+    timeKeywords.some((kw) => msg.includes(kw)) ||
+    eventKeywords.some((kw) => msg.includes(kw)) ||
+    queryKeywords.some((kw) => msg.includes(kw))
+  );
+}
+
+// Standard fallback message for errors (friendly, reassuring)
+function getFallbackMessage() {
+  const fallbacks = [
+    "Sorry, I encountered a temporary issue processing that. Please try again in a moment! 🤔",
+    "Oops! Something went wrong on my end. Could you rephrase that and try again? 💭",
+    "I hit a small bump there. Let me take a breath—please try again! ✨",
+    "Something didn't quite work as expected. Feel free to ask again! 🙌",
+  ];
+  return fallbacks[Math.floor(Math.random() * fallbacks.length)];
+}
+
+// Format response with better spacing and structure (markdown-friendly)
+function formatResponseForReadability(text) {
+  if (!text) return text;
+
+  // Add spacing between paragraphs (detect paragraph breaks)
+  let formatted = text.replace(/\n\n+/g, "\n\n");
+
+  // Ensure lists have breathing room
+  formatted = formatted.replace(/^(\s*[-*])/gm, "\n$1");
+
+  // Add spacing before headings (##, ###, etc.)
+  formatted = formatted.replace(/(\n)(#+\s)/g, "\n\n$2");
+
+  return formatted.trim();
+}
+
 // Helper: structure free-text responses into overview, bullets, code blocks
 function structureTextResponse(text) {
   if (!text) {
@@ -139,6 +223,19 @@ app.post("/api/ask", async (req, res) => {
         }
 
         try {
+          // AUTO-TRIGGER WEB SEARCH DETECTION (no confirmation needed)
+          const needsWebSearch = shouldAutoTriggerWebSearch(userMessage);
+          if (needsWebSearch && !data.webSearchEnabled) {
+            console.log(
+              "[Chat] Auto-detected need for web search; enabling...",
+              {
+                message: userMessage,
+              }
+            );
+            // Return signal to frontend to auto-enable web search
+            data.webSearchEnabled = true;
+          }
+
           // HARD ROUTING: Check for founder/builder questions WITHOUT consent
           const founderQuestionRegex =
             /(founder|builder|creator|who built|who created|who made)/i;
@@ -949,6 +1046,8 @@ If the user specifies length, format, or style, follow the user exactly and igno
           }
 
           const structured = structureTextResponse(finalText);
+          // FORMATTING: Apply readability improvements
+          const formattedText = formatResponseForReadability(finalText);
 
           // If client requested a summarize action, return the concise form
           if (data?.action === "summarize" && data?.mode === "concise") {
@@ -959,29 +1058,37 @@ If the user specifies length, format, or style, follow the user exactly and igno
               fullResponse: result,
               timestamp: new Date().toISOString(),
               status: "success",
+              webSearchAutoTriggered: needsWebSearch,
             });
           }
 
           return res.json({
             provider: selectedModel,
-            reply: finalText,
+            reply: formattedText,
             structured: structured,
             fullResponse: result,
             timestamp: new Date().toISOString(),
             status: "success",
+            webSearchAutoTriggered: needsWebSearch,
           });
         } catch (chatError) {
           console.error("[Chat] Exception caught:", {
             message: chatError.message,
             stack: chatError.stack,
             name: chatError.name,
+            provider: selectedModel || "unknown",
           });
+          // FALLBACK: Return friendly message instead of exposing error
+          const fallbackMsg = getFallbackMessage();
+          const structured = structureTextResponse(fallbackMsg);
           return res.status(500).json({
-            error: "Failed to process chat request",
-            message: chatError.message,
-            provider: "groq",
-            errorType: chatError.name,
+            provider: selectedModel || "groq",
+            reply: fallbackMsg,
+            structured: structured,
+            error: "Temporary issue - please try again",
             timestamp: new Date().toISOString(),
+            status: "error",
+            isErrorFallback: true,
           });
         }
 
@@ -1027,11 +1134,13 @@ If the user specifies length, format, or style, follow the user exactly and igno
               ? resp.data
               : JSON.stringify(resp.data, null, 2);
           const structured = structureTextResponse(resultsText);
+          // FORMATTING: Apply readability improvements
+          const formattedResults = formatResponseForReadability(resultsText);
 
           return res.json({
             provider: "tavily",
             results: resp.data,
-            reply: resultsText,
+            reply: formattedResults,
             structured: structured,
             timestamp: new Date().toISOString(),
             status: "success",
@@ -1041,11 +1150,15 @@ If the user specifies length, format, or style, follow the user exactly and igno
             "[Search] Error:",
             searchError?.response?.data || searchError.message || searchError
           );
-          return res.status(searchError?.response?.status || 500).json({
-            error: "Search request failed",
-            message: searchError?.response?.data || searchError.message,
+          // FALLBACK: Return friendly message instead of exposing error
+          const fallbackMsg = getFallbackMessage();
+          return res.status(500).json({
+            error: "Search temporarily unavailable",
+            reply: fallbackMsg,
             provider: "tavily",
             timestamp: new Date().toISOString(),
+            isErrorFallback: true,
+            status: "error",
           });
         }
 
@@ -1127,7 +1240,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
           };
 
           const geminiResponse = await axios.post(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${gemKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${gemKey}`,
             {
               contents: [
                 {
@@ -1152,10 +1265,12 @@ If the user specifies length, format, or style, follow the user exactly and igno
             geminiResponse.data?.candidates?.[0]?.content?.parts?.[0]?.text ||
             "No analysis returned";
           const structured = structureTextResponse(analysisText);
+          // FORMATTING: Apply readability improvements
+          const formattedAnalysis = formatResponseForReadability(analysisText);
 
           return res.json({
             provider: "gemini",
-            analysis: analysisText,
+            analysis: formattedAnalysis,
             structured: structured,
             fullResponse: geminiResponse.data,
             timestamp: new Date().toISOString(),
@@ -1167,12 +1282,15 @@ If the user specifies length, format, or style, follow the user exactly and igno
             data: imageError?.response?.data,
             message: imageError?.message,
           });
-          return res.status(imageError?.response?.status || 500).json({
-            error: "Image analysis failed",
-            message:
-              imageError?.response?.data?.error?.message || imageError.message,
+          // FALLBACK: Return friendly message instead of exposing error
+          const fallbackMsg = getFallbackMessage();
+          return res.status(500).json({
+            error: "Image analysis temporarily unavailable",
+            analysis: fallbackMsg,
             provider: "gemini",
             timestamp: new Date().toISOString(),
+            isErrorFallback: true,
+            status: "error",
           });
         }
 
@@ -1191,10 +1309,13 @@ If the user specifies length, format, or style, follow the user exactly and igno
       stack: mainError.stack,
       name: mainError.name,
     });
+    // FALLBACK: Return friendly message instead of exposing error
+    const fallbackMsg = getFallbackMessage();
     return res.status(500).json({
-      error: "Request processing failed",
-      message: mainError.message,
-      errorType: mainError.name,
+      error: "Request processing failed temporarily",
+      reply: fallbackMsg,
+      isErrorFallback: true,
+      status: "error",
       timestamp: new Date().toISOString(),
     });
   }

@@ -296,8 +296,7 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
                                           ),
                                           SizedBox(height: 4),
                                           Text(
-                                            chat['lastMessage'] ??
-                                                'No messages yet',
+                                            chat['lastMessage'] ?? '',
                                             style: AppTheme.bodySmall.copyWith(
                                               color: AppTheme.textSecondary,
                                             ),
