@@ -612,6 +612,14 @@ If the user specifies length, format, or style, follow the user exactly and igno
             .toString()
             .toLowerCase();
 
+          // Compute Gemini key from multiple possible env names (fallback to 'second-model')
+          const computedGemKey =
+            process.env["second-model"] ||
+            process.env.geminiapikey ||
+            process.env.GEMINI_API_KEY ||
+            process.env.GEMINIKEY ||
+            process.env.GEN_API_KEY;
+
           console.log(
             `[Chat] Selected model: ${selectedModel} (mode: ${responseMode}, constraints: ${JSON.stringify(
               constraintInfo
@@ -673,7 +681,8 @@ If the user specifies length, format, or style, follow the user exactly and igno
           } else if (selectedModel === "gemini") {
             // Gemini path (text-only)
             console.log("[Chat] Routing to Gemini text API");
-            if (!GEMINI_KEY) {
+            const gemKey = computedGemKey;
+            if (!gemKey) {
               console.error(
                 "[Chat] GEMINI key not configured (env 'second-model' or GEMINI_*)"
               );
@@ -693,7 +702,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
 
             try {
               const geminiResp = await axios.post(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5:generateText?key=${GEMINI_KEY}`,
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5:generateText?key=${gemKey}`,
                 {
                   prompt: { text: promptText },
                   // keep tokens and temperature conservative to match Groq behavior
@@ -874,8 +883,14 @@ If the user specifies length, format, or style, follow the user exactly and igno
                 const regenPrompt = regenMessages
                   .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
                   .join("\n\n");
+                const gemKey = computedGemKey;
+                if (!gemKey) {
+                  throw new Error(
+                    "Gemini API key not configured for regeneration"
+                  );
+                }
                 const gemResp = await axios.post(
-                  `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5:generateText?key=${GEMINI_KEY}`,
+                  `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5:generateText?key=${gemKey}`,
                   {
                     prompt: { text: regenPrompt },
                     maxOutputTokens: 1024,
@@ -1030,16 +1045,21 @@ If the user specifies length, format, or style, follow the user exactly and igno
       case "image":
         console.log("[Image Case] Processing image request:", data);
         try {
-          // Check for Gemini API key
-          const GEMINI_KEY = process.env.geminiApi;
-          if (!GEMINI_KEY) {
+          // Check for Gemini API key (support multiple env var names)
+          const gemKey =
+            process.env["second-model"] ||
+            process.env.geminiapikey ||
+            process.env.GEMINI_API_KEY ||
+            process.env.GEMINIKEY ||
+            process.env.GEN_API_KEY;
+          if (!gemKey) {
             console.error(
-              "[Image] GEMINI API key not configured (env 'geminiapikey')"
+              "[Image] GEMINI API key not configured (env 'second-model' or GEMINI_*)"
             );
             return res.status(500).json({
               error: "API configuration error",
               message:
-                "Gemini API key not configured. Set env var 'geminiapikey'.",
+                "Gemini API key not configured. Set env var 'second-model' or GEMINI_API_KEY.'",
               provider: "gemini",
               timestamp: new Date().toISOString(),
             });
@@ -1100,7 +1120,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
           };
 
           const geminiResponse = await axios.post(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${gemKey}`,
             {
               contents: [
                 {
