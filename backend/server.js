@@ -612,9 +612,9 @@ If the user specifies length, format, or style, follow the user exactly and igno
             .toString()
             .toLowerCase();
 
-          // Compute Gemini key from multiple possible env names (fallback to 'second-model')
+          // Compute Gemini key from multiple possible env names (fallback to 'second_model')
           const computedGemKey =
-            process.env["second-model"] ||
+            process.env["second_model"] ||
             process.env.geminiapikey ||
             process.env.GEMINI_API_KEY ||
             process.env.GEMINIKEY ||
@@ -684,12 +684,12 @@ If the user specifies length, format, or style, follow the user exactly and igno
             const gemKey = computedGemKey;
             if (!gemKey) {
               console.error(
-                "[Chat] GEMINI key not configured (env 'second-model' or GEMINI_*)"
+                "[Chat] GEMINI key not configured (env 'second_model' or GEMINI_*)"
               );
               return res.status(500).json({
                 error: "API configuration error",
                 message:
-                  "Gemini API key not configured. Set env var 'second-model' or GEMINI_API_KEY",
+                  "Gemini API key not configured. Set env var 'second_model' or GEMINI_API_KEY",
                 provider: "gemini",
                 timestamp: new Date().toISOString(),
               });
@@ -1047,19 +1047,19 @@ If the user specifies length, format, or style, follow the user exactly and igno
         try {
           // Check for Gemini API key (support multiple env var names)
           const gemKey =
-            process.env["second-model"] ||
+            process.env["second_model"] ||
             process.env.geminiapikey ||
             process.env.GEMINI_API_KEY ||
             process.env.GEMINIKEY ||
             process.env.GEN_API_KEY;
           if (!gemKey) {
             console.error(
-              "[Image] GEMINI API key not configured (env 'second-model' or GEMINI_*)"
+              "[Image] GEMINI API key not configured (env 'second_model' or GEMINI_*)"
             );
             return res.status(500).json({
               error: "API configuration error",
               message:
-                "Gemini API key not configured. Set env var 'second-model' or GEMINI_API_KEY.'",
+                "Gemini API key not configured. Set env var 'second_model' or GEMINI_API_KEY",
               provider: "gemini",
               timestamp: new Date().toISOString(),
             });
@@ -1208,7 +1208,7 @@ app.get("/", (req, res) => res.send("Backend is live!"));
 
 // Normalized environment variables (accept user-preferred names plus common variants)
 const GEMINI_KEY =
-  process.env['second-model'] ||
+  process.env['second_model'] ||
   process.env.geminiapikey ||
   process.env.GEMINI_API_KEY ||
   process.env.GEMINIKEY ||
