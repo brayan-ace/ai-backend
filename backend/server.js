@@ -702,12 +702,18 @@ If the user specifies length, format, or style, follow the user exactly and igno
 
             try {
               const geminiResp = await axios.post(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5:generateText?key=${gemKey}`,
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${gemKey}`,
                 {
-                  prompt: { text: promptText },
-                  // keep tokens and temperature conservative to match Groq behavior
-                  maxOutputTokens: 1024,
-                  temperature: 0.2,
+                  contents: [
+                    {
+                      role: "user",
+                      parts: [{ text: promptText }],
+                    },
+                  ],
+                  generationConfig: {
+                    maxOutputTokens: 1024,
+                    temperature: 0.2,
+                  },
                 },
                 {
                   headers: { "Content-Type": "application/json" },
@@ -718,16 +724,12 @@ If the user specifies length, format, or style, follow the user exactly and igno
               result = geminiResp.data;
               console.log("[Chat] Gemini API success:", result);
 
-              // Try multiple fallback locations for returned text
+              // Extract text from Gemini generateContent response format
               rawText =
-                result?.candidates?.[0]?.output?.[0]?.content ||
-                result?.candidates?.[0]?.output ||
-                result?.candidates?.[0]?.content ||
-                result?.output_text ||
-                result?.candidates?.[0]?.message?.content ||
+                result?.candidates?.[0]?.content?.parts?.[0]?.text ||
+                result?.candidates?.[0]?.content?.parts?.[0] ||
+                result?.candidates?.[0]?.text ||
                 rawText;
-
-              if (Array.isArray(rawText)) rawText = rawText.join("\n");
             } catch (gErr) {
               console.error("[Chat] Gemini API error:", {
                 message: gErr.message,
@@ -890,11 +892,18 @@ If the user specifies length, format, or style, follow the user exactly and igno
                   );
                 }
                 const gemResp = await axios.post(
-                  `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5:generateText?key=${gemKey}`,
+                  `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${gemKey}`,
                   {
-                    prompt: { text: regenPrompt },
-                    maxOutputTokens: 1024,
-                    temperature: 0.2,
+                    contents: [
+                      {
+                        role: "user",
+                        parts: [{ text: regenPrompt }],
+                      },
+                    ],
+                    generationConfig: {
+                      maxOutputTokens: 1024,
+                      temperature: 0.2,
+                    },
                   },
                   {
                     headers: { "Content-Type": "application/json" },
@@ -903,12 +912,10 @@ If the user specifies length, format, or style, follow the user exactly and igno
                 );
                 regenResult = gemResp.data;
                 regenText =
-                  regenResult?.candidates?.[0]?.output?.[0]?.content ||
-                  regenResult?.candidates?.[0]?.output ||
-                  regenResult?.candidates?.[0]?.content ||
-                  regenResult?.output_text ||
+                  regenResult?.candidates?.[0]?.content?.parts?.[0]?.text ||
+                  regenResult?.candidates?.[0]?.content?.parts?.[0] ||
+                  regenResult?.candidates?.[0]?.text ||
                   "";
-                if (Array.isArray(regenText)) regenText = regenText.join("\n");
               }
 
               regenText = sanitizeText(regenText || "");
