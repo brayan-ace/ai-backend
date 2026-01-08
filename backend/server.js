@@ -702,7 +702,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
 
             try {
               const geminiResp = await axios.post(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${gemKey}`,
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${gemKey}`,
                 {
                   contents: [
                     {
@@ -1127,7 +1127,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
           };
 
           const geminiResponse = await axios.post(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${gemKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${gemKey}`,
             {
               contents: [
                 {
