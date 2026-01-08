@@ -139,17 +139,6 @@ app.post("/api/ask", async (req, res) => {
         }
 
         try {
-          // Check if API key exists
-          if (!process.env.GROQ_API_KEY) {
-            console.error("[Chat] GROQ_API_KEY not configured");
-            return res.status(500).json({
-              error: "API configuration error",
-              message: "GROQ_API_KEY not configured",
-              provider: "groq",
-              timestamp: new Date().toISOString(),
-            });
-          }
-
           // HARD ROUTING: Check for founder/builder questions WITHOUT consent
           const founderQuestionRegex =
             /(founder|builder|creator|who built|who created|who made)/i;
@@ -619,50 +608,138 @@ If the user specifies length, format, or style, follow the user exactly and igno
             }
           }
 
+          const selectedModel = (data.model || data.provider || "groq")
+            .toString()
+            .toLowerCase();
+
           console.log(
-            `[Chat] Using ${responseMode} mode with Groq API (constraints: ${JSON.stringify(
+            `[Chat] Selected model: ${selectedModel} (mode: ${responseMode}, constraints: ${JSON.stringify(
               constraintInfo
             )})...`
           );
 
-          const response = await fetch(
-            "https://api.groq.com/openai/v1/chat/completions",
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-              },
-              body: JSON.stringify({
-                messages: messages,
-                model: "openai/gpt-oss-20b",
-              }),
-              timeout: 30000,
-            }
-          );
+          let result = null;
+          let rawText = "No response from API";
 
-          // Check response status
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error("[Chat] Groq API error response:", {
-              status: response.status,
-              statusText: response.statusText,
-              body: errorText,
-            });
-            return res.status(response.status).json({
-              error: "Groq API request failed",
-              message: errorText || response.statusText,
-              status: response.status,
-              provider: "groq",
+          if (selectedModel === "groq") {
+            // GROQ path (behavior preserved)
+            console.log("[Chat] Routing to Groq API");
+            if (!process.env.GROQ_API_KEY) {
+              console.error("[Chat] GROQ_API_KEY not configured");
+              return res.status(500).json({
+                error: "API configuration error",
+                message: "GROQ_API_KEY not configured",
+                provider: "groq",
+                timestamp: new Date().toISOString(),
+              });
+            }
+
+            const response = await fetch(
+              "https://api.groq.com/openai/v1/chat/completions",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+                },
+                body: JSON.stringify({
+                  messages: messages,
+                  model: "openai/gpt-oss-20b",
+                }),
+                timeout: 30000,
+              }
+            );
+
+            // Check response status
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error("[Chat] Groq API error response:", {
+                status: response.status,
+                statusText: response.statusText,
+                body: errorText,
+              });
+              return res.status(response.status).json({
+                error: "Groq API request failed",
+                message: errorText || response.statusText,
+                status: response.status,
+                provider: "groq",
+                timestamp: new Date().toISOString(),
+              });
+            }
+
+            result = await response.json();
+            console.log("[Chat] Groq API success:", result);
+            rawText = result.choices?.[0]?.message?.content || rawText;
+          } else if (selectedModel === "gemini") {
+            // Gemini path (text-only)
+            console.log("[Chat] Routing to Gemini text API");
+            if (!GEMINI_KEY) {
+              console.error(
+                "[Chat] GEMINI key not configured (env 'second-model' or GEMINI_*)"
+              );
+              return res.status(500).json({
+                error: "API configuration error",
+                message:
+                  "Gemini API key not configured. Set env var 'second-model' or GEMINI_API_KEY",
+                provider: "gemini",
+                timestamp: new Date().toISOString(),
+              });
+            }
+
+            // Convert structured messages into a single prompt for Gemini
+            const promptText = messages
+              .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
+              .join("\n\n");
+
+            try {
+              const geminiResp = await axios.post(
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5:generateText?key=${GEMINI_KEY}`,
+                {
+                  prompt: { text: promptText },
+                  // keep tokens and temperature conservative to match Groq behavior
+                  maxOutputTokens: 1024,
+                  temperature: 0.2,
+                },
+                {
+                  headers: { "Content-Type": "application/json" },
+                  timeout: 30000,
+                }
+              );
+
+              result = geminiResp.data;
+              console.log("[Chat] Gemini API success:", result);
+
+              // Try multiple fallback locations for returned text
+              rawText =
+                result?.candidates?.[0]?.output?.[0]?.content ||
+                result?.candidates?.[0]?.output ||
+                result?.candidates?.[0]?.content ||
+                result?.output_text ||
+                result?.candidates?.[0]?.message?.content ||
+                rawText;
+
+              if (Array.isArray(rawText)) rawText = rawText.join("\n");
+            } catch (gErr) {
+              console.error("[Chat] Gemini API error:", {
+                message: gErr.message,
+                response: gErr?.response?.data || gErr?.response?.status,
+              });
+              // Bubble up a clear error to client
+              return res.status(gErr?.response?.status || 502).json({
+                error: "Gemini API request failed",
+                message: gErr?.response?.data?.error?.message || gErr.message,
+                provider: "gemini",
+                timestamp: new Date().toISOString(),
+              });
+            }
+          } else {
+            console.warn("[Chat] Unsupported model requested:", selectedModel);
+            return res.status(400).json({
+              error: "Unsupported model",
+              message: `Model '${selectedModel}' is not supported. Use 'groq' or 'gemini'.`,
               timestamp: new Date().toISOString(),
             });
           }
-
-          const result = await response.json();
-          console.log("[Chat] Groq API success:", result);
-
-          let rawText =
-            result.choices?.[0]?.message?.content || "No response from API";
 
           // Reformat numbered definition style if needed
           rawText = reformatLeadingNumberedDefinition(rawText);
@@ -771,24 +848,55 @@ If the user specifies length, format, or style, follow the user exactly and igno
                 { role: "user", content: userMessage },
               ];
 
-              const regenResp = await fetch(
-                "https://api.groq.com/openai/v1/chat/completions",
-                {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+              // Regenerate using the same model the user requested
+              let regenResult = null;
+              let regenText = "";
+              if (selectedModel === "groq") {
+                const regenResp = await fetch(
+                  "https://api.groq.com/openai/v1/chat/completions",
+                  {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+                    },
+                    body: JSON.stringify({
+                      messages: regenMessages,
+                      model: "openai/gpt-oss-20b",
+                    }),
+                    timeout: 30000,
+                  }
+                );
+                regenResult = await regenResp.json();
+                regenText = regenResult.choices?.[0]?.message?.content || "";
+              } else if (selectedModel === "gemini") {
+                // Convert regen messages to a prompt string
+                const regenPrompt = regenMessages
+                  .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
+                  .join("\n\n");
+                const gemResp = await axios.post(
+                  `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5:generateText?key=${GEMINI_KEY}`,
+                  {
+                    prompt: { text: regenPrompt },
+                    maxOutputTokens: 1024,
+                    temperature: 0.2,
                   },
-                  body: JSON.stringify({
-                    messages: regenMessages,
-                    model: "openai/gpt-oss-20b",
-                  }),
-                  timeout: 30000,
-                }
-              );
-              const regenResult = await regenResp.json();
-              let regenText = regenResult.choices?.[0]?.message?.content || "";
-              regenText = sanitizeText(regenText);
+                  {
+                    headers: { "Content-Type": "application/json" },
+                    timeout: 30000,
+                  }
+                );
+                regenResult = gemResp.data;
+                regenText =
+                  regenResult?.candidates?.[0]?.output?.[0]?.content ||
+                  regenResult?.candidates?.[0]?.output ||
+                  regenResult?.candidates?.[0]?.content ||
+                  regenResult?.output_text ||
+                  "";
+                if (Array.isArray(regenText)) regenText = regenText.join("\n");
+              }
+
+              regenText = sanitizeText(regenText || "");
               if (constraintInfo.lines)
                 regenText = enforceLineCount(regenText, constraintInfo.lines);
 
@@ -823,7 +931,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
           // If client requested a summarize action, return the concise form
           if (data?.action === "summarize" && data?.mode === "concise") {
             return res.json({
-              provider: "groq",
+              provider: selectedModel,
               reply: structured.concise,
               structured: structured,
               fullResponse: result,
@@ -833,7 +941,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
           }
 
           return res.json({
-            provider: "groq",
+            provider: selectedModel,
             reply: finalText,
             structured: structured,
             fullResponse: result,
@@ -1080,6 +1188,7 @@ app.get("/", (req, res) => res.send("Backend is live!"));
 
 // Normalized environment variables (accept user-preferred names plus common variants)
 const GEMINI_KEY =
+  process.env['second-model'] ||
   process.env.geminiapikey ||
   process.env.GEMINI_API_KEY ||
   process.env.GEMINIKEY ||
