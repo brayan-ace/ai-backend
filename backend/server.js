@@ -278,7 +278,7 @@ Study Context:
 
         // Groq API uses OpenAI-compatible format
         const groqPayload = {
-          model: "mixtral-8x7b-32768",
+          model: "openai/gpt-oss-20b",
           messages: [
             {
               role: "system",
