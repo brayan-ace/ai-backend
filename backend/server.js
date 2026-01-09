@@ -209,6 +209,22 @@ async function ensureTables() {
       );
     `);
     console.log("[DB] chat_messages table ensured");
+
+    // Create bot_progress table for tracking learning progress
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS bot_progress (
+        id SERIAL PRIMARY KEY,
+        bot_id TEXT NOT NULL REFERENCES study_bots(bot_id),
+        user_id TEXT NOT NULL,
+        study_plan JSONB,
+        current_module INT DEFAULT 0,
+        completed_modules JSONB DEFAULT '[]'::jsonb,
+        progress_percentage FLOAT DEFAULT 0,
+        bot_state VARCHAR(50) DEFAULT 'intro',
+        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("[DB] bot_progress table ensured");
   } catch (err) {
     console.error("[DB] Failed to ensure tables:", err.message);
   }
@@ -625,6 +641,379 @@ app.post("/api/chat", async (req, res) => {
     });
   } catch (err) {
     console.error("[/api/chat] Error:", err.message);
+    return res.status(500).json({
+      error: "Chat processing failed",
+      message: err.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// ============= ENHANCED CHAT WITH STATE MANAGEMENT & FORMATTING =============
+
+// Generate study plan from AI
+async function generateStudyPlan(topic, description, gradeLevel, groqApiKey) {
+  try {
+    const planPrompt = `
+You are an expert curriculum designer. Create a detailed, structured study plan for:
+Topic: ${topic}
+Description: ${description}
+Grade Level: ${gradeLevel}
+
+Generate a JSON object with EXACTLY this structure:
+{
+  "title": "Study Plan Title",
+  "modules": [
+    {
+      "id": 1,
+      "title": "Module Title",
+      "description": "What you'll learn",
+      "duration": "X hours",
+      "objectives": ["objective 1", "objective 2"]
+    }
+  ],
+  "total_duration": "X hours",
+  "difficulty": "Beginner/Intermediate/Advanced"
+}
+
+Return ONLY valid JSON, no other text.`;
+
+    const groqRes = await axios.post(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        model: "openai/gpt-oss-20b",
+        messages: [{ role: "user", content: planPrompt }],
+        max_tokens: 1500,
+        temperature: 0.7,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${groqApiKey}`,
+        },
+        timeout: 30000,
+      }
+    );
+
+    const planText = groqRes?.data?.choices?.[0]?.message?.content;
+    return JSON.parse(planText);
+  } catch (err) {
+    console.error("[generateStudyPlan] Error:", err.message);
+    return null;
+  }
+}
+
+// Format response with emojis and ChatGPT-style formatting
+function formatChatGPTStyle(text) {
+  if (!text) return text;
+
+  // Add strategic emojis to headings
+  let formatted = text
+    .replace(/^#+\s+/gm, (match) => {
+      const emojiMap = {
+        "# ": "📚 ",
+        "## ": "🎯 ",
+        "### ": "✨ ",
+        "#### ": "🔹 ",
+      };
+      return emojiMap[match] || match;
+    })
+    // Bold important keywords
+    .replace(/\*\*(.+?)\*\*/g, "**$1**")
+    // Add spacing between sections
+    .replace(/\n\n/g, "\n\n")
+    // Add emojis to bullet points
+    .replace(/^-\s+/gm, "• ")
+    .replace(/^•\s+/gm, "→ ");
+
+  return formatted;
+}
+
+// Enhanced chat endpoint with state management
+app.post("/api/chat-enhanced", async (req, res) => {
+  const timestamp = new Date().toISOString();
+  console.log("[POST /api/chat-enhanced] Enhanced chat request:", timestamp);
+
+  try {
+    const { message, botId, userId, systemInstructions } = req.body;
+
+    if (!message || !botId || !userId) {
+      return res.status(400).json({
+        error: "Invalid request",
+        message: "message, botId, and userId are required",
+        timestamp,
+      });
+    }
+
+    // Get or initialize progress
+    let progress;
+    try {
+      const result = await pool.query(
+        `SELECT * FROM bot_progress WHERE bot_id = $1 AND user_id = $2 LIMIT 1`,
+        [botId, userId]
+      );
+
+      if (result.rows.length === 0) {
+        // Initialize progress for new bot session
+        await pool.query(
+          `INSERT INTO bot_progress (bot_id, user_id, bot_state) VALUES ($1, $2, 'intro')`,
+          [botId, userId]
+        );
+        progress = {
+          bot_state: "intro",
+          study_plan: null,
+          current_module: 0,
+          completed_modules: [],
+          progress_percentage: 0,
+        };
+      } else {
+        progress = result.rows[0];
+      }
+    } catch (dbErr) {
+      console.warn("[chat-enhanced] DB error:", dbErr.message);
+      progress = { bot_state: "intro", study_plan: null };
+    }
+
+    // Save user message
+    await pool.query(
+      `INSERT INTO chat_messages (bot_id, user_id, message_type, content) VALUES ($1, $2, $3, $4)`,
+      [botId, userId, "user", message]
+    );
+
+    let botResponse = "";
+    let newState = progress.bot_state;
+    let updatedPlan = progress.study_plan;
+
+    const groqApiKey = process.env.GROQ_API_KEY;
+
+    // STATE MACHINE LOGIC
+    if (progress.bot_state === "intro") {
+      if (
+        message.toLowerCase().includes("ready") ||
+        message.toLowerCase().includes("start") ||
+        message.toLowerCase().includes("yes")
+      ) {
+        // Generate study plan
+        const bot = await pool.query(
+          `SELECT topic, description, grade_level FROM study_bots WHERE bot_id = $1`,
+          [botId]
+        );
+
+        if (bot.rows.length > 0) {
+          const plan = await generateStudyPlan(
+            bot.rows[0].topic,
+            bot.rows[0].description,
+            bot.rows[0].grade_level,
+            groqApiKey
+          );
+
+          if (plan && plan.modules) {
+            updatedPlan = plan;
+            newState = "plan_review";
+            botResponse = `✅ **I've Created Your Study Plan!**
+
+📖 **${plan.title}**
+
+⏱️ **Total Duration:** ${plan.total_duration}
+📊 **Difficulty:** ${plan.difficulty}
+
+---
+
+**📋 Your Learning Path:**
+${plan.modules
+  .map(
+    (m, i) =>
+      `
+**${i + 1}. ${m.title}** 
+   ⏰ ${m.duration}
+   📝 ${m.description}
+   🎯 Objectives:
+${m.objectives.map((o) => `      • ${o}`).join("\n")}
+`
+  )
+  .join("\n")}
+
+---
+
+**Does this plan look good? Reply "yes" to start learning! 🚀**`;
+          }
+        }
+      } else {
+        botResponse =
+          "👋 Hi there! I'm excited to help you learn **${topic}**!\n\nWhen you're ready to begin, just type **\"ready\"** or **\"let's start\"** and I'll create a personalized study plan for you! 📚";
+      }
+    } else if (progress.bot_state === "plan_review") {
+      if (
+        message.toLowerCase().includes("yes") ||
+        message.toLowerCase().includes("approve") ||
+        message.toLowerCase().includes("looks good")
+      ) {
+        newState = "learning";
+        await pool.query(
+          `UPDATE bot_progress SET study_plan = $1, bot_state = $2, current_module = 0 WHERE bot_id = $3 AND user_id = $4`,
+          [JSON.stringify(updatedPlan), newState, botId, userId]
+        );
+
+        if (
+          updatedPlan &&
+          updatedPlan.modules &&
+          updatedPlan.modules.length > 0
+        ) {
+          const firstModule = updatedPlan.modules[0];
+          botResponse = `🎉 **Excellent! Let's Begin!**
+
+---
+
+**Module 1: ${firstModule.title}**
+⏰ Duration: ${firstModule.duration}
+
+${firstModule.description}
+
+---
+
+**📚 What You'll Learn:**
+${firstModule.objectives.map((obj) => `• ${obj}`).join("\n")}
+
+---
+
+Let me know when you're done with this module or if you have any questions! 💡`;
+        }
+      } else if (
+        message.toLowerCase().includes("edit") ||
+        message.toLowerCase().includes("change")
+      ) {
+        botResponse =
+          "📝 Sure! What would you like to adjust in the study plan? You can:\n\n• Change the **order** of modules\n• **Skip** certain topics\n• Add **more focus** on specific areas\n\nJust let me know! ✏️";
+      } else {
+        botResponse =
+          "I have your study plan ready! Would you like to:\n✅ Start learning (type **yes**)\n✏️ Edit the plan (type **edit**)\n\nWhat would you prefer? 🤔";
+      }
+    } else if (progress.bot_state === "learning") {
+      // Handle learning interactions with context
+      const historyResult = await pool.query(
+        `SELECT message_type, content FROM chat_messages WHERE bot_id = $1 AND user_id = $2 ORDER BY created_at DESC LIMIT 15`,
+        [botId, userId]
+      );
+
+      const chatHistory = historyResult.rows.reverse();
+      const systemPrompt = `${
+        systemInstructions?.instructions ||
+        "You are a supportive study tutor. Use emojis, bold text, and proper formatting."
+      }
+
+IMPORTANT: Format your responses with:
+- 📚 Bold headings for major concepts
+- ✨ Bullet points for key takeaways
+- 🔹 Numbered lists for sequences
+- 💡 Tips and interesting facts
+- Empty lines between paragraphs
+- Emojis at the start of sentences
+- Link concepts to previous lessons`;
+
+      const groqMessages = [{ role: "system", content: systemPrompt }];
+
+      for (const msg of chatHistory) {
+        groqMessages.push({
+          role: msg.message_type === "user" ? "user" : "assistant",
+          content: msg.content,
+        });
+      }
+
+      groqMessages.push({ role: "user", content: message });
+
+      const groqRes = await axios.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        {
+          model: "openai/gpt-oss-20b",
+          messages: groqMessages,
+          max_tokens: 1200,
+          temperature: 0.8,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${groqApiKey}`,
+          },
+          timeout: 30000,
+        }
+      );
+
+      botResponse =
+        groqRes?.data?.choices?.[0]?.message?.content ||
+        "I encountered an issue. Please try again! 🤔";
+
+      // Check if user completed module
+      if (
+        message.toLowerCase().includes("done") ||
+        message.toLowerCase().includes("completed") ||
+        message.toLowerCase().includes("next")
+      ) {
+        const completed = progress.completed_modules || [];
+        completed.push(progress.current_module);
+
+        const totalModules = updatedPlan?.modules?.length || 1;
+        const progressPercent = Math.round(
+          (completed.length / totalModules) * 100
+        );
+
+        await pool.query(
+          `UPDATE bot_progress SET completed_modules = $1, current_module = $2, progress_percentage = $3 WHERE bot_id = $4 AND user_id = $5`,
+          [
+            JSON.stringify(completed),
+            progress.current_module + 1,
+            progressPercent,
+            botId,
+            userId,
+          ]
+        );
+
+        const nextModule = updatedPlan?.modules?.[progress.current_module + 1];
+        if (nextModule) {
+          botResponse += `\n\n✅ **Great Work!** Module ${
+            progress.current_module + 1
+          } completed!\n\n📊 **Progress: ${progressPercent}%**\n\n➡️ **Next Up: ${
+            nextModule.title
+          }**\n${nextModule.description}`;
+        } else {
+          botResponse += `\n\n🎓 **Congratulations!** You've completed all modules!\n\n📊 **Final Progress: 100%** 🎉`;
+          newState = "completed";
+        }
+      }
+
+      botResponse = formatChatGPTStyle(botResponse);
+    }
+
+    // Update state if changed
+    if (newState !== progress.bot_state) {
+      await pool.query(
+        `UPDATE bot_progress SET bot_state = $1, study_plan = $2, last_updated = NOW() WHERE bot_id = $3 AND user_id = $4`,
+        [
+          newState,
+          updatedPlan ? JSON.stringify(updatedPlan) : progress.study_plan,
+          botId,
+          userId,
+        ]
+      );
+    }
+
+    // Save bot response
+    await pool.query(
+      `INSERT INTO chat_messages (bot_id, user_id, message_type, content) VALUES ($1, $2, $3, $4)`,
+      [botId, userId, "bot", botResponse]
+    );
+
+    return res.json({
+      status: "success",
+      response: botResponse,
+      state: newState,
+      progress: {
+        percentage: progress.progress_percentage || 0,
+        completed_modules: progress.completed_modules?.length || 0,
+      },
+      timestamp,
+    });
+  } catch (err) {
+    console.error("[chat-enhanced] Error:", err.message);
     return res.status(500).json({
       error: "Chat processing failed",
       message: err.message,

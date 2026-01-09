@@ -7,6 +7,78 @@ import '../services/study_plan_service.dart';
 import '../services/study_bot_flow_controller.dart';
 import '../utils/theme.dart';
 
+// Widget to render formatted text with emojis and markdown-like styling
+class FormattedTextWidget extends StatelessWidget {
+  final String text;
+
+  const FormattedTextWidget(this.text, {Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final spans = _parseMarkdownToSpans(text);
+    return RichText(
+      text: TextSpan(
+        children: spans,
+        style: AppTheme.bodyMedium.copyWith(color: AppTheme.textPrimary),
+      ),
+    );
+  }
+
+  List<TextSpan> _parseMarkdownToSpans(String text) {
+    final spans = <TextSpan>[];
+    final pattern = RegExp(
+      r'\*\*(.+?)\*\*|###\s+(.+?)(?=\n|$)|##\s+(.+?)(?=\n|$)|#\s+(.+?)(?=\n|$)|$^',
+      multiLine: true,
+    );
+
+    var lastIndex = 0;
+    for (final match in pattern.allMatches(text)) {
+      // Add plain text before the match
+      if (lastIndex < match.start) {
+        spans.add(TextSpan(text: text.substring(lastIndex, match.start)));
+      }
+
+      // Handle bold text
+      if (match.group(1) != null) {
+        spans.add(
+          TextSpan(
+            text: match.group(1),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: AppTheme.primaryBlue,
+            ),
+          ),
+        );
+      }
+      // Handle headings
+      else if (match.group(2) != null ||
+          match.group(3) != null ||
+          match.group(4) != null) {
+        final headingText = match.group(2) ?? match.group(3) ?? match.group(4);
+        spans.add(
+          TextSpan(
+            text: headingText,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: AppTheme.primaryBlue,
+            ),
+          ),
+        );
+      }
+
+      lastIndex = match.end;
+    }
+
+    // Add remaining text
+    if (lastIndex < text.length) {
+      spans.add(TextSpan(text: text.substring(lastIndex)));
+    }
+
+    return spans.isEmpty ? [TextSpan(text: text)] : spans;
+  }
+}
+
 class StudyPlanChatScreen extends StatefulWidget {
   // Phase 1 Bot Parameters
   final String? botId;
@@ -61,6 +133,10 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
 
   // Bot instructions from database
   Map<String, dynamic>? _botInstructions;
+
+  // Progress tracking
+  double _progressPercentage = 0;
+  String _botCurrentState = 'intro';
 
   // Backend URL
   static const String _backendUrl = String.fromEnvironment(
@@ -166,14 +242,13 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     try {
       print('[ChatScreen] Sending message to backend: $userMessage');
       print('[ChatScreen] Bot ID: ${widget.botId}');
-      print('[ChatScreen] Bot Instructions: $_botInstructions');
 
       // Get current user ID from Firebase Auth
       final currentUser = FirebaseAuth.instance.currentUser;
       final userId = currentUser?.uid ?? 'anonymous';
       print('[ChatScreen] User ID: $userId');
 
-      final uri = Uri.parse('$_backendUrl/api/chat');
+      final uri = Uri.parse('$_backendUrl/api/chat-enhanced');
       final payload = {
         'message': userMessage,
         'botId': widget.botId,
@@ -194,12 +269,21 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
           .timeout(Duration(seconds: 30));
 
       print(
-        '[ChatScreen] Response: ${resp.statusCode} ${resp.body.substring(0, 200)}',
+        '[ChatScreen] Response: ${resp.statusCode} ${resp.body.substring(0, resp.body.length > 200 ? 200 : resp.body.length)}',
       );
 
       if (resp.statusCode >= 200 && resp.statusCode < 300) {
         final body = jsonDecode(resp.body) as Map<String, dynamic>;
         final botResponse = body['response'] ?? 'No response';
+        final newState = body['state'] ?? _botCurrentState;
+        final progress = body['progress'] as Map<String, dynamic>?;
+
+        setState(() {
+          _botCurrentState = newState;
+          if (progress != null) {
+            _progressPercentage = (progress['percentage'] ?? 0).toDouble();
+          }
+        });
 
         await _addBotMessage(botResponse);
       } else {
@@ -695,6 +779,51 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            // Progress Bar
+            if (_progressPercentage > 0)
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppTheme.spaceMd,
+                  vertical: AppTheme.spaceSm,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '📚 Learning Progress',
+                          style: AppTheme.bodySmall.copyWith(
+                            color: AppTheme.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          '${_progressPercentage.toStringAsFixed(0)}%',
+                          style: AppTheme.bodySmall.copyWith(
+                            color: AppTheme.primaryBlue,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: LinearProgressIndicator(
+                        value: _progressPercentage / 100,
+                        minHeight: 6,
+                        backgroundColor: AppTheme.primaryBlue.withOpacity(0.2),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppTheme.primaryBlue,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
             // Table of Contents (if visible)
             if (_showToc && _botState?.tableOfContents != null)
               _buildTableOfContentsWidget(),
@@ -744,14 +873,16 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                                 AppTheme.radiusMd,
                               ),
                             ),
-                            child: Text(
-                              msg.text,
-                              style: AppTheme.bodyMedium.copyWith(
-                                color: isBot
-                                    ? AppTheme.textPrimary
-                                    : Colors.white,
-                              ),
-                            ),
+                            child: isBot
+                                ? FormattedTextWidget(msg.text)
+                                : Text(
+                                    msg.text,
+                                    style: AppTheme.bodyMedium.copyWith(
+                                      color: isBot
+                                          ? AppTheme.textPrimary
+                                          : Colors.white,
+                                    ),
+                                  ),
                           ),
                         ),
                         if (!isBot) SizedBox(width: AppTheme.spaceXs),
