@@ -274,10 +274,11 @@ Study Context:
         aiError = "GROQ_API_KEY not configured";
       } else {
         console.log("[create-study-bot] Calling Groq API...");
+        console.log("[create-study-bot] GROQ_API_KEY available:", !!groqApiKey);
 
         // Groq API uses OpenAI-compatible format
         const groqPayload = {
-          model: "mixtral-8x7b-32768", // or use "llama2-70b-4096" etc
+          model: "mixtral-8x7b-32768",
           messages: [
             {
               role: "system",
@@ -298,6 +299,11 @@ Example format: {"instructions": "You are a Study Bot tutor who..."}`,
           max_tokens: 1000,
           temperature: 0.7,
         };
+
+        console.log(
+          "[create-study-bot] Groq payload:",
+          JSON.stringify(groqPayload).substring(0, 200)
+        );
 
         const groqRes = await axios.post(
           "https://api.groq.com/openai/v1/chat/completions",
