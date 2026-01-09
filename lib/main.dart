@@ -9,7 +9,7 @@ import 'screens/profile_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/main_tabs.dart';
 import 'screens/online_ai_screen.dart';
-import 'screens/study_plan_screen.dart';
+import 'screens/study_plan_screen_phase1.dart';
 import 'screens/settings_screen.dart';
 import 'screens/api_test_screen.dart';
 import 'screens/notes_screen.dart';

@@ -10,7 +10,9 @@ class Note {
 }
 
 class NotesScreen extends StatefulWidget {
-  const NotesScreen({super.key});
+  final bool accessedViaSwipe;
+
+  const NotesScreen({super.key, this.accessedViaSwipe = false});
 
   @override
   State<NotesScreen> createState() => _NotesScreenState();
@@ -95,18 +97,20 @@ class _NotesScreenState extends State<NotesScreen> {
                 padding: EdgeInsets.all(AppTheme.spaceMd),
                 child: Row(
                   children: [
-                    // Back button to return to main chat
-                    IconButton(
-                      icon: Icon(
-                        Icons.arrow_back,
-                        color: AppTheme.textPrimary,
-                        size: 24,
+                    // Back button only appears when accessed via swipe gesture
+                    if (widget.accessedViaSwipe)
+                      IconButton(
+                        icon: Icon(
+                          Icons.arrow_back,
+                          color: AppTheme.textPrimary,
+                          size: 24,
+                        ),
+                        onPressed: () => Navigator.pop(context),
+                        padding: EdgeInsets.zero,
+                        constraints: BoxConstraints(),
                       ),
-                      onPressed: () => Navigator.pop(context),
-                      padding: EdgeInsets.zero,
-                      constraints: BoxConstraints(),
-                    ),
-                    SizedBox(width: AppTheme.spaceSm),
+                    if (widget.accessedViaSwipe)
+                      SizedBox(width: AppTheme.spaceSm),
                     Expanded(
                       child: ShaderMask(
                         shaderCallback: (bounds) => LinearGradient(

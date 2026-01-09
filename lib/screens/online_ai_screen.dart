@@ -783,33 +783,34 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
 
   // Build floating scroll button
   Widget _buildScrollButton() {
-    return AnimatedOpacity(
-      opacity: _showScrollButton ? 1.0 : 0.0,
-      duration: const Duration(milliseconds: 300),
-      child: _showScrollButton
-          ? Positioned(
-              bottom: 20,
-              right: 20,
-              child: GestureDetector(
-                onTap: _scrollToLatestMessage,
-                child: Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppTheme.primaryBlue,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppTheme.primaryBlue.withOpacity(0.4),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  padding: const EdgeInsets.all(12),
-                  child: Icon(Icons.expand_more, color: Colors.white, size: 24),
+    if (!_showScrollButton) return const SizedBox.shrink();
+
+    return Positioned(
+      // place a bit above the input container so it doesn't overlap
+      bottom: MediaQuery.of(context).viewInsets.bottom + 72,
+      right: 20,
+      child: AnimatedOpacity(
+        opacity: 1.0,
+        duration: const Duration(milliseconds: 300),
+        child: GestureDetector(
+          onTap: _scrollToLatestMessage,
+          child: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppTheme.primaryBlue,
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.primaryBlue.withOpacity(0.4),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
                 ),
-              ),
-            )
-          : const SizedBox.shrink(),
+              ],
+            ),
+            padding: const EdgeInsets.all(10),
+            child: Icon(Icons.expand_more, color: Colors.white, size: 20),
+          ),
+        ),
+      ),
     );
   }
 
@@ -3134,17 +3135,21 @@ Open the app and search for chat ID: $chatId
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            // Plus Button
+                            // Plus Button (open input options / attachments)
                             Container(
-                              margin: EdgeInsets.only(left: 4, bottom: 4),
+                              margin: EdgeInsets.only(left: 6, bottom: 6),
                               child: IconButton(
-                                icon: EqualizerIcon(
+                                icon: Icon(
+                                  Icons.add,
                                   color: AppTheme.textPrimary,
-                                  size: 24,
+                                  size: 20,
                                 ),
                                 onPressed: _showInputOptionsBottomSheet,
-                                padding: EdgeInsets.all(8),
-                                constraints: BoxConstraints(),
+                                padding: EdgeInsets.all(6),
+                                constraints: BoxConstraints(
+                                  minWidth: 36,
+                                  minHeight: 36,
+                                ),
                               ),
                             ),
 
@@ -3181,79 +3186,35 @@ Open the app and search for chat ID: $chatId
                               ),
                             ),
 
-                            // 3-line indicator or Send Button
+                            // Send Button (idle) or Upload-styled button (when typing)
                             if (_controller.text.trim().isEmpty)
-                              AnimatedOpacity(
-                                opacity: 1.0,
-                                duration: const Duration(milliseconds: 180),
-                                child: Transform.scale(
-                                  scale: 1.0,
-                                  child: Container(
-                                    margin: EdgeInsets.only(
-                                      right: 16,
-                                      bottom: 16,
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.end,
-                                      children: [
-                                        // Three vertical bars of varying heights
-                                        Container(
-                                          width: 3,
-                                          height: 16,
-                                          decoration: BoxDecoration(
-                                            color: AppTheme.textTertiary,
-                                            borderRadius: BorderRadius.circular(
-                                              1.5,
-                                            ),
-                                          ),
-                                        ),
-                                        SizedBox(width: 3),
-                                        Container(
-                                          width: 3,
-                                          height: 20,
-                                          decoration: BoxDecoration(
-                                            color: AppTheme.textTertiary,
-                                            borderRadius: BorderRadius.circular(
-                                              1.5,
-                                            ),
-                                          ),
-                                        ),
-                                        SizedBox(width: 3),
-                                        Container(
-                                          width: 3,
-                                          height: 12,
-                                          decoration: BoxDecoration(
-                                            color: AppTheme.textTertiary,
-                                            borderRadius: BorderRadius.circular(
-                                              1.5,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
+                              // Idle state: show circular white send button with equalizer
+                              Padding(
+                                padding: EdgeInsets.only(right: 6, bottom: 6),
+                                child: _buildSendButton(),
                               )
                             else
+                              // Typing state: show upload-styled circular button
                               Padding(
-                                padding: EdgeInsets.only(right: 4, bottom: 4),
-                                child: _buildSendButton(),
+                                padding: EdgeInsets.only(right: 6, bottom: 6),
+                                child: _buildTypingUploadButton(),
                               ),
 
                             // Microphone Button
                             Container(
-                              margin: EdgeInsets.only(right: 4, bottom: 4),
+                              margin: EdgeInsets.only(right: 6, bottom: 6),
                               child: IconButton(
                                 icon: Icon(
                                   Icons.mic_none,
                                   color: AppTheme.textPrimary,
-                                  size: 24,
+                                  size: 20,
                                 ),
                                 onPressed: _toggleListening,
-                                padding: EdgeInsets.all(8),
-                                constraints: BoxConstraints(),
+                                padding: EdgeInsets.all(6),
+                                constraints: BoxConstraints(
+                                  minWidth: 36,
+                                  minHeight: 36,
+                                ),
                               ),
                             ),
                           ],
@@ -3305,6 +3266,28 @@ Open the app and search for chat ID: $chatId
   }
 
   Widget _buildSendButton() {
+    // Idle send button: circular primary-blue button that floats slightly above input container
+    return Transform.translate(
+      offset: const Offset(0, 0),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppTheme.primaryBlue,
+          shape: BoxShape.circle,
+          boxShadow: AppTheme.glowShadow,
+        ),
+        margin: EdgeInsets.only(right: 6, bottom: 0),
+        child: IconButton(
+          icon: EqualizerIcon(color: Colors.white, size: 16),
+          onPressed: _send,
+          padding: EdgeInsets.all(6),
+          constraints: BoxConstraints(minWidth: 36, minHeight: 36),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTypingUploadButton() {
+    // Typing state: circular gradient button styled like ChatGPT/Claude upload/send
     return Container(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
@@ -3315,10 +3298,12 @@ Open the app and search for chat ID: $chatId
         ),
         boxShadow: AppTheme.glowShadow,
       ),
+      margin: EdgeInsets.only(right: 4, bottom: 4),
       child: IconButton(
-        icon: Icon(Icons.arrow_upward, color: Colors.black),
+        icon: Icon(Icons.upload_outlined, color: Colors.white, size: 18),
         onPressed: _send,
-        iconSize: 20,
+        padding: EdgeInsets.all(6),
+        constraints: BoxConstraints(minWidth: 36, minHeight: 36),
       ),
     );
   }

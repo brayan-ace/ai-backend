@@ -449,6 +449,107 @@ Example format: {"instructions": "You are a Study Bot tutor who..."}`,
   }
 });
 
+// Chat endpoint - uses bot's custom system_instructions
+app.post("/api/chat", async (req, res) => {
+  const timestamp = new Date().toISOString();
+  console.log("[POST /api/chat] Chat request:", timestamp);
+
+  try {
+    const { message, botId, systemInstructions } = req.body;
+
+    // Validation
+    if (!message || !botId) {
+      console.warn("[/api/chat] Missing message or botId");
+      return res.status(400).json({
+        error: "Invalid request",
+        message: "message and botId are required",
+        timestamp,
+      });
+    }
+
+    console.log(
+      "[/api/chat] Processing: botId=",
+      botId,
+      "message=",
+      message.substring(0, 50)
+    );
+
+    // Extract instructions text
+    const instructionsText =
+      systemInstructions?.instructions ||
+      systemInstructions?.raw ||
+      "You are a helpful study bot tutor. Lead the student through lessons logically.";
+
+    console.log(
+      "[/api/chat] Using instructions:",
+      instructionsText.substring(0, 100)
+    );
+
+    const groqApiKey = process.env.GROQ_API_KEY;
+    if (!groqApiKey || !groqApiKey.trim()) {
+      console.warn("[/api/chat] GROQ_API_KEY not configured");
+      return res.status(500).json({
+        error: "AI service unavailable",
+        message: "GROQ_API_KEY not configured",
+        timestamp,
+      });
+    }
+
+    // Call Groq with bot's custom instructions
+    const groqPayload = {
+      model: "openai/gpt-oss-20b",
+      messages: [
+        {
+          role: "system",
+          content: instructionsText,
+        },
+        {
+          role: "user",
+          content: message,
+        },
+      ],
+      max_tokens: 1000,
+      temperature: 0.7,
+    };
+
+    console.log("[/api/chat] Calling Groq...");
+
+    const groqRes = await axios.post(
+      "https://api.groq.com/openai/v1/chat/completions",
+      groqPayload,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${groqApiKey}`,
+        },
+        timeout: 30000,
+      }
+    );
+
+    const botResponse =
+      groqRes.data.choices?.[0]?.message?.content ||
+      "I couldn't generate a response.";
+
+    console.log(
+      "[/api/chat] Response generated:",
+      botResponse.substring(0, 100)
+    );
+
+    return res.json({
+      status: "success",
+      response: botResponse,
+      timestamp,
+    });
+  } catch (err) {
+    console.error("[/api/chat] Error:", err.message);
+    return res.status(500).json({
+      error: "Chat processing failed",
+      message: err.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
 app.post("/api/ask", async (req, res) => {
   try {
     console.log("[POST /api/ask] Request received:", {

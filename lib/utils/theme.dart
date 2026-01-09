@@ -195,6 +195,14 @@ class AppTheme {
     height: 1.2,
   );
 
+  static TextStyle get labelSmall => TextStyle(
+    fontSize: 11,
+    fontWeight: FontWeight.w500,
+    color: textTertiary,
+    letterSpacing: 0.3,
+    height: 1.2,
+  );
+
   // Theme Data
   static ThemeData get darkTheme => ThemeData(
     useMaterial3: true,
