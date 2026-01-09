@@ -104,6 +104,8 @@ class _BotProcessingScreenState extends State<BotProcessingScreen> {
                 planDescription: bot['description'] ?? '',
                 botName: bot['name'],
                 educationLevel: bot['grade_level'] ?? '',
+                systemInstructions:
+                    bot['system_instructions'] as Map<String, dynamic>?,
               ),
             ),
           );

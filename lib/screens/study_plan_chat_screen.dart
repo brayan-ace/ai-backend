@@ -14,6 +14,7 @@ class StudyPlanChatScreen extends StatefulWidget {
   final String? planDescription;
   final String? botName;
   final String? educationLevel;
+  final Map<String, dynamic>? systemInstructions;
 
   // Legacy parameters (for backward compatibility)
   final String? planId;
@@ -31,6 +32,7 @@ class StudyPlanChatScreen extends StatefulWidget {
     this.planDescription,
     this.botName,
     this.educationLevel,
+    this.systemInstructions,
     // Legacy
     this.planId,
     this.planTitle,
@@ -71,6 +73,12 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     super.initState();
     _planService = StudyPlanService();
     _flowController = StudyBotFlowController();
+
+    // Initialize bot instructions from parameters
+    _botInstructions = widget.systemInstructions;
+    print(
+      '[ChatScreen] initState: botId=${widget.botId}, instructions loaded=${_botInstructions != null}',
+    );
 
     // Detect mode
     _isPhase1 = widget.botId != null && widget.botName != null;
@@ -173,7 +181,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         'systemInstructions': _botInstructions,
       };
 
-      print('[ChatScreen] Payload: ${jsonEncode(payload).substring(0, 200)}');
+      final payloadStr = jsonEncode(payload);
+      final maxLen = payloadStr.length > 200 ? 200 : payloadStr.length;
+      print('[ChatScreen] Payload: ${payloadStr.substring(0, maxLen)}');
 
       final resp = await http
           .post(
