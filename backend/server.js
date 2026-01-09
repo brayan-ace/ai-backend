@@ -1022,6 +1022,44 @@ IMPORTANT: Format your responses with:
   }
 });
 
+// Get bot study plan and progress
+app.get("/api/bot-progress/:botId/:userId", async (req, res) => {
+  try {
+    const { botId, userId } = req.params;
+
+    const result = await pool.query(
+      `SELECT study_plan, learned_concepts, progress_percentage, bot_state 
+       FROM bot_progress WHERE bot_id = $1 AND user_id = $2 LIMIT 1`,
+      [botId, userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.json({
+        status: "success",
+        study_plan: null,
+        progress: 0,
+        learned_concepts: [],
+        bot_state: "intro",
+      });
+    }
+
+    const progress = result.rows[0];
+    return res.json({
+      status: "success",
+      study_plan: progress.study_plan,
+      progress: progress.progress_percentage || 0,
+      learned_concepts: progress.learned_concepts || [],
+      bot_state: progress.bot_state,
+    });
+  } catch (err) {
+    console.error("[bot-progress] Error:", err.message);
+    return res.status(500).json({
+      error: "Failed to fetch progress",
+      message: err.message,
+    });
+  }
+});
+
 app.post("/api/ask", async (req, res) => {
   try {
     console.log("[POST /api/ask] Request received:", {

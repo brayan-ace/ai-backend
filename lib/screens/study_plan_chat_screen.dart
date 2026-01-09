@@ -748,6 +748,13 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        leading: _botCurrentState == 'learning'
+            ? IconButton(
+                icon: Icon(Icons.bookmark_outline, color: AppTheme.primaryBlue, size: 28),
+                tooltip: 'View & Edit Learning Plan',
+                onPressed: () => _showModulesModal(),
+              )
+            : null,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -758,33 +765,39 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            Text(
-              'State: ${_botState?.currentState.toString().split('.').last.toUpperCase() ?? 'UNKNOWN'}',
-              style: AppTheme.bodySmall.copyWith(color: AppTheme.textSecondary),
-            ),
+            if (_botCurrentState.isNotEmpty)
+              Text(
+                _botCurrentState == 'intro'
+                    ? 'Ready to learn? Say "ready"'
+                    : _botCurrentState == 'plan_review'
+                        ? 'Plan created - Ready to start?'
+                        : 'Learning mode - Step by step',
+                style: AppTheme.bodySmall.copyWith(color: AppTheme.textSecondary),
+              ),
           ],
         ),
-        actions: [
-          if (_botState?.tableOfContents != null &&
-              _botState!.tableOfContents!.isNotEmpty)
-            IconButton(
-              icon: Icon(Icons.menu_book, color: AppTheme.primaryBlue),
-              onPressed: () {
-                setState(() => _showToc = !_showToc);
-              },
-            ),
-        ],
       ),
       drawer: _buildDrawer(),
       body: SafeArea(
         child: Column(
           children: [
-            // Progress Bar
-            if (_progressPercentage > 0)
+            // Enhanced Progress Bar with Concept Tracking
+            if (_botCurrentState == 'learning')
               Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: AppTheme.spaceMd,
-                  vertical: AppTheme.spaceSm,
+                padding: EdgeInsets.all(AppTheme.spaceMd),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppTheme.primaryBlue.withOpacity(0.05),
+                      AppTheme.primaryBlue.withOpacity(0.02),
+                    ],
+                  ),
+                  border: Border(
+                    bottom: BorderSide(
+                      color: AppTheme.primaryBlue.withOpacity(0.1),
+                      width: 1,
+                    ),
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -793,11 +806,42 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          '📚 Learning Progress',
+                          '🎯 Concepts Mastered',
                           style: AppTheme.bodySmall.copyWith(
                             color: AppTheme.textSecondary,
                             fontWeight: FontWeight.w600,
                           ),
+                        ),
+                        Text(
+                          '${_progressPercentage.toStringAsFixed(0)}%',
+                          style: AppTheme.bodySmall.copyWith(
+                            color: AppTheme.primaryBlue,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 12),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: LinearProgressIndicator(
+                        value: _progressPercentage / 100,
+                        minHeight: 8,
+                        backgroundColor: AppTheme.primaryBlue.withOpacity(0.15),
+                        valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryBlue),
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      '✨ Say "I understand" when you master a concept to track progress',
+                      style: AppTheme.bodyXSmall.copyWith(
+                        color: AppTheme.textSecondary,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
                         ),
                         Text(
                           '${_progressPercentage.toStringAsFixed(0)}%',
@@ -1195,6 +1239,197 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
               ),
             ),
           ],
+        );
+      },
+    );
+  }
+
+  /// Show modules/plan editor modal
+  void _showModulesModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.backgroundDeep,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppTheme.radiusLg)),
+      ),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          expand: false,
+          builder: (context, scrollController) {
+            return SingleChildScrollView(
+              controller: scrollController,
+              child: Padding(
+                padding: EdgeInsets.all(AppTheme.spaceMd),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryBlue.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: AppTheme.spaceMd),
+                    Text(
+                      '📚 Your Learning Plan',
+                      style: AppTheme.headlineSmall.copyWith(
+                        color: AppTheme.textPrimary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: AppTheme.spaceSm),
+                    Text(
+                      'Tap any module to see details and concepts',
+                      style: AppTheme.bodySmall.copyWith(
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                    SizedBox(height: AppTheme.spaceLg),
+
+                    // Modules List
+                    if (_botCurrentState == 'learning' && widget.planName != null)
+                      Text(
+                        '✨ ${widget.planName}',
+                        style: AppTheme.bodyMedium.copyWith(
+                          color: AppTheme.primaryBlue,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+
+                    SizedBox(height: AppTheme.spaceSm),
+                    Text(
+                      'Your personalized study plan has been created. As you learn each concept, your progress will update here automatically.',
+                      style: AppTheme.bodySmall.copyWith(
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+
+                    SizedBox(height: AppTheme.spaceLg),
+
+                    // Progress summary
+                    Container(
+                      padding: EdgeInsets.all(AppTheme.spaceMd),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            AppTheme.primaryBlue.withOpacity(0.1),
+                            AppTheme.primaryBlue.withOpacity(0.05),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '🎯 Learning Progress',
+                            style: AppTheme.bodyMedium.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                          SizedBox(height: AppTheme.spaceSm),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Concepts Mastered',
+                                style: AppTheme.bodySmall.copyWith(
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                              Text(
+                                '${_progressPercentage.toStringAsFixed(0)}%',
+                                style: AppTheme.bodyMedium.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.primaryBlue,
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 8),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: _progressPercentage / 100,
+                              minHeight: 6,
+                              backgroundColor: AppTheme.primaryBlue.withOpacity(0.2),
+                              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryBlue),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    SizedBox(height: AppTheme.spaceLg),
+
+                    // Tips
+                    Container(
+                      padding: EdgeInsets.all(AppTheme.spaceMd),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: AppTheme.primaryBlue.withOpacity(0.2),
+                        ),
+                        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '💡 Pro Tips',
+                            style: AppTheme.bodyMedium.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                          SizedBox(height: AppTheme.spaceSm),
+                          Text(
+                            '• When you understand a concept, tell me "I understand" or "that makes sense"\n• I\'ll track your progress automatically\n• Take your time - quality over speed\n• Ask questions anytime!',
+                            style: AppTheme.bodySmall.copyWith(
+                              color: AppTheme.textSecondary,
+                              height: 1.6,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    SizedBox(height: AppTheme.spaceLg),
+
+                    // Close button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryBlue,
+                          padding: EdgeInsets.symmetric(
+                            vertical: AppTheme.spaceMd,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                          ),
+                        ),
+                        child: Text(
+                          'Back to Learning',
+                          style: AppTheme.labelMedium.copyWith(
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    SizedBox(height: AppTheme.spaceMd),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );
