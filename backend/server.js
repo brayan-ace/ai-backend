@@ -178,9 +178,10 @@ app.listen(PORT, () => {
 // Ensure DB pool is available
 const { pool } = require("./db");
 
-// Ensure table exists (safe idempotent operation)
-async function ensureStudyBotsTable() {
+// Ensure tables exist (safe idempotent operation)
+async function ensureTables() {
   try {
+    // Create study_bots table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS study_bots (
         bot_id TEXT PRIMARY KEY,
@@ -190,16 +191,30 @@ async function ensureStudyBotsTable() {
         topic TEXT,
         grade_level TEXT,
         system_instructions JSONB,
-        state JSONB
+        state JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
     console.log("[DB] study_bots table ensured");
+
+    // Create chat_messages table for storing conversation history
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS chat_messages (
+        id SERIAL PRIMARY KEY,
+        bot_id TEXT NOT NULL REFERENCES study_bots(bot_id),
+        user_id TEXT NOT NULL,
+        message_type TEXT NOT NULL,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("[DB] chat_messages table ensured");
   } catch (err) {
-    console.error("[DB] Failed to ensure study_bots table:", err.message);
+    console.error("[DB] Failed to ensure tables:", err.message);
   }
 }
 
-ensureStudyBotsTable();
+ensureTables();
 
 // Create Study Bot endpoint - integrates with Groq AI to generate custom instructions
 app.post("/api/create-study-bot", async (req, res) => {
@@ -449,20 +464,20 @@ Example format: {"instructions": "You are a Study Bot tutor who..."}`,
   }
 });
 
-// Chat endpoint - uses bot's custom system_instructions
+// Chat endpoint - saves messages and uses bot's custom system_instructions with chat history
 app.post("/api/chat", async (req, res) => {
   const timestamp = new Date().toISOString();
   console.log("[POST /api/chat] Chat request:", timestamp);
 
   try {
-    const { message, botId, systemInstructions } = req.body;
+    const { message, botId, systemInstructions, userId } = req.body;
 
     // Validation
-    if (!message || !botId) {
-      console.warn("[/api/chat] Missing message or botId");
+    if (!message || !botId || !userId) {
+      console.warn("[/api/chat] Missing message, botId, or userId");
       return res.status(400).json({
         error: "Invalid request",
-        message: "message and botId are required",
+        message: "message, botId, and userId are required",
         timestamp,
       });
     }
@@ -474,11 +489,45 @@ app.post("/api/chat", async (req, res) => {
       message.substring(0, 50)
     );
 
+    // Save user message to database
+    try {
+      await pool.query(
+        `INSERT INTO chat_messages (bot_id, user_id, message_type, content) VALUES ($1, $2, $3, $4)`,
+        [botId, userId, "user", message]
+      );
+      console.log("[/api/chat] User message saved to database");
+    } catch (dbErr) {
+      console.warn("[/api/chat] Failed to save user message:", dbErr.message);
+    }
+
+    // Retrieve recent chat history (last 10 messages)
+    let chatHistory = [];
+    try {
+      const historyResult = await pool.query(
+        `SELECT message_type, content FROM chat_messages 
+         WHERE bot_id = $1 AND user_id = $2 
+         ORDER BY created_at ASC 
+         LIMIT 10`,
+        [botId, userId]
+      );
+      chatHistory = historyResult.rows;
+      console.log(
+        "[/api/chat] Retrieved",
+        chatHistory.length,
+        "historical messages"
+      );
+    } catch (dbErr) {
+      console.warn(
+        "[/api/chat] Failed to retrieve chat history:",
+        dbErr.message
+      );
+    }
+
     // Extract instructions text
     const instructionsText =
       systemInstructions?.instructions ||
       systemInstructions?.raw ||
-      "You are a helpful study bot tutor. Lead the student through lessons logically.";
+      "You are a helpful study bot tutor. Lead the student through lessons logically. Analyze previous messages to provide consistent and contextual responses.";
 
     console.log(
       "[/api/chat] Using instructions:",
@@ -495,24 +544,47 @@ app.post("/api/chat", async (req, res) => {
       });
     }
 
-    // Call Groq with bot's custom instructions
+    // Build messages array with chat history
+    const groqMessages = [
+      {
+        role: "system",
+        content: instructionsText,
+      },
+    ];
+
+    // Add previous messages for context
+    for (const msg of chatHistory) {
+      if (msg.message_type === "user") {
+        groqMessages.push({
+          role: "user",
+          content: msg.content,
+        });
+      } else if (msg.message_type === "bot") {
+        groqMessages.push({
+          role: "assistant",
+          content: msg.content,
+        });
+      }
+    }
+
+    // Add current message
+    groqMessages.push({
+      role: "user",
+      content: message,
+    });
+
     const groqPayload = {
       model: "openai/gpt-oss-20b",
-      messages: [
-        {
-          role: "system",
-          content: instructionsText,
-        },
-        {
-          role: "user",
-          content: message,
-        },
-      ],
+      messages: groqMessages,
       max_tokens: 1000,
       temperature: 0.7,
     };
 
-    console.log("[/api/chat] Calling Groq...");
+    console.log(
+      "[/api/chat] Calling Groq with",
+      groqMessages.length,
+      "messages for context"
+    );
 
     const groqRes = await axios.post(
       "https://api.groq.com/openai/v1/chat/completions",
@@ -534,6 +606,17 @@ app.post("/api/chat", async (req, res) => {
       "[/api/chat] Response generated:",
       botResponse.substring(0, 100)
     );
+
+    // Save bot response to database
+    try {
+      await pool.query(
+        `INSERT INTO chat_messages (bot_id, user_id, message_type, content) VALUES ($1, $2, $3, $4)`,
+        [botId, userId, "bot", botResponse]
+      );
+      console.log("[/api/chat] Bot response saved to database");
+    } catch (dbErr) {
+      console.warn("[/api/chat] Failed to save bot response:", dbErr.message);
+    }
 
     return res.json({
       status: "success",

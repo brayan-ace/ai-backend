@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/study_bot_state.dart';
 import '../services/study_plan_service.dart';
 import '../services/study_bot_flow_controller.dart';
@@ -159,10 +160,16 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       print('[ChatScreen] Bot ID: ${widget.botId}');
       print('[ChatScreen] Bot Instructions: $_botInstructions');
 
+      // Get current user ID from Firebase Auth
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final userId = currentUser?.uid ?? 'anonymous';
+      print('[ChatScreen] User ID: $userId');
+
       final uri = Uri.parse('$_backendUrl/api/chat');
       final payload = {
         'message': userMessage,
         'botId': widget.botId,
+        'userId': userId,
         'systemInstructions': _botInstructions,
       };
 
