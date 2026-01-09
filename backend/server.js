@@ -131,19 +131,8 @@ function structureTextResponse(text) {
   };
 }
 
-// Global error handler middleware - catches all async errors
-app.use((err, req, res, next) => {
-  console.error("[Global Error Handler]", {
-    message: err.message,
-    stack: err.stack,
-    timestamp: new Date().toISOString(),
-  });
-  res.status(err.status || 500).json({
-    error: err.message || "Internal Server Error",
-    details: process.env.NODE_ENV === "development" ? err.stack : undefined,
-    timestamp: new Date().toISOString(),
-  });
-});
+// NOTE: Error handler MUST be at the END, after all routes are defined
+// It is moved to the end of this file (search for "Global error handler middleware")
 
 app.get("/", (req, res) => {
   try {
@@ -184,6 +173,274 @@ app.listen(PORT, () => {
   console.log(
     "[Server] AI identity, formatting rules, and validation system active"
   );
+});
+
+// Ensure DB pool is available
+const { pool } = require("./db");
+
+// Ensure table exists (safe idempotent operation)
+async function ensureStudyBotsTable() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS study_bots (
+        bot_id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        topic TEXT,
+        grade_level TEXT,
+        system_instructions JSONB,
+        state JSONB
+      );
+    `);
+    console.log("[DB] study_bots table ensured");
+  } catch (err) {
+    console.error("[DB] Failed to ensure study_bots table:", err.message);
+  }
+}
+
+ensureStudyBotsTable();
+
+// Create Study Bot endpoint - integrates with Groq AI to generate custom instructions
+app.post("/api/create-study-bot", async (req, res) => {
+  const timestamp = new Date().toISOString();
+  console.log("[POST /api/create-study-bot] Request started:", timestamp);
+
+  try {
+    const { user_id, name, description, topic, grade_level } = req.body;
+
+    // ============ VALIDATION ============
+    if (!user_id || !user_id.trim()) {
+      console.warn(
+        "[create-study-bot] Validation failed: missing or empty user_id"
+      );
+      return res.status(400).json({
+        error: "Invalid request",
+        message: "user_id is required and must not be empty",
+        timestamp,
+      });
+    }
+
+    if (!name || !name.trim()) {
+      console.warn(
+        "[create-study-bot] Validation failed: missing or empty name"
+      );
+      return res.status(400).json({
+        error: "Invalid request",
+        message: "name is required and must not be empty",
+        timestamp,
+      });
+    }
+
+    // Sanitize inputs
+    const userId = user_id.trim();
+    const botName = name.trim();
+    const desc = (description || "").trim();
+    const botTopic = (topic || "General").trim();
+    const gradeLevel = (grade_level || "Self-Learner").trim();
+
+    console.log("[create-study-bot] Input validation passed", {
+      userId,
+      botName,
+      botTopic,
+      gradeLevel,
+    });
+
+    // ============ GROQ AI CALL ============
+    const standardInstructions = `You are a Study Bot tutor. Your role:
+- Lead the student through lessons logically, step by step
+- Generate a detailed Table of Contents and ask for user approval before each module
+- Track student progress, mastery levels, and identify weak areas
+- Generate quizzes when requested
+- Provide clear examples, thorough explanations, and concise summaries
+- Adapt content difficulty to match the student's grade level (${gradeLevel})
+- Maintain a friendly, supportive, encouraging, and engaging tone
+- Respond with structured, well-organized information
+
+Study Context:
+- Topic: ${botTopic}
+- Description: ${desc || "Not provided"}
+- Grade Level: ${gradeLevel}`;
+
+    let system_instructions = null;
+    let aiError = null;
+
+    try {
+      const groqApiKey = process.env.GROQ_API_KEY;
+      if (!groqApiKey || !groqApiKey.trim()) {
+        console.warn(
+          "[create-study-bot] GROQ_API_KEY not found in environment; using fallback instructions"
+        );
+        aiError = "GROQ_API_KEY not configured";
+      } else {
+        console.log("[create-study-bot] Calling Groq API...");
+
+        // Groq API uses OpenAI-compatible format
+        const groqPayload = {
+          model: "mixtral-8x7b-32768", // or use "llama2-70b-4096" etc
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are an educational AI system. Generate detailed, personalized tutor system instructions as JSON.",
+            },
+            {
+              role: "user",
+              content: `Generate a detailed system_instructions JSON object for a Study Bot with these parameters:
+Topic: ${botTopic}
+Description: ${desc || "Not provided"}
+Grade Level: ${gradeLevel}
+
+Return ONLY valid JSON with key "instructions" containing a string of detailed tutor directives.
+Example format: {"instructions": "You are a Study Bot tutor who..."}`,
+            },
+          ],
+          max_tokens: 1000,
+          temperature: 0.7,
+        };
+
+        const groqRes = await axios.post(
+          "https://api.groq.com/openai/v1/chat/completions",
+          groqPayload,
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${groqApiKey}`,
+            },
+            timeout: 30000,
+          }
+        );
+
+        console.log("[create-study-bot] Groq API response received");
+
+        // Extract response content
+        const aiResponseText = groqRes?.data?.choices?.[0]?.message?.content;
+        if (!aiResponseText) {
+          throw new Error("Groq returned empty response content");
+        }
+
+        // Try to parse JSON response
+        try {
+          const parsed = JSON.parse(aiResponseText);
+          system_instructions = {
+            instructions: parsed.instructions || aiResponseText,
+            gradeLevel,
+            topic: botTopic,
+            generated_at: timestamp,
+          };
+          console.log("[create-study-bot] AI instructions parsed successfully");
+        } catch (parseErr) {
+          console.warn(
+            "[create-study-bot] Failed to parse Groq JSON; storing as raw text:",
+            parseErr.message
+          );
+          system_instructions = {
+            instructions: aiResponseText,
+            gradeLevel,
+            topic: botTopic,
+            generated_at: timestamp,
+          };
+        }
+      }
+    } catch (groqErr) {
+      aiError = groqErr.message;
+      console.error("[create-study-bot] Groq API call failed:", {
+        error: groqErr.message,
+        status: groqErr.response?.status,
+        statusText: groqErr.response?.statusText,
+      });
+      // Fallback to standard instructions
+      system_instructions = {
+        instructions: standardInstructions,
+        gradeLevel,
+        topic: botTopic,
+        ai_error: aiError,
+        generated_at: timestamp,
+        is_fallback: true,
+      };
+    }
+
+    // ============ DATABASE INSERT ============
+    const bot_id = `bot_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+    const initialState = {
+      current_module: 0,
+      current_subtopic: 0,
+      mastery: {},
+      weak_areas: [],
+      created_at: timestamp,
+    };
+
+    try {
+      console.log("[create-study-bot] Inserting bot into database...", {
+        bot_id,
+        userId,
+        botName,
+      });
+
+      const insertSql = `INSERT INTO study_bots (
+        bot_id, user_id, name, description, topic, grade_level, system_instructions, state
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`;
+
+      await pool.query(insertSql, [
+        bot_id,
+        userId,
+        botName,
+        desc || null,
+        botTopic || null,
+        gradeLevel || null,
+        system_instructions,
+        initialState,
+      ]);
+
+      console.log("[create-study-bot] Bot inserted successfully into database");
+    } catch (dbErr) {
+      console.error("[create-study-bot] Database insert failed:", {
+        error: dbErr.message,
+        code: dbErr.code,
+        detail: dbErr.detail,
+      });
+      throw new Error(
+        `Database error: ${dbErr.message || "Failed to save bot to database"}`
+      );
+    }
+
+    // ============ RESPONSE ============
+    const botObject = {
+      bot_id,
+      user_id: userId,
+      name: botName,
+      description: desc || null,
+      topic: botTopic,
+      grade_level: gradeLevel,
+      system_instructions,
+      state: initialState,
+      created_at: timestamp,
+    };
+
+    console.log("[create-study-bot] Success! Returning bot object", {
+      bot_id,
+      timestamp,
+    });
+
+    return res.json({
+      status: "success",
+      message: "Study Bot created successfully",
+      bot: botObject,
+      timestamp,
+    });
+  } catch (err) {
+    console.error("[POST /api/create-study-bot] Fatal error:", {
+      error: err.message,
+      stack: err.stack,
+      timestamp: new Date().toISOString(),
+    });
+
+    return res.status(500).json({
+      error: "Failed to create study bot",
+      message: err.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
 });
 
 app.post("/api/ask", async (req, res) => {
@@ -1538,3 +1795,16 @@ app.listen(port, () => {
   console.log(`Backend server listening at http://localhost:${port}`);
 });
 */
+// Global error handler middleware - MUST be last, after all routes
+app.use((err, req, res, next) => {
+  console.error("[Global Error Handler]", {
+    message: err.message,
+    stack: err.stack,
+    timestamp: new Date().toISOString(),
+  });
+  res.status(err.status || 500).json({
+    error: err.message || "Internal Server Error",
+    details: process.env.NODE_ENV === "development" ? err.stack : undefined,
+    timestamp: new Date().toISOString(),
+  });
+});
