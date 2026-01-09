@@ -99,6 +99,155 @@ function structureTextResponse(text) {
     return { overview: "", answer: "", bullets: [], code: [], concise: "" };
   }
 
+  // Parse text into structured components
+  const parts = text.split(/\n(?=[A-Z])/);
+  return {
+    overview: parts[0]?.substring(0, 150) || "",
+    answer: text,
+    bullets: text.match(/[-*•]\s+.+/g) || [],
+    code: text.match(/```[\s\S]+?```/g) || [],
+    concise: text.substring(0, 200),
+  };
+}
+
+// ============= TAVILY WEB SEARCH =============
+
+// Search for topic information using Tavily API
+async function searchTopicOnline(topic, gradeLevel) {
+  try {
+    const tavilyApiKey = process.env.TAVILY_API_KEY;
+    if (!tavilyApiKey) {
+      console.warn("[Tavily] TAVILY_API_KEY not configured");
+      return null;
+    }
+
+    console.log(`[Tavily] Searching for: ${topic} at ${gradeLevel} level`);
+
+    // Create search query
+    const searchQuery = `${topic} educational content ${gradeLevel} level learning`;
+
+    const response = await axios.post(
+      "https://api.tavily.com/search",
+      {
+        api_key: tavilyApiKey,
+        query: searchQuery,
+        include_answer: true,
+        max_results: 5,
+      },
+      {
+        timeout: 10000,
+      }
+    );
+
+    if (response.data?.results?.length > 0) {
+      console.log(`[Tavily] Found ${response.data.results.length} results`);
+
+      // Compile search results into context
+      const searchContext = {
+        answer: response.data.answer || "",
+        sources: response.data.results.slice(0, 3).map((r) => ({
+          title: r.title,
+          content: r.content,
+          url: r.url,
+        })),
+      };
+
+      return searchContext;
+    }
+
+    return null;
+  } catch (err) {
+    console.warn("[Tavily] Search error:", err.message);
+    return null;
+  }
+}
+
+// Generate enhanced instructions using web search results
+async function generateEnhancedInstructions(
+  topic,
+  description,
+  gradeLevel,
+  groqApiKey
+) {
+  try {
+    // Search for online information about the topic
+    const searchResults = await searchTopicOnline(topic, gradeLevel);
+
+    let instructionPrompt = `You are an expert curriculum designer. Create system_instructions for a Study Bot teaching:
+Topic: ${topic}
+Grade Level: ${gradeLevel}
+Description: ${description}
+
+${
+  searchResults
+    ? `Based on this educational research:
+${searchResults.sources
+  .map(
+    (s) => `
+Source: ${s.title}
+Content: ${s.content.substring(0, 300)}
+`
+  )
+  .join("\n")}
+
+${searchResults.answer ? `Educational context: ${searchResults.answer}` : ""}
+
+Create COMPREHENSIVE system instructions that:
+1. Are based on current educational standards for this topic
+2. Use real-world examples and context from the research
+3. Include learning objectives aligned with ${gradeLevel} standards
+4. Suggest hands-on examples relevant to ${gradeLevel} students
+5. Recommend assessment methods appropriate for this level`
+    : `Create comprehensive system instructions for teaching this topic at ${gradeLevel} level`
+}
+
+Return ONLY a JSON object with this exact structure:
+{
+  "instructions": "Detailed teaching directives as a string...",
+  "key_concepts": ["concept1", "concept2", "concept3"],
+  "real_world_examples": ["example1", "example2"],
+  "assessment_methods": ["method1", "method2"]
+}`;
+
+    const groqRes = await axios.post(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        model: "openai/gpt-oss-20b",
+        messages: [{ role: "user", content: instructionPrompt }],
+        max_tokens: 1500,
+        temperature: 0.7,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${groqApiKey}`,
+        },
+        timeout: 30000,
+      }
+    );
+
+    const responseText = groqRes?.data?.choices?.[0]?.message?.content;
+    const parsed = JSON.parse(responseText);
+
+    return {
+      instructions: parsed.instructions,
+      key_concepts: parsed.key_concepts,
+      real_world_examples: parsed.real_world_examples,
+      assessment_methods: parsed.assessment_methods,
+      enhanced_with_search: !!searchResults,
+    };
+  } catch (err) {
+    console.error("[generateEnhancedInstructions] Error:", err.message);
+    return null;
+  }
+}
+
+// Helper: structure free-text responses into overview, bullets, code blocks
+function structureTextResponse(text) {
+  if (!text) {
+    return { overview: "", answer: "", bullets: [], code: [], concise: "" };
+  }
+
   // Extract code blocks fenced by triple backticks
   const codeBlocks = [];
   const codeRegex = /```([\s\S]*?)```/g;
@@ -304,87 +453,99 @@ Study Context:
         );
         aiError = "GROQ_API_KEY not configured";
       } else {
-        console.log("[create-study-bot] Calling Groq API...");
-        console.log("[create-study-bot] GROQ_API_KEY available:", !!groqApiKey);
+        console.log(
+          "[create-study-bot] Generating enhanced instructions with web search..."
+        );
 
-        // Groq API uses OpenAI-compatible format
-        const groqPayload = {
-          model: "openai/gpt-oss-20b",
-          messages: [
-            {
-              role: "system",
-              content:
-                "You are an educational AI system. Generate detailed, personalized tutor system instructions as JSON.",
-            },
-            {
-              role: "user",
-              content: `Generate a detailed system_instructions JSON object for a Study Bot with these parameters:
+        // Use enhanced instruction generation with web search
+        const enhancedInstructions = await generateEnhancedInstructions(
+          botTopic,
+          desc || "General study",
+          gradeLevel,
+          groqApiKey
+        );
+
+        if (enhancedInstructions) {
+          system_instructions = {
+            instructions: enhancedInstructions.instructions,
+            key_concepts: enhancedInstructions.key_concepts,
+            real_world_examples: enhancedInstructions.real_world_examples,
+            assessment_methods: enhancedInstructions.assessment_methods,
+            gradeLevel,
+            topic: botTopic,
+            generated_at: timestamp,
+            enhanced_with_web_search: enhancedInstructions.enhanced_with_search,
+          };
+          console.log(
+            "[create-study-bot] Enhanced instructions generated successfully"
+          );
+        } else {
+          // Fallback to basic Groq generation
+          console.log(
+            "[create-study-bot] Enhanced generation failed, falling back to basic Groq..."
+          );
+
+          const groqPayload = {
+            model: "openai/gpt-oss-20b",
+            messages: [
+              {
+                role: "system",
+                content:
+                  "You are an educational AI system. Generate detailed, personalized tutor system instructions as JSON.",
+              },
+              {
+                role: "user",
+                content: `Generate a detailed system_instructions JSON object for a Study Bot with these parameters:
 Topic: ${botTopic}
 Description: ${desc || "Not provided"}
 Grade Level: ${gradeLevel}
 
 Return ONLY valid JSON with key "instructions" containing a string of detailed tutor directives.
 Example format: {"instructions": "You are a Study Bot tutor who..."}`,
-            },
-          ],
-          max_tokens: 1000,
-          temperature: 0.7,
-        };
-
-        console.log(
-          "[create-study-bot] Groq payload:",
-          JSON.stringify(groqPayload).substring(0, 200)
-        );
-
-        const groqRes = await axios.post(
-          "https://api.groq.com/openai/v1/chat/completions",
-          groqPayload,
-          {
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${groqApiKey}`,
-            },
-            timeout: 30000,
-          }
-        );
-
-        console.log("[create-study-bot] Groq API response received");
-
-        // Extract response content
-        const aiResponseText = groqRes?.data?.choices?.[0]?.message?.content;
-        if (!aiResponseText) {
-          throw new Error("Groq returned empty response content");
-        }
-
-        // Try to parse JSON response
-        try {
-          const parsed = JSON.parse(aiResponseText);
-          system_instructions = {
-            instructions: parsed.instructions || aiResponseText,
-            gradeLevel,
-            topic: botTopic,
-            generated_at: timestamp,
+              },
+            ],
+            max_tokens: 1000,
+            temperature: 0.7,
           };
-          console.log("[create-study-bot] AI instructions parsed successfully");
-        } catch (parseErr) {
-          console.warn(
-            "[create-study-bot] Failed to parse Groq JSON; storing as raw text:",
-            parseErr.message
+
+          const groqRes = await axios.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            groqPayload,
+            {
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${groqApiKey}`,
+              },
+              timeout: 30000,
+            }
           );
-          system_instructions = {
-            instructions: aiResponseText,
-            gradeLevel,
-            topic: botTopic,
-            generated_at: timestamp,
-          };
+
+          const aiResponseText = groqRes?.data?.choices?.[0]?.message?.content;
+          if (aiResponseText) {
+            try {
+              const parsed = JSON.parse(aiResponseText);
+              system_instructions = {
+                instructions: parsed.instructions || aiResponseText,
+                gradeLevel,
+                topic: botTopic,
+                generated_at: timestamp,
+              };
+            } catch (parseErr) {
+              system_instructions = {
+                instructions: aiResponseText,
+                gradeLevel,
+                topic: botTopic,
+                generated_at: timestamp,
+              };
+            }
+          }
         }
       }
     } catch (groqErr) {
       aiError = groqErr.message;
-      console.error("[create-study-bot] Groq API call failed:", {
+      console.error("[create-study-bot] Instruction generation error:", {
         error: groqErr.message,
         status: groqErr.response?.status,
-        statusText: groqErr.response?.statusText,
       });
       // Fallback to standard instructions
       system_instructions = {
@@ -810,32 +971,37 @@ app.post("/api/chat-enhanced", async (req, res) => {
           if (plan && plan.modules) {
             updatedPlan = plan;
             newState = "plan_review";
-            botResponse = `✅ **I've Created Your Study Plan!**
 
-📖 **${plan.title}**
+            // Format modules with better spacing and structure
+            const modulesFormatted = plan.modules
+              .map(
+                (m, i) =>
+                  `## ${i + 1}. ${m.title}
 
-⏱️ **Total Duration:** ${plan.total_duration}
-📊 **Difficulty:** ${plan.difficulty}
+⏰ **Duration:** ${m.duration}
+📝 **Description:** ${m.description}
+
+**🎯 Learning Objectives:**
+${m.objectives.map((o) => `• ${o}`).join("\n")}`
+              )
+              .join("\n\n---\n\n");
+
+            botResponse = `## ✅ Study Plan Created!
+
+### 📚 ${plan.title}
+
+**⏱️ Total Duration:** ${plan.total_duration}
+**📊 Difficulty:** ${plan.difficulty}
 
 ---
 
-**📋 Your Learning Path:**
-${plan.modules
-  .map(
-    (m, i) =>
-      `
-**${i + 1}. ${m.title}** 
-   ⏰ ${m.duration}
-   📝 ${m.description}
-   🎯 Objectives:
-${m.objectives.map((o) => `      • ${o}`).join("\n")}
-`
-  )
-  .join("\n")}
+## 📋 Your Learning Path
+
+${modulesFormatted}
 
 ---
 
-**Does this plan look good? Reply "yes" to start learning! 🚀**`;
+Does this plan look good? Reply **"yes"** to start learning! 🚀`;
           }
         }
       } else {
@@ -901,14 +1067,24 @@ Let me know when you're done with this module or if you have any questions! 💡
         "You are a supportive study tutor. Use emojis, bold text, and proper formatting."
       }
 
-IMPORTANT: Format your responses with:
-- 📚 Bold headings for major concepts
-- ✨ Bullet points for key takeaways
-- 🔹 Numbered lists for sequences
-- 💡 Tips and interesting facts
-- Empty lines between paragraphs
-- Emojis at the start of sentences
-- Link concepts to previous lessons`;
+RESPONSE FORMAT GUIDELINES:
+- Use proper markdown headings (# for main, ## for sections, ### for subsections)
+- **Bold** important concepts and key terms
+- Separate paragraphs with blank lines
+- Use bullet points (•) for lists
+- Include relevant emojis
+- Provide real-world examples
+- Ask questions to verify understanding
+- Keep responses focused and conversational
+- Use line breaks between different topics
+
+TEACHING STYLE:
+- Be encouraging and supportive
+- Explain complex ideas simply
+- Build on previous concepts
+- Provide step-by-step explanations
+- Include practical examples
+- Check for understanding`;
 
       const groqMessages = [{ role: "system", content: systemPrompt }];
 
@@ -969,13 +1145,25 @@ IMPORTANT: Format your responses with:
 
         const nextModule = updatedPlan?.modules?.[progress.current_module + 1];
         if (nextModule) {
-          botResponse += `\n\n✅ **Great Work!** Module ${
-            progress.current_module + 1
-          } completed!\n\n📊 **Progress: ${progressPercent}%**\n\n➡️ **Next Up: ${
-            nextModule.title
-          }**\n${nextModule.description}`;
+          botResponse += `\n\n## ✅ Module Complete!
+
+Module ${progress.current_module + 1} done! Great work! 🎉
+
+**📊 Progress:** ${progressPercent}%
+
+---
+
+## ➡️ Next: ${nextModule.title}
+
+${nextModule.description}`;
         } else {
-          botResponse += `\n\n🎓 **Congratulations!** You've completed all modules!\n\n📊 **Final Progress: 100%** 🎉`;
+          botResponse += `\n\n## 🎓 Course Complete!
+
+Congratulations! You've finished all modules! 🏆
+
+**📊 Final Progress:** 100%
+
+You've successfully learned **${updatedPlan?.title || "this course"}**! 🎉`;
           newState = "completed";
         }
       }

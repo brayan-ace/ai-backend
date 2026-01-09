@@ -8,6 +8,7 @@ import '../services/study_bot_flow_controller.dart';
 import '../utils/theme.dart';
 
 // Widget to render formatted text with emojis and markdown-like styling
+// Includes professional spacing, line separators, and full-width containers
 class FormattedTextWidget extends StatelessWidget {
   final String text;
 
@@ -15,19 +16,49 @@ class FormattedTextWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final spans = _parseMarkdownToSpans(text);
+    // Split text by double newlines (paragraphs) for better formatting
+    final paragraphs = text.split(RegExp(r'\n\n+'));
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (int i = 0; i < paragraphs.length; i++) ...[
+          _buildParagraph(paragraphs[i].trim()),
+          // Add space between paragraphs, but not after the last one
+          if (i < paragraphs.length - 1)
+            SizedBox(height: AppTheme.spaceSm),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildParagraph(String paragraph) {
+    if (paragraph.isEmpty) return SizedBox.shrink();
+
+    final spans = _parseMarkdownToSpans(paragraph);
     return RichText(
       text: TextSpan(
         children: spans,
-        style: AppTheme.bodyMedium.copyWith(color: AppTheme.textPrimary),
+        style: AppTheme.bodyMedium.copyWith(
+          color: AppTheme.textPrimary,
+          height: 1.5,
+        ),
       ),
     );
   }
 
   List<TextSpan> _parseMarkdownToSpans(String text) {
     final spans = <TextSpan>[];
+    
+    // Enhanced regex pattern for:
+    // - **bold text**
+    // - ### Heading 3
+    // - ## Heading 2
+    // - # Heading 1
+    // - •️ Bullet points
     final pattern = RegExp(
-      r'\*\*(.+?)\*\*|###\s+(.+?)(?=\n|$)|##\s+(.+?)(?=\n|$)|#\s+(.+?)(?=\n|$)|$^',
+      r'\*\*(.+?)\*\*|###\s+(.+?)(?=\n|$)|##\s+(.+?)(?=\n|$)|#\s+(.+?)(?=\n|$)',
       multiLine: true,
     );
 
@@ -50,14 +81,37 @@ class FormattedTextWidget extends StatelessWidget {
           ),
         );
       }
-      // Handle headings
-      else if (match.group(2) != null ||
-          match.group(3) != null ||
-          match.group(4) != null) {
-        final headingText = match.group(2) ?? match.group(3) ?? match.group(4);
+      // Handle heading level 3
+      else if (match.group(2) != null) {
         spans.add(
           TextSpan(
-            text: headingText,
+            text: match.group(2),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: AppTheme.primaryBlue,
+            ),
+          ),
+        );
+      }
+      // Handle heading level 2
+      else if (match.group(3) != null) {
+        spans.add(
+          TextSpan(
+            text: match.group(3),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+              color: AppTheme.primaryBlue,
+            ),
+          ),
+        );
+      }
+      // Handle heading level 1
+      else if (match.group(4) != null) {
+        spans.add(
+          TextSpan(
+            text: match.group(4),
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 16,
@@ -875,15 +929,18 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
             // Chat Messages
             Expanded(
               child: ListView.builder(
-                padding: EdgeInsets.all(AppTheme.spaceMd),
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppTheme.spaceMd,
+                  vertical: AppTheme.spaceMd,
+                ),
                 itemCount: _messages.length,
                 itemBuilder: (context, index) {
                   final msg = _messages[index];
                   final isBot = msg.senderType == 'bot';
                   return Padding(
-                    padding: EdgeInsets.only(bottom: AppTheme.spaceSm),
+                    padding: EdgeInsets.only(bottom: AppTheme.spaceMd),
                     child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: isBot
                           ? MainAxisAlignment.start
                           : MainAxisAlignment.end,
@@ -892,6 +949,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                           Container(
                             width: 32,
                             height: 32,
+                            margin: EdgeInsets.only(right: AppTheme.spaceSm),
                             decoration: BoxDecoration(
                               color: AppTheme.primaryBlue,
                               shape: BoxShape.circle,
@@ -902,19 +960,25 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                               size: 18,
                             ),
                           ),
-                        SizedBox(width: AppTheme.spaceXs),
                         Flexible(
                           child: Container(
                             padding: EdgeInsets.symmetric(
                               horizontal: AppTheme.spaceMd,
-                              vertical: AppTheme.spaceSm,
+                              vertical: AppTheme.spaceMd,
                             ),
                             decoration: BoxDecoration(
                               color: isBot
                                   ? AppTheme.surfaceCard
                                   : AppTheme.primaryBlue,
-                              borderRadius: BorderRadius.circular(
-                                AppTheme.radiusMd,
+                              borderRadius: BorderRadius.only(
+                                topLeft: Radius.circular(
+                                  isBot ? 4 : AppTheme.radiusMd,
+                                ),
+                                topRight: Radius.circular(
+                                  isBot ? AppTheme.radiusMd : 4,
+                                ),
+                                bottomLeft: Radius.circular(AppTheme.radiusMd),
+                                bottomRight: Radius.circular(AppTheme.radiusMd),
                               ),
                             ),
                             child: isBot
@@ -922,9 +986,8 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                                 : Text(
                                     msg.text,
                                     style: AppTheme.bodyMedium.copyWith(
-                                      color: isBot
-                                          ? AppTheme.textPrimary
-                                          : Colors.white,
+                                      color: Colors.white,
+                                      height: 1.5,
                                     ),
                                   ),
                           ),
