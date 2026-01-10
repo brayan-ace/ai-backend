@@ -350,136 +350,6 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     }
   }
 
-  Future<void> _processUserMessage(String userMessage) async {
-    final currentState = _botState?.currentState ?? StudyBotStateType.intro;
-    String botResponse = '';
-    StudyBotStateType? nextState;
-
-    // Handle state transitions based on user input
-    switch (currentState) {
-      case StudyBotStateType.intro:
-        if (userMessage.toLowerCase().contains('yes') ||
-            userMessage.toLowerCase().contains('begin') ||
-            userMessage.toLowerCase().contains('start')) {
-          nextState = StudyBotStateType.planProposal;
-
-          // Generate TOC
-          final toc = _flowController.generateTableOfContents(
-            educationLevel: widget.educationLevel ?? 'secondary',
-            planDescription:
-                widget.planDescription ?? widget.planName ?? 'Study Plan',
-          );
-
-          _botState = _botState!.copyWith(
-            tableOfContents: toc,
-            tocGenerated: true,
-          );
-
-          botResponse = _flowController.getBotResponseForState(
-            StudyBotStateType.planProposal,
-            planName: widget.planName,
-          );
-        } else {
-          botResponse =
-              'Of course! I can tell you more about our study approach. Are you ready to begin?';
-        }
-        break;
-
-      case StudyBotStateType.planProposal:
-        if (userMessage.toLowerCase().contains('approve')) {
-          nextState = StudyBotStateType.planApproved;
-          botResponse = _flowController.getBotResponseForState(
-            StudyBotStateType.planApproved,
-            botName: widget.botName,
-          );
-        } else if (userMessage.toLowerCase().contains('modify')) {
-          nextState = StudyBotStateType.planModification;
-          botResponse = _flowController.getBotResponseForState(
-            StudyBotStateType.planModification,
-            planName: widget.planName,
-          );
-        } else {
-          botResponse =
-              'Would you like to approve this plan or modify it? You can adjust the pace, topics, or depth.';
-        }
-        break;
-
-      case StudyBotStateType.planModification:
-        // Store modification request
-        final mod = PlanModificationRequest(
-          modificationArea: _extractModificationArea(userMessage),
-          userRequest: userMessage,
-          timestamp: DateTime.now(),
-        );
-
-        final mods = _botState?.modificationHistory ?? [];
-        _botState = _botState!.copyWith(modificationHistory: [...mods, mod]);
-
-        // Transition back to plan proposal to regenerate TOC
-        nextState = StudyBotStateType.planProposal;
-
-        // Regenerate TOC with modifications
-        final toc = _flowController.generateTableOfContents(
-          educationLevel: widget.educationLevel ?? 'secondary',
-          planDescription: '${widget.planDescription} - ${userMessage}',
-        );
-
-        _botState = _botState!.copyWith(tableOfContents: toc);
-
-        botResponse = _flowController.getBotResponseForState(
-          StudyBotStateType.planProposal,
-          planName: widget.planName,
-        );
-        botResponse =
-            'Based on your feedback, I\'ve adjusted your learning path. Here\'s the updated plan:\n\n$botResponse';
-        break;
-
-      case StudyBotStateType.planApproved:
-        if (userMessage.toLowerCase().contains('start')) {
-          nextState = StudyBotStateType.lessonActive;
-          _botState = _botState!.copyWith(currentModule: 1);
-          botResponse = _flowController.getBotResponseForState(
-            StudyBotStateType.lessonActive,
-            botName: widget.botName,
-            planName: widget.planName,
-          );
-        } else {
-          botResponse = 'Ready? Let\'s start Module 1!';
-        }
-        break;
-
-      default:
-        botResponse = 'I\'m processing your request...';
-    }
-
-    // Perform state transition if valid
-    if (nextState != null && _botState != null) {
-      if (_flowController.canTransitionTo(currentState, nextState)) {
-        _botState = _flowController.transitionTo(_botState!, nextState);
-      }
-    }
-
-    // Add bot response
-    await _addBotMessage(botResponse);
-
-    // Update state
-    if (_botState != null) {
-      _botState = _botState!.copyWith(lastUpdated: DateTime.now());
-      await _planService.saveBotState(_botState!);
-    }
-
-    setState(() {
-      _isLoading = false;
-    });
-  }
-
-  String _extractModificationArea(String text) {
-    if (text.toLowerCase().contains('pace')) return 'pace';
-    if (text.toLowerCase().contains('topic')) return 'topics';
-    if (text.toLowerCase().contains('depth')) return 'depth';
-    return 'general';
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_isPhase1 && !_isPhase2) {
@@ -895,9 +765,10 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                     SizedBox(height: 8),
                     Text(
                       '✨ Say "I understand" when you master a concept to track progress',
-                      style: AppTheme.bodyXSmall.copyWith(
+                      style: AppTheme.bodySmall.copyWith(
                         color: AppTheme.textSecondary,
                         fontStyle: FontStyle.italic,
+                        fontSize: 12,
                       ),
                     ),
                   ],
