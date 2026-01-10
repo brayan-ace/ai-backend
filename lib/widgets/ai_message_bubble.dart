@@ -909,40 +909,40 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
                           children: [
                             if (widget.imagePath != null &&
                                 widget.imagePath!.isNotEmpty) ...[
-                          GestureDetector(
-                            onTap: () => _showFullScreenImage(context),
-                            child: Container(
-                              margin: EdgeInsets.only(bottom: AppTheme.spaceSm),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(
-                                  AppTheme.radiusSm,
-                                ),
-                                child: Image.file(
-                                  File(widget.imagePath!),
-                                  fit: BoxFit.cover,
-                                  width: double.infinity,
-                                  height: 200,
+                              GestureDetector(
+                                onTap: () => _showFullScreenImage(context),
+                                child: Container(
+                                  margin: EdgeInsets.only(
+                                    bottom: AppTheme.spaceSm,
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(
+                                      AppTheme.radiusSm,
+                                    ),
+                                    child: Image.file(
+                                      File(widget.imagePath!),
+                                      fit: BoxFit.cover,
+                                      width: double.infinity,
+                                      height: 200,
+                                    ),
+                                  ),
                                 ),
                               ),
+                            ],
+                            SelectableText.rich(
+                              TextSpan(children: _parseText(formattedText)),
+                              style: TextStyle(
+                                color: AppTheme.textPrimary,
+                                fontSize: 15,
+                                height: 1.6,
+                                letterSpacing: 0.2,
+                              ),
                             ),
-                          ),
-                        ],
-                        SelectableText.rich(
-                          TextSpan(children: _parseText(formattedText)),
-                          style: TextStyle(
-                            color: AppTheme.textPrimary,
-                            fontSize: 15,
-                            height: 1.6,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                          ],
                         ),
                       ),
                     ),
+                  ),
                 ),
         ),
         // Action buttons attached directly to AI message bubble
