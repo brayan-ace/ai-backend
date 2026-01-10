@@ -1248,6 +1248,40 @@ app.get("/api/bot-progress/:botId/:userId", async (req, res) => {
   }
 });
 
+// Get user's study bots
+app.get("/api/user-bots/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const result = await pool.query(
+      `SELECT bot_id, name, description, topic, grade_level, created_at 
+       FROM study_bots 
+       WHERE user_id = $1 
+       ORDER BY created_at DESC 
+       LIMIT 20`,
+      [userId]
+    );
+
+    return res.json({
+      status: "success",
+      bots: result.rows.map((bot) => ({
+        bot_id: bot.bot_id,
+        name: bot.name,
+        description: bot.description,
+        topic: bot.topic,
+        grade_level: bot.grade_level,
+        created_at: bot.created_at,
+      })),
+    });
+  } catch (err) {
+    console.error("[user-bots] Error:", err.message);
+    return res.status(500).json({
+      error: "Failed to fetch bots",
+      message: err.message,
+    });
+  }
+});
+
 app.post("/api/ask", async (req, res) => {
   try {
     console.log("[POST /api/ask] Request received:", {

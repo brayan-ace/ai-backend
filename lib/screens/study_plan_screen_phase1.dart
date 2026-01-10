@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../utils/globals.dart';
 import '../utils/theme.dart';
 import 'bot_processing_screen.dart';
+import 'recent_study_bots_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class StudyPlanScreen extends StatefulWidget {
@@ -252,6 +253,68 @@ class _StudyPlanScreenState extends State<StudyPlanScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Header with Recent Bots Button
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        ShaderMask(
+                          shaderCallback: (bounds) => LinearGradient(
+                            colors: AppTheme.primaryGradient,
+                          ).createShader(bounds),
+                          child: Icon(
+                            Icons.school,
+                            color: Colors.white,
+                            size: 32,
+                          ),
+                        ),
+                        SizedBox(width: AppTheme.spaceSm),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Create Study Bot',
+                              style: AppTheme.headlineSmall.copyWith(
+                                color: AppTheme.textPrimary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              'Set up your AI study companion',
+                              style: AppTheme.bodySmall.copyWith(
+                                color: AppTheme.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryBlue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                      ),
+                      child: IconButton(
+                        icon: Icon(
+                          Icons.history,
+                          color: AppTheme.primaryBlue,
+                          size: 24,
+                        ),
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const RecentStudyBotsScreen(),
+                            ),
+                          );
+                        },
+                        tooltip: 'View Recent Study Bots',
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: AppTheme.spaceLg),
+
                 // Header
                 Row(
                   children: [
@@ -391,9 +454,11 @@ class _StudyPlanScreenState extends State<StudyPlanScreen> {
                     color: AppTheme.textPrimary,
                   ),
                   maxLines: 5,
+                  textAlignVertical: TextAlignVertical.top,
                   decoration: InputDecoration(
                     hintText:
-                        'Describe what you want to study and how you want to learn. (Max 100 words)',
+                        'Describe what you want to study and how you want to learn (Max 100 words)',
+                    hintMaxLines: 2,
                     filled: true,
                     fillColor: AppTheme.primaryBlue.withOpacity(0.05),
                     border: OutlineInputBorder(
