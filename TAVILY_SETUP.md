@@ -29,7 +29,7 @@ When you create a new study bot:
 3. Go to **Settings** → **Environment**
 4. Click **Add Environment Variable**
 5. Set:
-   - **Key:** `TAVILY_API_KEY`
+   - **Key:** `tsvily`
    - **Value:** (paste your Tavily API key)
 6. Click **Save**
 

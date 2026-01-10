@@ -21,7 +21,7 @@
 **Environment Variable Required:**
 
 ```
-TAVILY_API_KEY=your_key_from_tavily.com
+tsvily=your_key_from_tavily.com
 ```
 
 ### 2. ✅ Professional Response Formatting

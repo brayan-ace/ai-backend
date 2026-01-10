@@ -2409,7 +2409,7 @@ const GROQ_KEY =
   process.env.GROQ_API_KEY ||
   process.env.GROQKEY;
 const TAVILY_KEY =
-  process.env.tavily || process.env.TAVILY_API_KEY || process.env.TAVILYKEY;
+  process.env.tsvily || process.env.tavily || process.env.TAVILYKEY;
 const OPENROUTER_KEY =
   process.env.openrouterapikey ||
   process.env.OPENROUTER_API_KEY ||
@@ -2578,7 +2578,7 @@ app.post("/tavily/search", async (req, res) => {
     const response = await axios.post(
       "https://api.tavily.com/v1/search",
       { query },
-      { headers: { Authorization: `Bearer ${process.env.TAVILY_API_KEY}` } }
+      { headers: { Authorization: `Bearer ${process.env.tsvily}` } }
     );
 
     res.json(response.data);
