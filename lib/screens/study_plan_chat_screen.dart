@@ -18,7 +18,7 @@ class FormattedTextWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     // Split text by double newlines (paragraphs) for better formatting
     final paragraphs = text.split(RegExp(r'\n\n+'));
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -26,8 +26,7 @@ class FormattedTextWidget extends StatelessWidget {
         for (int i = 0; i < paragraphs.length; i++) ...[
           _buildParagraph(paragraphs[i].trim()),
           // Add space between paragraphs, but not after the last one
-          if (i < paragraphs.length - 1)
-            SizedBox(height: AppTheme.spaceSm),
+          if (i < paragraphs.length - 1) SizedBox(height: AppTheme.spaceSm),
         ],
       ],
     );
@@ -50,7 +49,7 @@ class FormattedTextWidget extends StatelessWidget {
 
   List<TextSpan> _parseMarkdownToSpans(String text) {
     final spans = <TextSpan>[];
-    
+
     // Enhanced regex pattern for:
     // - **bold text**
     // - ### Heading 3
@@ -804,7 +803,11 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         elevation: 0,
         leading: _botCurrentState == 'learning'
             ? IconButton(
-                icon: Icon(Icons.bookmark_outline, color: AppTheme.primaryBlue, size: 28),
+                icon: Icon(
+                  Icons.bookmark_outline,
+                  color: AppTheme.primaryBlue,
+                  size: 28,
+                ),
                 tooltip: 'View & Edit Learning Plan',
                 onPressed: () => _showModulesModal(),
               )
@@ -824,9 +827,11 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                 _botCurrentState == 'intro'
                     ? 'Ready to learn? Say "ready"'
                     : _botCurrentState == 'plan_review'
-                        ? 'Plan created - Ready to start?'
-                        : 'Learning mode - Step by step',
-                style: AppTheme.bodySmall.copyWith(color: AppTheme.textSecondary),
+                    ? 'Plan created - Ready to start?'
+                    : 'Learning mode - Step by step',
+                style: AppTheme.bodySmall.copyWith(
+                  color: AppTheme.textSecondary,
+                ),
               ),
           ],
         ),
@@ -882,7 +887,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                         value: _progressPercentage / 100,
                         minHeight: 8,
                         backgroundColor: AppTheme.primaryBlue.withOpacity(0.15),
-                        valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryBlue),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppTheme.primaryBlue,
+                        ),
                       ),
                     ),
                     SizedBox(height: 8),
@@ -891,31 +898,6 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                       style: AppTheme.bodyXSmall.copyWith(
                         color: AppTheme.textSecondary,
                         fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-                        ),
-                        Text(
-                          '${_progressPercentage.toStringAsFixed(0)}%',
-                          style: AppTheme.bodySmall.copyWith(
-                            color: AppTheme.primaryBlue,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 8),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: LinearProgressIndicator(
-                        value: _progressPercentage / 100,
-                        minHeight: 6,
-                        backgroundColor: AppTheme.primaryBlue.withOpacity(0.2),
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          AppTheme.primaryBlue,
-                        ),
                       ),
                     ),
                   ],
@@ -1313,7 +1295,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       context: context,
       backgroundColor: AppTheme.backgroundDeep,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppTheme.radiusLg)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppTheme.radiusLg),
+        ),
       ),
       builder: (context) {
         return DraggableScrollableSheet(
@@ -1355,7 +1339,8 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                     SizedBox(height: AppTheme.spaceLg),
 
                     // Modules List
-                    if (_botCurrentState == 'learning' && widget.planName != null)
+                    if (_botCurrentState == 'learning' &&
+                        widget.planName != null)
                       Text(
                         '✨ ${widget.planName}',
                         style: AppTheme.bodyMedium.copyWith(
@@ -1421,8 +1406,12 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                             child: LinearProgressIndicator(
                               value: _progressPercentage / 100,
                               minHeight: 6,
-                              backgroundColor: AppTheme.primaryBlue.withOpacity(0.2),
-                              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryBlue),
+                              backgroundColor: AppTheme.primaryBlue.withOpacity(
+                                0.2,
+                              ),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                AppTheme.primaryBlue,
+                              ),
                             ),
                           ),
                         ],
@@ -1475,7 +1464,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                             vertical: AppTheme.spaceMd,
                           ),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                            borderRadius: BorderRadius.circular(
+                              AppTheme.radiusMd,
+                            ),
                           ),
                         ),
                         child: Text(
