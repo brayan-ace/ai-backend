@@ -29,7 +29,7 @@ When you create a new study bot:
 3. Go to **Settings** → **Environment**
 4. Click **Add Environment Variable**
 5. Set:
-   - **Key:** `tsvily`
+   - **Key:** `tavily`
    - **Value:** (paste your Tavily API key)
 6. Click **Save**
 
@@ -95,7 +95,7 @@ Photosynthesis educational content 9th Grade level learning
 
 **Bot instructions don't seem enhanced:**
 
-- Make sure `TAVILY_API_KEY` is set in Render environment
+- Make sure `tavily` environment variable is set in Render
 - Check Render logs: `Settings` → `Logs` for any errors
 
 **API limit exceeded:**
@@ -159,7 +159,7 @@ Generic tutor instructions...
 ## Next Steps
 
 1. ✅ Deploy Tavily integration
-2. ✅ Set `TAVILY_API_KEY` in Render
+2. ✅ Set `tavily` in Render
 3. 🔄 Test bot creation
 4. 🔄 Verify research-backed instructions
 5. 🔄 Monitor Render logs for any issues

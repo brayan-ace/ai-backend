@@ -115,9 +115,9 @@ function structureTextResponse(text) {
 // Search for topic information using Tavily API
 async function searchTopicOnline(topic, gradeLevel) {
   try {
-    const tavilyApiKey = process.env.TAVILY_API_KEY;
+    const tavilyApiKey = process.env.tavily;
     if (!tavilyApiKey) {
-      console.warn("[Tavily] TAVILY_API_KEY not configured");
+      console.warn("[Tavily] tavily environment variable not configured");
       return null;
     }
 
@@ -2409,7 +2409,7 @@ const GROQ_KEY =
   process.env.GROQ_API_KEY ||
   process.env.GROQKEY;
 const TAVILY_KEY =
-  process.env.tsvily || process.env.tavily || process.env.TAVILYKEY;
+  process.env.tavily || process.env.tsvily || process.env.TAVILYKEY;
 const OPENROUTER_KEY =
   process.env.openrouterapikey ||
   process.env.OPENROUTER_API_KEY ||
@@ -2578,7 +2578,7 @@ app.post("/tavily/search", async (req, res) => {
     const response = await axios.post(
       "https://api.tavily.com/v1/search",
       { query },
-      { headers: { Authorization: `Bearer ${process.env.tsvily}` } }
+      { headers: { Authorization: `Bearer ${process.env.tavily}` } }
     );
 
     res.json(response.data);
