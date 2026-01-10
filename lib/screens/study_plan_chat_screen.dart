@@ -221,36 +221,104 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   }
 
   Future<void> _initPhase2() async {
-    // Check if we have an existing state for this bot
-    StudyBotState? existingState;
-    if (widget.botId != null) {
-      final states = await _planService.getBotStatesByBotId(widget.botId!);
-      if (states.isNotEmpty) {
-        existingState = states.first;
+    try {
+      // If resuming a bot, load chat history and progress from backend
+      if (widget.botId != null) {
+        final currentUser = FirebaseAuth.instance.currentUser;
+        final userId = currentUser?.uid ?? 'anonymous';
+
+        // Fetch chat history
+        try {
+          final historyUri = Uri.parse(
+            '$_backendUrl/api/chat-history/${widget.botId}/$userId',
+          );
+          final historyRes = await http
+              .get(historyUri)
+              .timeout(const Duration(seconds: 15));
+
+          if (historyRes.statusCode == 200) {
+            final body = jsonDecode(historyRes.body);
+            final messages = (body['messages'] as List? ?? [])
+                .map(
+                  (m) => StudyBotMessage(
+                    id: DateTime.now().millisecondsSinceEpoch.toString(),
+                    senderType: m['senderType'] as String? ?? 'user',
+                    text: m['text'] as String? ?? '',
+                    timestamp: DateTime.parse(
+                      m['timestamp'] as String? ??
+                          DateTime.now().toIso8601String(),
+                    ),
+                  ),
+                )
+                .toList();
+
+            setState(() => _messages = messages);
+            print(
+              '[ChatScreen] Loaded ${messages.length} messages from backend',
+            );
+          }
+        } catch (e) {
+          print('[ChatScreen] Error loading chat history: $e');
+        }
+
+        // Fetch bot progress and state
+        try {
+          final progressUri = Uri.parse(
+            '$_backendUrl/api/bot-progress/${widget.botId}/$userId',
+          );
+          final progressRes = await http
+              .get(progressUri)
+              .timeout(const Duration(seconds: 15));
+
+          if (progressRes.statusCode == 200) {
+            final body = jsonDecode(progressRes.body);
+            setState(() {
+              _botCurrentState = body['bot_state'] as String? ?? 'intro';
+              _progressPercentage =
+                  (body['progress'] as num?)?.toDouble() ?? 0.0;
+            });
+            print(
+              '[ChatScreen] Restored state: $_botCurrentState, progress: $_progressPercentage%',
+            );
+          }
+        } catch (e) {
+          print('[ChatScreen] Error loading progress: $e');
+        }
       }
+
+      // Check if we have an existing state for this bot
+      StudyBotState? existingState;
+      if (widget.botId != null) {
+        final states = await _planService.getBotStatesByBotId(widget.botId!);
+        if (states.isNotEmpty) {
+          existingState = states.first;
+        }
+      }
+
+      if (existingState != null && _messages.isEmpty) {
+        _botState = existingState;
+        _messages = (existingState.chatHistory ?? [])
+            .map((m) => StudyBotMessage.fromJson(Map<String, dynamic>.from(m)))
+            .toList();
+      } else if (_messages.isEmpty) {
+        // Create new session only if no messages were loaded
+        _botState = _flowController.createNewSession(botId: widget.botId!);
+        _messages = [];
+
+        // Add initial bot greeting
+        await _addBotMessage(
+          _flowController.getBotResponseForState(
+            StudyBotStateType.intro,
+            botName: widget.botName,
+            planName: widget.planName,
+          ),
+        );
+      }
+
+      setState(() {});
+    } catch (e) {
+      print('[ChatScreen] Error in _initPhase2: $e');
     }
-
-    if (existingState != null) {
-      _botState = existingState;
-      _messages = (existingState.chatHistory ?? [])
-          .map((m) => StudyBotMessage.fromJson(Map<String, dynamic>.from(m)))
-          .toList();
-    } else {
-      // Create new session
-      _botState = _flowController.createNewSession(botId: widget.botId!);
-      _messages = [];
-
-      // Add initial bot greeting
-      await _addBotMessage(
-        _flowController.getBotResponseForState(
-          StudyBotStateType.intro,
-          botName: widget.botName,
-          planName: widget.planName,
-        ),
-      );
-    }
-
-    setState(() {});
   }
 
   Future<void> _addBotMessage(String text) async {

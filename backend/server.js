@@ -1248,6 +1248,43 @@ app.get("/api/bot-progress/:botId/:userId", async (req, res) => {
   }
 });
 
+// Get chat history for a bot
+app.get("/api/chat-history/:botId/:userId", async (req, res) => {
+  try {
+    const { botId, userId } = req.params;
+    console.log(
+      "[chat-history] Fetching messages for bot:",
+      botId,
+      "user:",
+      userId
+    );
+
+    const result = await pool.query(
+      `SELECT message_type, content, created_at 
+       FROM chat_messages 
+       WHERE bot_id = $1 AND user_id = $2 
+       ORDER BY created_at ASC`,
+      [botId, userId]
+    );
+
+    console.log("[chat-history] Found", result.rows.length, "messages");
+    return res.json({
+      status: "success",
+      messages: result.rows.map((msg) => ({
+        senderType: msg.message_type,
+        text: msg.content,
+        timestamp: msg.created_at,
+      })),
+    });
+  } catch (err) {
+    console.error("[chat-history] Error:", err.message);
+    return res.status(500).json({
+      error: "Failed to fetch chat history",
+      message: err.message,
+    });
+  }
+});
+
 // Get user's study bots
 app.get("/api/user-bots/:userId", async (req, res) => {
   try {
