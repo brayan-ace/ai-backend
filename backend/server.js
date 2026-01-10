@@ -1252,16 +1252,18 @@ app.get("/api/bot-progress/:botId/:userId", async (req, res) => {
 app.get("/api/user-bots/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
+    console.log("[user-bots] Fetching bots for user:", userId);
 
     const result = await pool.query(
-      `SELECT bot_id, name, description, topic, grade_level, created_at 
+      `SELECT bot_id, name, description, topic, grade_level
        FROM study_bots 
        WHERE user_id = $1 
-       ORDER BY created_at DESC 
+       ORDER BY bot_id DESC 
        LIMIT 20`,
       [userId]
     );
 
+    console.log("[user-bots] Found", result.rows.length, "bots");
     return res.json({
       status: "success",
       bots: result.rows.map((bot) => ({
@@ -1270,11 +1272,11 @@ app.get("/api/user-bots/:userId", async (req, res) => {
         description: bot.description,
         topic: bot.topic,
         grade_level: bot.grade_level,
-        created_at: bot.created_at,
       })),
     });
   } catch (err) {
     console.error("[user-bots] Error:", err.message);
+    console.error("[user-bots] Full error:", err);
     return res.status(500).json({
       error: "Failed to fetch bots",
       message: err.message,
