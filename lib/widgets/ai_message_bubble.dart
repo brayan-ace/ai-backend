@@ -222,16 +222,21 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
               baseline: TextBaseline.alphabetic,
               child: isDisplayMath
                   ? Container(
-                      width: double.infinity,
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width - 60,
+                      ),
                       padding: EdgeInsets.symmetric(vertical: 8),
                       child: Center(
-                        child: Math.tex(
-                          latexCode,
-                          textStyle: TextStyle(
-                            color: AppTheme.textPrimary,
-                            fontSize: 18,
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Math.tex(
+                            latexCode,
+                            textStyle: TextStyle(
+                              color: AppTheme.textPrimary,
+                              fontSize: 18,
+                            ),
+                            mathStyle: MathStyle.display,
                           ),
-                          mathStyle: MathStyle.display,
                         ),
                       ),
                     )
@@ -893,11 +898,17 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
                     padding: EdgeInsets.symmetric(horizontal: 0, vertical: 6),
                     // No background, border, or shadow for AI messages
                     color: Colors.transparent,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (widget.imagePath != null &&
-                            widget.imagePath!.isNotEmpty) ...[
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minWidth: MediaQuery.of(context).size.width - 32,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (widget.imagePath != null &&
+                                widget.imagePath!.isNotEmpty) ...[
                           GestureDetector(
                             onTap: () => _showFullScreenImage(context),
                             child: Container(
@@ -928,6 +939,10 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
                       ],
                     ),
                   ),
+                ),
+                        ),
+                      ),
+                    ),
                 ),
         ),
         // Action buttons attached directly to AI message bubble
