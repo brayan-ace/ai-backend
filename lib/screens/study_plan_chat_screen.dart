@@ -222,6 +222,11 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
 
   Future<void> _initPhase2() async {
     try {
+      // Initialize botState first so screen can render
+      if (_botState == null && widget.botId != null) {
+        _botState = _flowController.createNewSession(botId: widget.botId!);
+      }
+
       // If resuming a bot, load chat history and progress from backend
       if (widget.botId != null) {
         final currentUser = FirebaseAuth.instance.currentUser;
