@@ -870,14 +870,16 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: _botCurrentState == 'learning'
+        leading:
+            (_botCurrentState == 'learning' ||
+                _botCurrentState == 'plan_review')
             ? IconButton(
                 icon: Icon(
                   Icons.bookmark_outline,
                   color: AppTheme.primaryBlue,
                   size: 28,
                 ),
-                tooltip: 'View & Edit Learning Plan',
+                tooltip: 'View Study Plan',
                 onPressed: () => _showModulesModal(),
               )
             : null,
