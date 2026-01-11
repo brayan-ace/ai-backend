@@ -323,14 +323,11 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         _botState = _flowController.createNewSession(botId: widget.botId!);
         _messages = [];
 
-        // Add initial bot greeting
-        await _addBotMessage(
-          _flowController.getBotResponseForState(
-            StudyBotStateType.intro,
-            botName: widget.botName,
-            planName: widget.planName,
-          ),
-        );
+        // Get initial greeting from backend (will use fresh system instructions)
+        // This ensures the greeting respects the current system instructions
+        final initialGreeting =
+            'Hi! I\'m ${widget.botName}, your personal study guide. How are you doing today?';
+        await _addBotMessage(initialGreeting);
       }
 
       setState(() {});

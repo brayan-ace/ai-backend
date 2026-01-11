@@ -126,6 +126,35 @@ class HomeScreen extends StatelessWidget {
 
                 SizedBox(height: AppTheme.spaceLg),
 
+                // Study Plans Section - NEW!
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: AppTheme.spaceMd),
+                  child: Text(
+                    'Study Plans',
+                    style: AppTheme.labelMedium.copyWith(
+                      color: AppTheme.textTertiary,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                ),
+                SizedBox(height: AppTheme.spaceSm),
+                _buildDrawerItem(
+                  icon: Icons.school_rounded,
+                  title: 'My Study Plans',
+                  context: context,
+                  onTap: () {
+                    navigatorKey.currentState?.pushNamed('/study');
+                  },
+                ),
+
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppTheme.spaceMd,
+                    vertical: AppTheme.spaceSm,
+                  ),
+                  child: Divider(color: AppTheme.surfaceElevated, height: 1),
+                ),
+
                 // Chats section
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: AppTheme.spaceMd),
@@ -337,6 +366,7 @@ class HomeScreen extends StatelessWidget {
     required IconData icon,
     required String title,
     required BuildContext context,
+    VoidCallback? onTap,
   }) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: AppTheme.spaceSm, vertical: 2),
@@ -346,7 +376,7 @@ class HomeScreen extends StatelessWidget {
           title,
           style: AppTheme.bodyMedium.copyWith(color: AppTheme.textPrimary),
         ),
-        onTap: () => Navigator.pop(context),
+        onTap: onTap ?? () => Navigator.pop(context),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppTheme.radiusSm),
         ),
