@@ -1508,20 +1508,70 @@ app.post("/api/chat-enhanced", async (req, res) => {
       progress = { bot_state: "intro", study_plan: null };
     }
 
-    // Save user message
-    await pool.query(
-      `INSERT INTO chat_messages (bot_id, user_id, message_type, content) VALUES ($1, $2, $3, $4)`,
-      [botId, userId, "user", message]
-    );
-
     let botResponse = "";
     let newState = progress.bot_state;
     let updatedPlan = progress.study_plan;
 
     const groqApiKey = process.env.GROQ_API_KEY;
 
+    // HANDLE INITIAL SESSION START - Generate greeting from AI (don't save to database)
+    if (message === "[START_SESSION]") {
+      // Use Groq to generate a personalized greeting based on system instructions
+      try {
+        const systemPrompt =
+          finalSystemInstructions?.instructions ||
+          `You are a friendly study buddy. Greet the student and ask how they're doing today.`;
+
+        const chatCompletion = await axios.post(
+          "https://api.groq.com/openai/v1/chat/completions",
+          {
+            messages: [
+              {
+                role: "system",
+                content: systemPrompt,
+              },
+              {
+                role: "user",
+                content:
+                  "Hi, I'm starting a study session with you. Please greet me warmly.",
+              },
+            ],
+            model: "mixtral-8x7b-32768",
+            max_tokens: 150,
+            temperature: 0.7,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${groqApiKey}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        botResponse =
+          chatCompletion.data.choices[0]?.message?.content ||
+          "Hi! I'm here to help you learn. How are you doing today?";
+
+        console.log("[chat-enhanced] Initial greeting generated from AI");
+      } catch (grErr) {
+        console.warn(
+          "[chat-enhanced] Failed to generate greeting:",
+          grErr.message
+        );
+        botResponse =
+          "Hi! I'm here to help you learn. How are you doing today?";
+      }
+    }
+    // SAVE REGULAR USER MESSAGES (not [START_SESSION])
+    else {
+      await pool.query(
+        `INSERT INTO chat_messages (bot_id, user_id, message_type, content) VALUES ($1, $2, $3, $4)`,
+        [botId, userId, "user", message]
+      );
+    }
+
     // STATE MACHINE LOGIC
-    if (progress.bot_state === "intro") {
+    if (progress.bot_state === "intro" && message !== "[START_SESSION]") {
       if (
         message.toLowerCase().includes("ready") ||
         message.toLowerCase().includes("start") ||

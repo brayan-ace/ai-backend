@@ -304,31 +304,14 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         }
       }
 
-      // Check if we have an existing state for this bot
-      StudyBotState? existingState;
-      if (widget.botId != null) {
-        final states = await _planService.getBotStatesByBotId(widget.botId!);
-        if (states.isNotEmpty) {
-          existingState = states.first;
-        }
-      }
+      // Always create fresh session - no state caching
+      // This ensures we always fetch fresh greeting from backend AI
+      _botState = _flowController.createNewSession(botId: widget.botId!);
+      _messages = [];
 
-      if (existingState != null && _messages.isEmpty) {
-        _botState = existingState;
-        _messages = (existingState.chatHistory ?? [])
-            .map((m) => StudyBotMessage.fromJson(Map<String, dynamic>.from(m)))
-            .toList();
-      } else if (_messages.isEmpty) {
-        // Create new session only if no messages were loaded
-        _botState = _flowController.createNewSession(botId: widget.botId!);
-        _messages = [];
-
-        // Get initial greeting from backend (will use fresh system instructions)
-        // This ensures the greeting respects the current system instructions
-        final initialGreeting =
-            'Hi! I\'m ${widget.botName}, your personal study guide. How are you doing today?';
-        await _addBotMessage(initialGreeting);
-      }
+      // Always fetch initial greeting from backend - ALL responses come from AI
+      // The backend will use system instructions to generate personalized greeting
+      _fetchInitialGreeting();
 
       setState(() {});
 
@@ -369,6 +352,44 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     } catch (e) {
       print('[ChatScreen] ⚠️ Error fetching fresh instructions: $e');
       // Non-blocking error - continue with existing instructions
+    }
+  }
+
+  /// Fetch the initial greeting from backend
+  /// This triggers the AI to generate a greeting based on system instructions
+  Future<void> _fetchInitialGreeting() async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final userId = currentUser?.uid ?? 'anonymous';
+
+      final uri = Uri.parse('$_backendUrl/api/chat-enhanced');
+      final payload = {
+        'message': '[START_SESSION]', // Special message to trigger greeting
+        'botId': widget.botId,
+        'userId': userId,
+        'systemInstructions': _botInstructions,
+      };
+
+      final resp = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(payload),
+          )
+          .timeout(Duration(seconds: 30));
+
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        final body = jsonDecode(resp.body) as Map<String, dynamic>;
+        final botResponse = body['response'] ?? 'Let\'s get started!';
+        await _addBotMessage(botResponse);
+        print('[ChatScreen] ✅ Initial greeting fetched from backend');
+      } else {
+        print('[ChatScreen] ⚠️ Failed to fetch greeting: ${resp.statusCode}');
+        // Fallback - still let user interact, backend will respond when they type
+      }
+    } catch (e) {
+      print('[ChatScreen] ⚠️ Error fetching initial greeting: $e');
+      // Non-blocking - user can still send messages and backend will respond
     }
   }
 
