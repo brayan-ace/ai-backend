@@ -1459,6 +1459,181 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
 
                     SizedBox(height: AppTheme.spaceLg),
 
+                    // Modules List - MAIN CONTENT
+                    if (_studyPlan != null &&
+                        (_studyPlan!['modules'] as List?)?.isNotEmpty == true)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '📚 Modules',
+                            style: AppTheme.headlineSmall.copyWith(
+                              color: AppTheme.textPrimary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: AppTheme.spaceMd),
+                          ...((_studyPlan!['modules'] as List? ?? []).asMap().entries.map((
+                            entry,
+                          ) {
+                            final index = entry.key;
+                            final module = entry.value as Map<String, dynamic>;
+                            final isCompleted =
+                                (_botState?.completedModules ?? []).contains(
+                                  index,
+                                );
+                            final isCurrent =
+                                _botCurrentState == 'learning' &&
+                                progress?.current_module == index;
+
+                            return Container(
+                              margin: EdgeInsets.only(bottom: AppTheme.spaceMd),
+                              decoration: BoxDecoration(
+                                color: AppTheme.surfaceCard,
+                                border: Border.all(
+                                  color: isCurrent
+                                      ? AppTheme.primaryBlue
+                                      : AppTheme.primaryBlue.withOpacity(0.2),
+                                  width: isCurrent ? 2 : 1,
+                                ),
+                                borderRadius: BorderRadius.circular(
+                                  AppTheme.radiusMd,
+                                ),
+                              ),
+                              child: ExpansionTile(
+                                title: Row(
+                                  children: [
+                                    if (isCompleted)
+                                      Icon(
+                                        Icons.check_circle,
+                                        color: Colors.green,
+                                        size: 20,
+                                      )
+                                    else if (isCurrent)
+                                      Icon(
+                                        Icons.play_circle,
+                                        color: AppTheme.primaryBlue,
+                                        size: 20,
+                                      )
+                                    else
+                                      Icon(
+                                        Icons.radio_button_unchecked,
+                                        color: AppTheme.textSecondary,
+                                        size: 20,
+                                      ),
+                                    SizedBox(width: AppTheme.spaceSm),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Module ${index + 1}: ${module['title'] ?? 'Untitled'}',
+                                            style: AppTheme.bodyMedium.copyWith(
+                                              color: AppTheme.textPrimary,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          Text(
+                                            module['duration'] ?? 'N/A',
+                                            style: AppTheme.bodySmall.copyWith(
+                                              color: AppTheme.textSecondary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                children: [
+                                  Padding(
+                                    padding: EdgeInsets.all(AppTheme.spaceMd),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Description',
+                                          style: AppTheme.bodyMedium.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                            color: AppTheme.textPrimary,
+                                          ),
+                                        ),
+                                        SizedBox(height: AppTheme.spaceSm),
+                                        Text(
+                                          module['description'] ??
+                                              'No description',
+                                          style: AppTheme.bodySmall.copyWith(
+                                            color: AppTheme.textSecondary,
+                                          ),
+                                        ),
+                                        SizedBox(height: AppTheme.spaceMd),
+                                        Text(
+                                          'Learning Objectives',
+                                          style: AppTheme.bodyMedium.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                            color: AppTheme.textPrimary,
+                                          ),
+                                        ),
+                                        SizedBox(height: AppTheme.spaceSm),
+                                        ...((module['objectives'] as List? ??
+                                                [])
+                                            .map(
+                                              (obj) => Padding(
+                                                padding: EdgeInsets.only(
+                                                  bottom: AppTheme.spaceSm,
+                                                ),
+                                                child: Row(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      '• ',
+                                                      style: AppTheme.bodySmall
+                                                          .copyWith(
+                                                            color: AppTheme
+                                                                .textSecondary,
+                                                          ),
+                                                    ),
+                                                    Expanded(
+                                                      child: Text(
+                                                        obj as String? ?? '',
+                                                        style: AppTheme
+                                                            .bodySmall
+                                                            .copyWith(
+                                                              color: AppTheme
+                                                                  .textSecondary,
+                                                            ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            )
+                                            .toList()),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList()),
+                          SizedBox(height: AppTheme.spaceLg),
+                        ],
+                      )
+                    else
+                      Padding(
+                        padding: EdgeInsets.all(AppTheme.spaceMd),
+                        child: Text(
+                          'No modules available yet. Create a study plan to get started!',
+                          style: AppTheme.bodyMedium.copyWith(
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                      ),
+
+                    SizedBox(height: AppTheme.spaceLg),
+
                     // Progress summary
                     Container(
                       padding: EdgeInsets.all(AppTheme.spaceMd),
