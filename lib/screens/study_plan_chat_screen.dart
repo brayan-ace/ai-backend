@@ -871,19 +871,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading:
-            (_botCurrentState == 'learning' ||
-                _botCurrentState == 'plan_review')
-            ? IconButton(
-                icon: Icon(
-                  Icons.bookmark_outline,
-                  color: AppTheme.primaryBlue,
-                  size: 28,
-                ),
-                tooltip: 'View Study Plan',
-                onPressed: () => _showModulesModal(),
-              )
-            : null,
+        leading: null,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -907,6 +895,34 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
               ),
           ],
         ),
+        actions: [
+          // Bookmark Icon - Study Plan Access
+          if (_botCurrentState == 'learning' ||
+              _botCurrentState == 'plan_review')
+            Padding(
+              padding: EdgeInsets.only(right: AppTheme.spaceMd),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryBlue.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: IconButton(
+                  icon: Icon(
+                    Icons.bookmark,
+                    color: AppTheme.primaryBlue,
+                    size: 24,
+                  ),
+                  tooltip: 'View Study Plan',
+                  onPressed: () {
+                    print(
+                      '[ChatScreen] 📖 Bookmark tapped - showing modules modal',
+                    );
+                    _showModulesModal();
+                  },
+                ),
+              ),
+            ),
+        ],
       ),
       drawer: _buildDrawer(),
       body: SafeArea(
