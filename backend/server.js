@@ -1652,6 +1652,20 @@ app.post("/api/chat-enhanced", async (req, res) => {
               updatedPlan = plan;
               newState = "plan_review";
 
+              // Save the plan to database so it's available in next request
+              try {
+                await pool.query(
+                  `UPDATE bot_progress SET study_plan = $1, bot_state = $2 WHERE bot_id = $3 AND user_id = $4`,
+                  [JSON.stringify(plan), newState, botId, userId]
+                );
+                console.log("✅ Study plan saved to database");
+              } catch (saveErr) {
+                console.warn(
+                  "⚠️ Failed to save plan to database:",
+                  saveErr.message
+                );
+              }
+
               // Don't send full plan in chat - only show in bookmark icon modal
               botResponse = `📚 Your personalized study plan has been created!
 

@@ -535,6 +535,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
           if (progress != null) {
             _progressPercentage = (progress['percentage'] ?? 0).toDouble();
           }
+          print('[ChatScreen] 📊 State updated: $_botCurrentState');
         });
 
         await _addBotMessage(botResponse);
