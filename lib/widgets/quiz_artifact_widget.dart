@@ -360,28 +360,35 @@ class _QuizArtifactWidgetState extends State<QuizArtifactWidget> {
                     SizedBox(height: AppTheme.spaceMd),
                     SizedBox(
                       width: double.infinity,
-                      child: ElevatedButton.icon(
+                      child: ElevatedButton(
                         onPressed: widget.onExplainAnswer != null
                             ? () => _requestDeepExplanation(
                                 index,
-                                text,
+                                answerText,
                                 answerText,
                                 _currentExplanations[index] ?? explanation,
                               )
                             : null,
-                        icon: Icon(Icons.help_outline, size: 16),
-                        label: Text('I don\'t understand this'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.primaryBlue.withOpacity(
                             0.15,
                           ),
                           foregroundColor: AppTheme.primaryBlue,
                           padding: EdgeInsets.symmetric(
+                            horizontal: AppTheme.spaceMd,
                             vertical: AppTheme.spaceSm,
                           ),
                           side: BorderSide(
                             color: AppTheme.primaryBlue.withOpacity(0.3),
                           ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.help_outline, size: 16),
+                            SizedBox(width: 8),
+                            Text('I don\'t understand this'),
+                          ],
                         ),
                       ),
                     ),
