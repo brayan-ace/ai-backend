@@ -1484,6 +1484,24 @@ app.post("/api/chat-enhanced", async (req, res) => {
     // Use database instructions if available, fallback to provided instructions
     const finalSystemInstructions = dbSystemInstructions || systemInstructions;
 
+    console.log(
+      `📋 [Instructions Source] Database: ${
+        dbSystemInstructions ? "YES" : "NO"
+      }, Provided: ${systemInstructions ? "YES" : "NO"}`
+    );
+    if (finalSystemInstructions?.instructions) {
+      console.log(
+        `📋 [Final Instructions] Using: "${finalSystemInstructions.instructions.substring(
+          0,
+          100
+        )}..."`
+      );
+    } else {
+      console.log(
+        `⚠️ [Final Instructions] No instructions found, will use default greeting prompt`
+      );
+    }
+
     // Get or initialize progress
     let progress;
     try {

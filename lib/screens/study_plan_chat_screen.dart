@@ -401,9 +401,11 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
 
       if (resp.statusCode >= 200 && resp.statusCode < 300) {
         final body = jsonDecode(resp.body) as Map<String, dynamic>;
+        print('[ChatScreen] 📦 Full response body: $body');
         final botResponse = body['response'] ?? 'Let\'s get started!';
         print('[ChatScreen] ✅ AI GREETING RECEIVED from backend');
         print('[ChatScreen] 💬 Greeting text: "$botResponse"');
+        print('[ChatScreen] 💬 Greeting length: ${botResponse.length} chars');
         await _addBotMessage(botResponse);
         print(
           '[ChatScreen] ✅ Initial greeting fetched from backend and displayed',
