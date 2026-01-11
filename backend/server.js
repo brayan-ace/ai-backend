@@ -1606,40 +1606,67 @@ app.post("/api/chat-enhanced", async (req, res) => {
 
     // STATE MACHINE LOGIC
     if (progress.bot_state === "intro" && message !== "[START_SESSION]") {
-      console.log("🔄 STATE: intro (user not ready yet)");
-      if (
-        message.toLowerCase().includes("ready") ||
-        message.toLowerCase().includes("start") ||
-        message.toLowerCase().includes("yes")
-      ) {
-        // Generate study plan
-        if (bot) {
-          const plan = await generateStudyPlan(
-            bot.topic,
-            bot.description || "",
-            bot.grade_level,
-            groqApiKey
-          );
+      console.log("🔄 STATE: intro (responding to mood/greeting)");
 
-          if (plan && plan.modules) {
-            updatedPlan = plan;
-            newState = "plan_review";
+      // Check if user is responding to mood check or ready to start
+      const lowerMsg = message.toLowerCase();
+      const isReadyToStart =
+        lowerMsg.includes("ready") ||
+        lowerMsg.includes("start") ||
+        (lowerMsg.includes("yes") && !lowerMsg.includes("no"));
 
-            // Format modules with better spacing and structure
-            const modulesFormatted = plan.modules
-              .map(
-                (m, i) =>
-                  `## ${i + 1}. ${m.title}
+      const isMoodResponse =
+        lowerMsg.includes("fine") ||
+        lowerMsg.includes("good") ||
+        lowerMsg.includes("great") ||
+        lowerMsg.includes("okay") ||
+        lowerMsg.includes("ok") ||
+        lowerMsg.includes("doing well") ||
+        lowerMsg.includes("feeling") ||
+        lowerMsg.includes("alright") ||
+        lowerMsg.includes("pretty good") ||
+        lowerMsg.includes("not bad") ||
+        lowerMsg.includes("could be better") ||
+        lowerMsg.includes("so-so") ||
+        lowerMsg.includes("tired") ||
+        lowerMsg.includes("focused") ||
+        lowerMsg.includes("excited") ||
+        lowerMsg.includes("ready");
+
+      if (isReadyToStart || isMoodResponse) {
+        // User responded to mood or expressed readiness
+        // Now ask if they want to start learning
+        const botName = bot?.name || "Study Bot";
+
+        if (isReadyToStart) {
+          // They said "ready", go directly to study plan
+          if (bot) {
+            const plan = await generateStudyPlan(
+              bot.topic,
+              bot.description || "",
+              bot.grade_level,
+              groqApiKey
+            );
+
+            if (plan && plan.modules) {
+              updatedPlan = plan;
+              newState = "plan_review";
+
+              // Format modules with better spacing and structure
+              const modulesFormatted = plan.modules
+                .map(
+                  (m, i) =>
+                    `## ${i + 1}. ${m.title}
 
 ⏰ **Duration:** ${m.duration}
 📝 **Description:** ${m.description}
 
 **🎯 Learning Objectives:**
 ${m.objectives.map((o) => `• ${o}`).join("\n")}`
-              )
-              .join("\n\n---\n\n");
+                )
+                .join("\n\n---\n\n");
 
-            botResponse = `## ✅ Study Plan Created!
+              botResponse = `## ✅ Study Plan Created!
 
 ### 📚 ${plan.title}
 
@@ -1655,11 +1682,23 @@ ${modulesFormatted}
 ---
 
 Does this plan look good? Reply **"yes"** to start learning! 🚀`;
+            }
           }
+        } else {
+          // They just responded to mood check, now ask if they're ready to start
+          botResponse = `That's great to hear! 😊
+
+I've prepared a personalized study plan for you on **${
+            bot?.topic || "your subject"
+          }**. 
+
+Are you ready to get started with learning? Just say **"yes"** or **"let's go"**! 🚀`;
         }
       } else {
-        const botName = bot?.name || "Study Bot";
-        botResponse = `Hi, I'm ${botName}. I'm here to make studying feel like a breeze.\n\nHow are you doing today?`;
+        // Still in mood/greeting phase, continue conversation naturally
+        botResponse = `I appreciate you sharing that! 😊 
+
+Whenever you're ready to dive into studying, just let me know and we can get started. Are you feeling ready to learn today? 📚`;
       }
     } else if (progress.bot_state === "plan_review") {
       if (
