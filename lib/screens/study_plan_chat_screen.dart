@@ -6,6 +6,9 @@ import '../models/study_bot_state.dart';
 import '../services/study_plan_service.dart';
 import '../services/study_bot_flow_controller.dart';
 import '../utils/theme.dart';
+import 'study_plan_editor_screen.dart';
+import 'quiz_config_screen.dart';
+import '../widgets/quiz_artifact_widget.dart';
 
 // Widget to render formatted text with emojis and markdown-like styling
 // Includes professional spacing, line separators, and full-width containers
@@ -187,9 +190,15 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   // Bot instructions from database
   Map<String, dynamic>? _botInstructions;
 
+  // Study plan management
+  Map<String, dynamic>? _studyPlan;
+
   // Progress tracking
   double _progressPercentage = 0;
   String _botCurrentState = 'intro';
+
+  // Quiz tracking
+  int? _currentQuizId;
 
   // Backend URL
   static const String _backendUrl = String.fromEnvironment(
@@ -281,10 +290,14 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
               _botCurrentState = body['bot_state'] as String? ?? 'intro';
               _progressPercentage =
                   (body['progress'] as num?)?.toDouble() ?? 0.0;
+              _studyPlan = body['study_plan'] as Map<String, dynamic>?;
             });
             print(
               '[ChatScreen] Restored state: $_botCurrentState, progress: $_progressPercentage%',
             );
+            if (_studyPlan != null) {
+              print('[ChatScreen] Loaded study plan with modules');
+            }
           }
         } catch (e) {
           print('[ChatScreen] Error loading progress: $e');
@@ -327,22 +340,53 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   }
 
   Future<void> _addBotMessage(String text) async {
-    final message = StudyBotMessage(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      senderType: 'bot',
-      text: text,
-      timestamp: DateTime.now(),
-    );
+    // Check if this is a quiz popup trigger
+    if (text.contains('[SHOW_QUIZ_POPUP]')) {
+      // Extract the actual message (without the marker)
+      final displayText = text.replaceAll('[SHOW_QUIZ_POPUP]', '').trim();
 
-    setState(() {
-      _messages.add(message);
-    });
-
-    if (_botState != null) {
-      _botState = _botState!.copyWith(
-        chatHistory: _messages.map((m) => m.toJson()).toList(),
+      // Add the message without the marker
+      final message = StudyBotMessage(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        senderType: 'bot',
+        text: displayText,
+        timestamp: DateTime.now(),
       );
-      await _planService.saveBotState(_botState!);
+
+      setState(() {
+        _messages.add(message);
+      });
+
+      if (_botState != null) {
+        _botState = _botState!.copyWith(
+          chatHistory: _messages.map((m) => m.toJson()).toList(),
+        );
+        await _planService.saveBotState(_botState!);
+      }
+
+      // Show quiz popup after a short delay to let the message display
+      Future.delayed(Duration(milliseconds: 500), () {
+        _showQuizPopup();
+      });
+    } else {
+      // Normal message handling
+      final message = StudyBotMessage(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        senderType: 'bot',
+        text: text,
+        timestamp: DateTime.now(),
+      );
+
+      setState(() {
+        _messages.add(message);
+      });
+
+      if (_botState != null) {
+        _botState = _botState!.copyWith(
+          chatHistory: _messages.map((m) => m.toJson()).toList(),
+        );
+        await _planService.saveBotState(_botState!);
+      }
     }
   }
 
@@ -1266,12 +1310,23 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                       ),
                     ),
                     SizedBox(height: AppTheme.spaceMd),
-                    Text(
-                      '📚 Your Learning Plan',
-                      style: AppTheme.headlineSmall.copyWith(
-                        color: AppTheme.textPrimary,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '📚 Your Learning Plan',
+                          style: AppTheme.headlineSmall.copyWith(
+                            color: AppTheme.textPrimary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (_studyPlan != null)
+                          IconButton(
+                            icon: Icon(Icons.edit, color: AppTheme.primaryBlue),
+                            tooltip: 'Edit Plan',
+                            onPressed: () => _openPlanEditor(),
+                          ),
+                      ],
                     ),
                     SizedBox(height: AppTheme.spaceSm),
                     Text(
@@ -1431,6 +1486,385 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         );
       },
     );
+  }
+
+  Future<void> _openPlanEditor() async {
+    if (_studyPlan == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Study plan not loaded yet. Please try again.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final userId = currentUser?.uid ?? 'anonymous';
+
+    Navigator.pop(context); // Close the modal
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => StudyPlanEditorScreen(
+          studyPlan: _studyPlan!,
+          onSave: (updatedPlan) async {
+            await _savePlanChanges(updatedPlan, userId);
+          },
+        ),
+      ),
+    );
+
+    // Reload plan after editor closes
+    if (result != null) {
+      _loadStudyPlan();
+    }
+  }
+
+  Future<void> _savePlanChanges(
+    Map<String, dynamic> updatedPlan,
+    String userId,
+  ) async {
+    try {
+      // Update plan in state
+      setState(() => _studyPlan = updatedPlan);
+
+      // Send to backend
+      final uri = Uri.parse('$_backendUrl/api/update-study-plan');
+
+      final response = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'botId': widget.botId,
+              'userId': userId,
+              'updatedPlan': updatedPlan,
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              '✅ Study plan updated! I\'ll adjust my teaching strategy.',
+            ),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+        print('[ChatScreen] Plan saved successfully');
+      } else {
+        throw Exception('Server error: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('[ChatScreen] Error saving plan: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving plan: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _loadStudyPlan() async {
+    if (widget.botId == null) return;
+
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final userId = currentUser?.uid ?? 'anonymous';
+
+      final uri = Uri.parse(
+        '$_backendUrl/api/bot-progress/${widget.botId}/$userId',
+      );
+      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        setState(() {
+          _studyPlan = body['study_plan'] as Map<String, dynamic>?;
+        });
+      }
+    } catch (e) {
+      print('[ChatScreen] Error loading study plan: $e');
+    }
+  }
+
+  /// Show quiz popup asking if user wants to take quiz now or later
+  void _showQuizPopup() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: AppTheme.backgroundDeep,
+          title: Text(
+            '📝 Ready for a Quiz?',
+            style: AppTheme.headlineSmall.copyWith(
+              color: AppTheme.textPrimary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: Text(
+            'Do you want to take a quiz now to test your knowledge, or would you prefer to do it later?',
+            style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _sendMessageToBackend('Later');
+              },
+              child: Text(
+                'Later',
+                style: AppTheme.bodyMedium.copyWith(
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _showQuizConfiguration();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryBlue,
+              ),
+              child: Text(
+                'Now',
+                style: AppTheme.labelMedium.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Show quiz configuration screen
+  void _showQuizConfiguration() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return QuizConfigScreen(
+          moduleName: 'Module Quiz',
+          onStartQuiz: (config) async {
+            await _generateQuiz(config);
+          },
+        );
+      },
+    );
+  }
+
+  /// Generate quiz by calling backend endpoint
+  Future<void> _generateQuiz(Map<String, dynamic> config) async {
+    try {
+      print('[ChatScreen] Starting quiz generation with config: $config');
+
+      setState(() => _isLoading = true);
+
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final userId = currentUser?.uid ?? 'anonymous';
+
+      final uri = Uri.parse('$_backendUrl/api/generate-quiz');
+      final payload = {
+        'botId': widget.botId,
+        'userId': userId,
+        'moduleName':
+            'Module ${((_botState?.chatHistory?.length) ?? 0) ~/ 5 + 1}',
+        'moduleContent': _getModuleContext(),
+        'questionType': config['questionType'] ?? 'both',
+        'mcqCount': config['mcqCount'] ?? 5,
+        'textCount': config['textCount'] ?? 3,
+        'useWebSearch': config['useWebSearch'] ?? true,
+        'gradeLevel': widget.educationLevel ?? 'General',
+        'topic': widget.planName ?? 'General',
+      };
+
+      print('[ChatScreen] Calling quiz generation endpoint');
+      final resp = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(payload),
+          )
+          .timeout(Duration(seconds: 45));
+
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        final body = jsonDecode(resp.body) as Map<String, dynamic>;
+        final quiz = body['quiz'] as Map<String, dynamic>?;
+        final quizId = body['quizId'] as int?;
+
+        print('[ChatScreen] Quiz generated successfully');
+
+        if (quiz != null) {
+          // Store quiz ID for explanation callbacks
+          _currentQuizId = quizId;
+          // Show quiz artifact
+          _showQuizArtifact(quiz);
+        }
+      } else {
+        print('[ChatScreen] Quiz generation failed: ${resp.statusCode}');
+        _addBotMessage(
+          'Sorry, I had trouble generating the quiz. Let\'s try again later!',
+        );
+      }
+    } catch (e) {
+      print('[ChatScreen] Error: $e');
+      _addBotMessage('Network error while generating quiz: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  /// Show quiz artifact dialog
+  void _showQuizArtifact(Map<String, dynamic> quiz) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.all(AppTheme.spaceMd),
+          child: Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.85,
+            ),
+            child: Column(
+              children: [
+                Expanded(
+                  child: QuizArtifactWidget(
+                    quizData: quiz,
+                    onExplainAnswer: _handleExplainAnswer,
+                  ),
+                ),
+                SizedBox(height: AppTheme.spaceMd),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _sendMessageToBackend('I\'ve completed the quiz review.');
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryBlue,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppTheme.spaceLg,
+                      vertical: AppTheme.spaceMd,
+                    ),
+                  ),
+                  child: Text(
+                    'Close Quiz',
+                    style: AppTheme.labelMedium.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Extract module context for quiz generation
+  String _getModuleContext() {
+    // Extract last few messages as module context
+    final recentMessages = _messages
+        .where((m) => m.senderType == 'bot')
+        .toList()
+        .asMap()
+        .entries
+        .where(
+          (e) => e.key >= (_messages.length - 10).clamp(0, _messages.length),
+        )
+        .map((e) => e.value.text)
+        .join('\n\n');
+
+    return recentMessages.isNotEmpty
+        ? recentMessages
+        : 'Use the topic: ${widget.planName} at ${widget.educationLevel} level';
+  }
+
+  /// Handle student requesting a deeper explanation for a quiz answer
+  Future<String?> _handleExplainAnswer(
+    int questionIndex,
+    String questionText,
+    String answerText,
+    String currentExplanation,
+  ) async {
+    try {
+      // Show loading indicator
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Getting a simpler explanation...'),
+            duration: Duration(seconds: 1),
+            backgroundColor: AppTheme.primaryBlue,
+          ),
+        );
+      }
+
+      // Get the quiz ID from quiz_data table
+      final quizResult = await http.post(
+        Uri.parse('$_backendUrl/api/explain-answer'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'botId': widget.botId,
+          'userId': (FirebaseAuth.instance.currentUser?.uid ?? 'anonymous'),
+          'quizId': _currentQuizId ?? 0,
+          'questionIndex': questionIndex,
+          'questionText': questionText,
+          'answerText': answerText,
+          'currentExplanation': currentExplanation,
+        }),
+      );
+
+      if (quizResult.statusCode == 200) {
+        final responseData = jsonDecode(quizResult.body);
+        final newExplanation = responseData['explanation'] as String? ?? '';
+
+        if (newExplanation.isNotEmpty) {
+          // Show success message
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Explanation updated!'),
+                duration: Duration(seconds: 1),
+                backgroundColor: AppTheme.success,
+              ),
+            );
+          }
+          return newExplanation;
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to get explanation'),
+              backgroundColor: AppTheme.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('[_handleExplainAnswer] Error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error getting explanation'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
+    }
+    return null;
   }
 
   @override
