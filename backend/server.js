@@ -1534,6 +1534,7 @@ app.post("/api/chat-enhanced", async (req, res) => {
         console.log(
           "📋 System Prompt loaded (length: " + systemPrompt.length + " chars)"
         );
+        console.log(`📋 System Prompt: "${systemPrompt.substring(0, 200)}..."`);
         console.log("🔗 Calling Groq API for greeting generation...");
 
         const chatCompletion = await axios.post(

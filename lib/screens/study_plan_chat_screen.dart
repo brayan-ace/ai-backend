@@ -309,16 +309,17 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       _botState = _flowController.createNewSession(botId: widget.botId!);
       _messages = [];
 
+      // Fetch fresh system instructions from backend FIRST
+      // This ensures instructions are available when greeting is fetched
+      if (widget.botId != null) {
+        await _fetchFreshSystemInstructions(widget.botId!);
+      }
+
       // Always fetch initial greeting from backend - ALL responses come from AI
       // The backend will use system instructions to generate personalized greeting
       _fetchInitialGreeting();
 
       setState(() {});
-
-      // Fetch fresh system instructions from backend
-      if (widget.botId != null) {
-        _fetchFreshSystemInstructions(widget.botId!);
-      }
     } catch (e) {
       print('[ChatScreen] Error in _initPhase2: $e');
     }
@@ -362,6 +363,15 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       print(
         '[ChatScreen] 🎯 _fetchInitialGreeting() CALLED - Getting fresh AI greeting',
       );
+      print(
+        '[ChatScreen] 📋 System Instructions available: ${_botInstructions != null}',
+      );
+      if (_botInstructions != null) {
+        final instructions = _botInstructions?['instructions'] as String? ?? '';
+        print(
+          '[ChatScreen] 📝 Instructions preview: "${instructions.substring(0, 150)}..."',
+        );
+      }
       final currentUser = FirebaseAuth.instance.currentUser;
       final userId = currentUser?.uid ?? 'anonymous';
       print('[ChatScreen] 👤 User ID: $userId');

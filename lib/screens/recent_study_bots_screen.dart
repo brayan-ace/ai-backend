@@ -69,7 +69,9 @@ class _RecentStudyBotsScreenState extends State<RecentStudyBotsScreen> {
       if (user == null) return;
 
       final uri = Uri.parse('$_backendUrl/api/delete-bot/$botId');
-      final response = await http.delete(uri).timeout(const Duration(seconds: 15));
+      final response = await http
+          .delete(uri)
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         setState(() {
@@ -109,9 +111,7 @@ class _RecentStudyBotsScreenState extends State<RecentStudyBotsScreen> {
         backgroundColor: AppTheme.surfaceCard,
         title: Text(
           'Rename Bot',
-          style: AppTheme.headlineSmall.copyWith(
-            color: AppTheme.textPrimary,
-          ),
+          style: AppTheme.headlineSmall.copyWith(color: AppTheme.textPrimary),
         ),
         content: TextField(
           controller: controller,
@@ -155,11 +155,13 @@ class _RecentStudyBotsScreenState extends State<RecentStudyBotsScreen> {
                   final botId = bot['bot_id'] as String?;
                   if (botId != null) {
                     final uri = Uri.parse('$_backendUrl/api/rename-bot/$botId');
-                    final response = await http.post(
-                      uri,
-                      headers: {'Content-Type': 'application/json'},
-                      body: jsonEncode({'name': newName}),
-                    ).timeout(const Duration(seconds: 15));
+                    final response = await http
+                        .post(
+                          uri,
+                          headers: {'Content-Type': 'application/json'},
+                          body: jsonEncode({'name': newName}),
+                        )
+                        .timeout(const Duration(seconds: 15));
 
                     if (response.statusCode == 200) {
                       setState(() {
@@ -259,10 +261,10 @@ class _RecentStudyBotsScreenState extends State<RecentStudyBotsScreen> {
               ),
             )
           : _errorMessage.isNotEmpty
-              ? _buildErrorState()
-              : _bots.isEmpty
-                  ? _buildEmptyState()
-                  : _buildBotsList(),
+          ? _buildErrorState()
+          : _bots.isEmpty
+          ? _buildEmptyState()
+          : _buildBotsList(),
     );
   }
 
@@ -551,12 +553,10 @@ class _RecentStudyBotsScreenState extends State<RecentStudyBotsScreen> {
                   ],
                 ),
                 // Description
-                if (bot['description'] != null && (bot['description'] as String).isNotEmpty)
+                if (bot['description'] != null &&
+                    (bot['description'] as String).isNotEmpty)
                   Padding(
-                    padding: EdgeInsets.only(
-                      top: AppTheme.spaceSm,
-                      left: 50,
-                    ),
+                    padding: EdgeInsets.only(top: AppTheme.spaceSm, left: 50),
                     child: Text(
                       bot['description'] ?? '',
                       style: AppTheme.bodySmall.copyWith(
@@ -569,10 +569,7 @@ class _RecentStudyBotsScreenState extends State<RecentStudyBotsScreen> {
                   ),
                 // Grade Level
                 Padding(
-                  padding: EdgeInsets.only(
-                    top: AppTheme.spaceSm,
-                    left: 50,
-                  ),
+                  padding: EdgeInsets.only(top: AppTheme.spaceSm, left: 50),
                   child: Row(
                     children: [
                       Icon(
@@ -598,4 +595,4 @@ class _RecentStudyBotsScreenState extends State<RecentStudyBotsScreen> {
       ),
     );
   }
-
+}
