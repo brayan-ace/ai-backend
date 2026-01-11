@@ -1652,36 +1652,10 @@ app.post("/api/chat-enhanced", async (req, res) => {
               updatedPlan = plan;
               newState = "plan_review";
 
-              // Format modules with better spacing and structure
-              const modulesFormatted = plan.modules
-                .map(
-                  (m, i) =>
-                    `## ${i + 1}. ${m.title}
+              // Don't send full plan in chat - only show in bookmark icon modal
+              botResponse = `📚 Your personalized study plan has been created!
 
-⏰ **Duration:** ${m.duration}
-📝 **Description:** ${m.description}
-
-**🎯 Learning Objectives:**
-${m.objectives.map((o) => `• ${o}`).join("\n")}`
-                )
-                .join("\n\n---\n\n");
-
-              botResponse = `## ✅ Study Plan Created!
-
-### 📚 ${plan.title}
-
-**⏱️ Total Duration:** ${plan.total_duration}
-**📊 Difficulty:** ${plan.difficulty}
-
----
-
-## 📋 Your Learning Path
-
-${modulesFormatted}
-
----
-
-Does this plan look good? Reply **"yes"** to start learning! 🚀`;
+Tap the **📖 bookmark icon** at the top to view your learning path, or reply **"yes"** when you're ready to start! 🚀`;
             }
           }
         } else {
@@ -1718,23 +1692,11 @@ Whenever you're ready to dive into studying, just let me know and we can get sta
           updatedPlan.modules.length > 0
         ) {
           const firstModule = updatedPlan.modules[0];
-          botResponse = `🎉 **Excellent! Let's Begin!**
+          botResponse = `🎉 Excellent! Let's begin learning!
 
----
+We're starting with **Module 1: ${firstModule.title}**
 
-**Module 1: ${firstModule.title}**
-⏰ Duration: ${firstModule.duration}
-
-${firstModule.description}
-
----
-
-**📚 What You'll Learn:**
-${firstModule.objectives.map((obj) => `• ${obj}`).join("\n")}
-
----
-
-Let me know when you're done with this module or if you have any questions! 💡`;
+Feel free to ask questions as we go, or say "next" to move forward. Let's do this! 💪`;
         }
       } else if (
         message.toLowerCase().includes("edit") ||
