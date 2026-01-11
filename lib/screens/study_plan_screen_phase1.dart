@@ -242,6 +242,307 @@ class _StudyPlanScreenState extends State<StudyPlanScreen> {
     }
   }
 
+  // ✨ PREMIUM UI BUILDER METHODS
+
+  /// Build premium input label with emoji
+  Widget _buildPremiumInputLabel(String label) {
+    return Text(
+      label,
+      style: AppTheme.labelMedium.copyWith(
+        color: AppTheme.textPrimary,
+        fontWeight: FontWeight.w600,
+        fontSize: 14,
+      ),
+    );
+  }
+
+  /// Build premium text field with gradient border on focus
+  Widget _buildPremiumTextField({
+    required TextEditingController controller,
+    required String hintText,
+    required IconData icon,
+    required bool enabled,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.primaryBlue.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: controller,
+        enabled: enabled,
+        style: AppTheme.bodyMedium.copyWith(
+          color: AppTheme.textPrimary,
+          fontWeight: FontWeight.w500,
+        ),
+        decoration: InputDecoration(
+          hintText: hintText,
+          hintStyle: AppTheme.bodyMedium.copyWith(
+            color: AppTheme.textSecondary.withOpacity(0.6),
+          ),
+          filled: true,
+          fillColor: AppTheme.primaryBlue.withOpacity(0.04),
+          prefixIcon: Padding(
+            padding: const EdgeInsets.only(left: 14, right: 12),
+            child: Icon(icon, color: AppTheme.primaryBlue, size: 20),
+          ),
+          prefixIconConstraints: const BoxConstraints(
+            minWidth: 0,
+            minHeight: 0,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: AppTheme.primaryBlue.withOpacity(0.15),
+            ),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: AppTheme.primaryBlue.withOpacity(0.15),
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: AppTheme.primaryBlue, width: 2),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Build premium text area for descriptions
+  Widget _buildPremiumTextArea({
+    required TextEditingController controller,
+    required String hintText,
+    required bool enabled,
+    required Function(String) onChanged,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.primaryBlue.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: controller,
+        enabled: enabled,
+        maxLines: 4,
+        textAlignVertical: TextAlignVertical.top,
+        style: AppTheme.bodyMedium.copyWith(
+          color: AppTheme.textPrimary,
+          fontWeight: FontWeight.w500,
+          height: 1.5,
+        ),
+        decoration: InputDecoration(
+          hintText: hintText,
+          hintStyle: AppTheme.bodyMedium.copyWith(
+            color: AppTheme.textSecondary.withOpacity(0.6),
+          ),
+          filled: true,
+          fillColor: AppTheme.primaryBlue.withOpacity(0.04),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: AppTheme.primaryBlue.withOpacity(0.15),
+            ),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: AppTheme.primaryBlue.withOpacity(0.15),
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: AppTheme.primaryBlue, width: 2),
+          ),
+          contentPadding: const EdgeInsets.all(16),
+        ),
+        onChanged: onChanged,
+      ),
+    );
+  }
+
+  /// Build premium dropdown
+  Widget _buildPremiumDropdown() {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.primaryBlue.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: AppTheme.primaryBlue.withOpacity(0.15)),
+          borderRadius: BorderRadius.circular(12),
+          color: AppTheme.primaryBlue.withOpacity(0.04),
+        ),
+        child: DropdownButton<String>(
+          isExpanded: true,
+          value: _selectedLevel,
+          underline: const SizedBox(),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          items: educationLevels.map((level) {
+            return DropdownMenuItem(
+              value: level,
+              child: Text(
+                level,
+                style: AppTheme.bodyMedium.copyWith(
+                  color: AppTheme.textPrimary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            );
+          }).toList(),
+          onChanged: _isProcessing
+              ? null
+              : (value) {
+                  if (value != null) {
+                    setState(() => _selectedLevel = value);
+                  }
+                },
+          dropdownColor: AppTheme.surfaceCard,
+          icon: Icon(Icons.expand_more_rounded, color: AppTheme.primaryBlue),
+        ),
+      ),
+    );
+  }
+
+  /// Build premium create button with gradient
+  Widget _buildPremiumCreateButton() {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.primaryBlue.withOpacity(0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: FilledButton(
+        onPressed: _isProcessing ? null : _handleCreateStudyBot,
+        style: FilledButton.styleFrom(
+          backgroundColor: AppTheme.primaryBlue,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: _isProcessing
+            ? Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Colors.white.withOpacity(0.9),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Creating Bot...',
+                    style: AppTheme.labelMedium.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              )
+            : Text(
+                '✨ Create Study Bot',
+                style: AppTheme.labelMedium.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
+              ),
+      ),
+    );
+  }
+
+  /// Build premium info box
+  Widget _buildPremiumInfoBox() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppTheme.primaryBlue.withOpacity(0.1),
+            AppTheme.primaryBlue.withOpacity(0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(color: AppTheme.primaryBlue.withOpacity(0.2)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryBlue.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.lightbulb_rounded,
+                  color: AppTheme.primaryBlue,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'About Your Study Bot',
+                style: AppTheme.labelMedium.copyWith(
+                  color: AppTheme.primaryBlue,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Your Study Bot becomes your personalized AI mentor. It learns your preferred style and adapts lessons to your pace.',
+            style: AppTheme.bodySmall.copyWith(
+              color: AppTheme.textSecondary,
+              height: 1.6,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -393,293 +694,85 @@ class _StudyPlanScreenState extends State<StudyPlanScreen> {
                 ),
                 SizedBox(height: AppTheme.spaceLg),
 
-                // Study Plan Name Input
-                Text(
-                  'Study Plan Name',
-                  style: AppTheme.labelMedium.copyWith(
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
+                // ✨ PREMIUM FORM SECTION
+                // Study Plan Name Input - Premium Style
+                _buildPremiumInputLabel('📚 Study Topic'),
                 SizedBox(height: AppTheme.spaceSm),
-                TextField(
+                _buildPremiumTextField(
                   controller: _planNameCtrl,
+                  hintText: 'e.g., Advanced Biology, Quantum Physics',
+                  icon: Icons.subject_rounded,
                   enabled: !_isProcessing,
-                  style: AppTheme.bodyMedium.copyWith(
-                    color: AppTheme.textPrimary,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'e.g., Superb Nutrition, Biology Revision Bot',
-                    filled: true,
-                    fillColor: AppTheme.primaryBlue.withOpacity(0.05),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                      borderSide: BorderSide(
-                        color: AppTheme.primaryBlue.withOpacity(0.2),
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                      borderSide: BorderSide(
-                        color: AppTheme.primaryBlue.withOpacity(0.2),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                      borderSide: BorderSide(
-                        color: AppTheme.primaryBlue,
-                        width: 2,
-                      ),
-                    ),
-                    prefixIcon: Icon(
-                      Icons.subject,
-                      color: AppTheme.textSecondary,
-                    ),
-                    contentPadding: EdgeInsets.all(AppTheme.spaceMd),
-                  ),
                 ),
                 SizedBox(height: AppTheme.spaceLg),
 
-                // Study Plan Description Input
-                Text(
-                  'Study Plan Description',
-                  style: AppTheme.labelMedium.copyWith(
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
+                // Study Plan Description Input - Premium Style
+                _buildPremiumInputLabel('📝 Learning Goals'),
                 SizedBox(height: AppTheme.spaceSm),
-                TextField(
+                _buildPremiumTextArea(
                   controller: _planDescriptionCtrl,
+                  hintText: 'What do you want to master? (100 word max)',
                   enabled: !_isProcessing,
-                  style: AppTheme.bodyMedium.copyWith(
-                    color: AppTheme.textPrimary,
-                  ),
-                  maxLines: 5,
-                  textAlignVertical: TextAlignVertical.top,
-                  decoration: InputDecoration(
-                    hintText:
-                        'Describe what you want to study and how you want to learn (Max 100 words)',
-                    hintMaxLines: 2,
-                    filled: true,
-                    fillColor: AppTheme.primaryBlue.withOpacity(0.05),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                      borderSide: BorderSide(
-                        color: AppTheme.primaryBlue.withOpacity(0.2),
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                      borderSide: BorderSide(
-                        color: AppTheme.primaryBlue.withOpacity(0.2),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                      borderSide: BorderSide(
-                        color: AppTheme.primaryBlue,
-                        width: 2,
-                      ),
-                    ),
-                    contentPadding: EdgeInsets.all(AppTheme.spaceMd),
-                  ),
-                  onChanged: (text) {
-                    setState(() {}); // Update word count display
-                  },
+                  onChanged: (text) => setState(() {}),
                 ),
                 SizedBox(height: AppTheme.spaceSm),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Describe your learning goals',
+                      'Detail your learning vision',
                       style: AppTheme.bodySmall.copyWith(
                         color: AppTheme.textSecondary,
                       ),
                     ),
-                    Text(
-                      '${_getWordCount(_planDescriptionCtrl.text)}/100',
-                      style: AppTheme.labelSmall.copyWith(
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: AppTheme.spaceSm,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
                         color: _getWordCount(_planDescriptionCtrl.text) > 100
-                            ? Colors.red
-                            : AppTheme.textSecondary,
-                        fontWeight: FontWeight.w600,
+                            ? Colors.red.withOpacity(0.15)
+                            : AppTheme.primaryBlue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${_getWordCount(_planDescriptionCtrl.text)}/100',
+                        style: AppTheme.labelSmall.copyWith(
+                          color: _getWordCount(_planDescriptionCtrl.text) > 100
+                              ? Colors.red
+                              : AppTheme.primaryBlue,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ],
                 ),
                 SizedBox(height: AppTheme.spaceLg),
 
-                // Study Bot Name Input
-                Text(
-                  'Study Bot Name',
-                  style: AppTheme.labelMedium.copyWith(
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
+                // Study Bot Name Input - Premium Style
+                _buildPremiumInputLabel('🤖 Bot Name'),
                 SizedBox(height: AppTheme.spaceSm),
-                TextField(
+                _buildPremiumTextField(
                   controller: _botNameCtrl,
+                  hintText: 'e.g., Alex, Dr. Scholar, Coach Pro',
+                  icon: Icons.person_rounded,
                   enabled: !_isProcessing,
-                  style: AppTheme.bodyMedium.copyWith(
-                    color: AppTheme.textPrimary,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'e.g., James, Dr. Nutri, Coach Ali',
-                    filled: true,
-                    fillColor: AppTheme.primaryBlue.withOpacity(0.05),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                      borderSide: BorderSide(
-                        color: AppTheme.primaryBlue.withOpacity(0.2),
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                      borderSide: BorderSide(
-                        color: AppTheme.primaryBlue.withOpacity(0.2),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                      borderSide: BorderSide(
-                        color: AppTheme.primaryBlue,
-                        width: 2,
-                      ),
-                    ),
-                    prefixIcon: Icon(
-                      Icons.person,
-                      color: AppTheme.textSecondary,
-                    ),
-                    contentPadding: EdgeInsets.all(AppTheme.spaceMd),
-                  ),
                 ),
                 SizedBox(height: AppTheme.spaceLg),
 
-                // Education Level Dropdown
-                Text(
-                  'Education / Grade Level',
-                  style: AppTheme.labelMedium.copyWith(
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
+                // Education Level Dropdown - Premium Style
+                _buildPremiumInputLabel('🎓 Education Level'),
                 SizedBox(height: AppTheme.spaceSm),
-                Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: AppTheme.primaryBlue.withOpacity(0.2),
-                    ),
-                    borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                  ),
-                  child: DropdownButton<String>(
-                    isExpanded: true,
-                    value: _selectedLevel,
-                    underline: const SizedBox(),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: AppTheme.spaceMd,
-                      vertical: AppTheme.spaceSm,
-                    ),
-                    items: educationLevels.map((level) {
-                      return DropdownMenuItem(
-                        value: level,
-                        child: Text(
-                          level,
-                          style: AppTheme.bodyMedium.copyWith(
-                            color: AppTheme.textPrimary,
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: _isProcessing
-                        ? null
-                        : (value) {
-                            if (value != null) {
-                              setState(() => _selectedLevel = value);
-                            }
-                          },
-                    dropdownColor: AppTheme.surfaceCard,
-                  ),
-                ),
+                _buildPremiumDropdown(),
                 SizedBox(height: AppTheme.spaceLg),
 
-                // Create Study Bot Button
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: _isProcessing ? null : _handleCreateStudyBot,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppTheme.primaryBlue,
-                      padding: EdgeInsets.symmetric(vertical: AppTheme.spaceMd),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                      ),
-                    ),
-                    child: _isProcessing
-                        ? Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white.withOpacity(0.8),
-                                  ),
-                                ),
-                              ),
-                              SizedBox(width: AppTheme.spaceSm),
-                              Text(
-                                'Preparing...',
-                                style: AppTheme.labelMedium.copyWith(
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          )
-                        : Text(
-                            'Create Study Bot',
-                            style: AppTheme.labelMedium.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                  ),
-                ),
+                // Create Study Bot Button - Premium Style with Gradient
+                _buildPremiumCreateButton(),
                 SizedBox(height: AppTheme.spaceLg),
 
-                // Info Box
-                Container(
-                  padding: EdgeInsets.all(AppTheme.spaceMd),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryBlue.withOpacity(0.1),
-                    border: Border.all(
-                      color: AppTheme.primaryBlue.withOpacity(0.2),
-                    ),
-                    borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '💡 What is a Study Bot?',
-                        style: AppTheme.labelMedium.copyWith(
-                          color: AppTheme.primaryBlue,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(height: AppTheme.spaceSm),
-                      Text(
-                        'A Study Bot is your personal AI tutor, customized to your subject and learning level. '
-                        'In Phase 1, you\'re setting up its identity and expertise. '
-                        'Future phases will add teaching, quizzes, and progress tracking.',
-                        style: AppTheme.bodySmall.copyWith(
-                          color: AppTheme.textSecondary,
-                          height: 1.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                // Info Box - Premium Style
+                _buildPremiumInfoBox(),
                 SizedBox(height: AppTheme.spaceLg),
               ],
             ),
