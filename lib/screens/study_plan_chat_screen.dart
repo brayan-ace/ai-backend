@@ -334,8 +334,44 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       }
 
       setState(() {});
+
+      // Fetch fresh system instructions from backend
+      if (widget.botId != null) {
+        _fetchFreshSystemInstructions(widget.botId!);
+      }
     } catch (e) {
       print('[ChatScreen] Error in _initPhase2: $e');
+    }
+  }
+
+  /// Fetch the latest system instructions from the backend database
+  Future<void> _fetchFreshSystemInstructions(String botId) async {
+    try {
+      final uri = Uri.parse('$_backendUrl/api/bot/$botId/instructions');
+      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        final freshInstructions =
+            body['systemInstructions'] as Map<String, dynamic>?;
+
+        if (freshInstructions != null) {
+          setState(() {
+            _botInstructions = freshInstructions;
+          });
+          print('[ChatScreen] ✅ Fresh system instructions fetched and updated');
+          print(
+            '[ChatScreen] Bot: ${body['botName']}, Topic: ${body['topic']}',
+          );
+        }
+      } else {
+        print(
+          '[ChatScreen] ⚠️ Failed to fetch fresh instructions: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      print('[ChatScreen] ⚠️ Error fetching fresh instructions: $e');
+      // Non-blocking error - continue with existing instructions
     }
   }
 

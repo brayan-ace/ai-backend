@@ -1085,6 +1085,110 @@ app.post("/api/create-study-bot", async (req, res) => {
   }
 });
 
+// ============ GET FRESH SYSTEM INSTRUCTIONS FROM DATABASE ============
+app.get("/api/bot/:botId/instructions", async (req, res) => {
+  try {
+    const { botId } = req.params;
+
+    if (!botId || !botId.trim()) {
+      return res.status(400).json({
+        error: "Invalid request",
+        message: "botId is required",
+      });
+    }
+
+    const result = await pool.query(
+      `SELECT system_instructions, name, topic, grade_level FROM study_bots WHERE bot_id = $1`,
+      [botId.trim()]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        error: "Not found",
+        message: "Bot not found",
+      });
+    }
+
+    const bot = result.rows[0];
+    console.log(
+      `[GET /api/bot/:botId/instructions] Fresh instructions fetched for ${botId}`
+    );
+
+    res.json({
+      status: "success",
+      systemInstructions: bot.system_instructions,
+      botName: bot.name,
+      topic: bot.topic,
+      gradeLevel: bot.grade_level,
+    });
+  } catch (err) {
+    console.error("[GET /api/bot/:botId/instructions] Error:", err.message);
+    res.status(500).json({
+      error: "Server error",
+      message: err.message,
+    });
+  }
+});
+
+// ============ UPDATE SYSTEM INSTRUCTIONS ============
+app.put("/api/bot/:botId/instructions", async (req, res) => {
+  try {
+    const { botId } = req.params;
+    const { systemInstructions } = req.body;
+
+    if (!botId || !botId.trim()) {
+      return res.status(400).json({
+        error: "Invalid request",
+        message: "botId is required",
+      });
+    }
+
+    if (!systemInstructions) {
+      return res.status(400).json({
+        error: "Invalid request",
+        message: "systemInstructions is required",
+      });
+    }
+
+    // Verify bot exists
+    const botCheck = await pool.query(
+      `SELECT bot_id FROM study_bots WHERE bot_id = $1`,
+      [botId.trim()]
+    );
+
+    if (botCheck.rows.length === 0) {
+      return res.status(404).json({
+        error: "Not found",
+        message: "Bot not found",
+      });
+    }
+
+    // Update system instructions
+    const updateResult = await pool.query(
+      `UPDATE study_bots SET system_instructions = $1 WHERE bot_id = $2 RETURNING system_instructions, name`,
+      [systemInstructions, botId.trim()]
+    );
+
+    console.log(
+      `[PUT /api/bot/:botId/instructions] Instructions updated for ${botId}`
+    );
+
+    res.json({
+      status: "success",
+      message: "System instructions updated successfully",
+      botId: botId.trim(),
+      botName: updateResult.rows[0].name,
+      systemInstructions: updateResult.rows[0].system_instructions,
+    });
+  } catch (err) {
+    console.error("[PUT /api/bot/:botId/instructions] Error:", err.message);
+    res.status(500).json({
+      error: "Server error",
+      message: err.message,
+    });
+  }
+});
+
 // Chat endpoint - saves messages and uses bot's custom system_instructions with chat history
 app.post("/api/chat", async (req, res) => {
   const timestamp = new Date().toISOString();
@@ -3603,6 +3707,62 @@ app.post("/proxy", async (req, res) => {
   } catch (err) {
     console.error("Proxy error", err?.response?.data || err.message || err);
     return res.status(500).json({ error: "Proxy request failed" });
+  }
+});
+
+// ============ DIAGNOSTIC ENDPOINT - VIEW BOT DATA IN DATABASE ============
+app.get("/api/debug/bot/:botId", async (req, res) => {
+  try {
+    const { botId } = req.params;
+
+    if (!botId || !botId.trim()) {
+      return res.status(400).json({ error: "botId is required" });
+    }
+
+    const result = await pool.query(
+      `SELECT bot_id, user_id, name, description, topic, grade_level, system_instructions, state, created_at 
+       FROM study_bots WHERE bot_id = $1`,
+      [botId.trim()]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Bot not found" });
+    }
+
+    const bot = result.rows[0];
+    
+    // Format the response for easy viewing
+    const response = {
+      status: "success",
+      debug_info: {
+        botId: bot.bot_id,
+        botName: bot.name,
+        topic: bot.topic,
+        gradeLevel: bot.grade_level,
+        createdAt: bot.created_at,
+        description: bot.description,
+        currentState: bot.state,
+      },
+      systemInstructions: {
+        bot_name: bot.system_instructions?.bot_name,
+        topic: bot.system_instructions?.topic,
+        grade_level: bot.system_instructions?.grade_level,
+        generated_at: bot.system_instructions?.generated_at,
+        is_natural_bot: bot.system_instructions?.is_natural_bot,
+        instructions_length: bot.system_instructions?.instructions?.length || 0,
+        instructions_preview: bot.system_instructions?.instructions?.substring(0, 300) || "N/A",
+        full_instructions: bot.system_instructions?.instructions,
+      },
+    };
+
+    console.log(`[GET /api/debug/bot/:botId] Data retrieved for ${botId}`);
+    res.json(response);
+  } catch (err) {
+    console.error("[GET /api/debug/bot/:botId] Error:", err.message);
+    res.status(500).json({
+      error: "Server error",
+      message: err.message,
+    });
   }
 });
 
