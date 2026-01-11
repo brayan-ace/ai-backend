@@ -359,16 +359,25 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   /// This triggers the AI to generate a greeting based on system instructions
   Future<void> _fetchInitialGreeting() async {
     try {
+      print(
+        '[ChatScreen] 🎯 _fetchInitialGreeting() CALLED - Getting fresh AI greeting',
+      );
       final currentUser = FirebaseAuth.instance.currentUser;
       final userId = currentUser?.uid ?? 'anonymous';
+      print('[ChatScreen] 👤 User ID: $userId');
 
       final uri = Uri.parse('$_backendUrl/api/chat-enhanced');
+      print('[ChatScreen] 🔗 Calling endpoint: $uri');
+
       final payload = {
         'message': '[START_SESSION]', // Special message to trigger greeting
         'botId': widget.botId,
         'userId': userId,
         'systemInstructions': _botInstructions,
       };
+      print(
+        '[ChatScreen] 📨 Payload: message=[START_SESSION], botId=${widget.botId}',
+      );
 
       final resp = await http
           .post(
@@ -378,17 +387,24 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
           )
           .timeout(Duration(seconds: 30));
 
+      print('[ChatScreen] 📬 Response status: ${resp.statusCode}');
+
       if (resp.statusCode >= 200 && resp.statusCode < 300) {
         final body = jsonDecode(resp.body) as Map<String, dynamic>;
         final botResponse = body['response'] ?? 'Let\'s get started!';
+        print('[ChatScreen] ✅ AI GREETING RECEIVED from backend');
+        print('[ChatScreen] 💬 Greeting text: "$botResponse"');
         await _addBotMessage(botResponse);
-        print('[ChatScreen] ✅ Initial greeting fetched from backend');
+        print(
+          '[ChatScreen] ✅ Initial greeting fetched from backend and displayed',
+        );
       } else {
         print('[ChatScreen] ⚠️ Failed to fetch greeting: ${resp.statusCode}');
+        print('[ChatScreen] Response body: ${resp.body}');
         // Fallback - still let user interact, backend will respond when they type
       }
     } catch (e) {
-      print('[ChatScreen] ⚠️ Error fetching initial greeting: $e');
+      print('[ChatScreen] ❌ Error fetching initial greeting: $e');
       // Non-blocking - user can still send messages and backend will respond
     }
   }

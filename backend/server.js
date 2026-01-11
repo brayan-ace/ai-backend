@@ -1441,12 +1441,17 @@ function formatChatGPTStyle(text) {
 // Enhanced chat endpoint with state management
 app.post("/api/chat-enhanced", async (req, res) => {
   const timestamp = new Date().toISOString();
-  console.log("[POST /api/chat-enhanced] Enhanced chat request:", timestamp);
+  console.log("\n🔵 ===== [POST /api/chat-enhanced] NEW REQUEST =====");
+  console.log(`⏰ Timestamp: ${timestamp}`);
 
   try {
     const { message, botId, userId, systemInstructions } = req.body;
+    console.log(`📨 Message: "${message}"`);
+    console.log(`🤖 Bot ID: ${botId}`);
+    console.log(`👤 User ID: ${userId}`);
 
     if (!message || !botId || !userId) {
+      console.error("❌ MISSING REQUIRED FIELDS");
       return res.status(400).json({
         error: "Invalid request",
         message: "message, botId, and userId are required",
@@ -1514,13 +1519,22 @@ app.post("/api/chat-enhanced", async (req, res) => {
 
     const groqApiKey = process.env.GROQ_API_KEY;
 
-    // HANDLE INITIAL SESSION START - Generate greeting from AI (don't save to database)
+    // ⭐ HANDLE INITIAL SESSION START - Generate greeting from AI (don't save to database)
     if (message === "[START_SESSION]") {
+      console.log("⭐ SPECIAL MESSAGE DETECTED: [START_SESSION]");
+      console.log(
+        "🎯 ACTION: Generate personalized greeting from AI using system instructions"
+      );
       // Use Groq to generate a personalized greeting based on system instructions
       try {
         const systemPrompt =
           finalSystemInstructions?.instructions ||
           `You are a friendly study buddy. Greet the student and ask how they're doing today.`;
+
+        console.log(
+          "📋 System Prompt loaded (length: " + systemPrompt.length + " chars)"
+        );
+        console.log("🔗 Calling Groq API for greeting generation...");
 
         const chatCompletion = await axios.post(
           "https://api.groq.com/openai/v1/chat/completions",
@@ -1552,26 +1566,28 @@ app.post("/api/chat-enhanced", async (req, res) => {
           chatCompletion.data.choices[0]?.message?.content ||
           "Hi! I'm here to help you learn. How are you doing today?";
 
-        console.log("[chat-enhanced] Initial greeting generated from AI");
+        console.log("✅ AI GREETING GENERATED");
+        console.log(`📝 Response: "${botResponse.substring(0, 100)}..."`);
       } catch (grErr) {
-        console.warn(
-          "[chat-enhanced] Failed to generate greeting:",
-          grErr.message
-        );
+        console.error("❌ GROQ API ERROR:", grErr.message);
         botResponse =
           "Hi! I'm here to help you learn. How are you doing today?";
+        console.log("📝 Using fallback response");
       }
     }
     // SAVE REGULAR USER MESSAGES (not [START_SESSION])
     else {
+      console.log("💬 REGULAR MESSAGE - Saving to database");
       await pool.query(
         `INSERT INTO chat_messages (bot_id, user_id, message_type, content) VALUES ($1, $2, $3, $4)`,
         [botId, userId, "user", message]
       );
+      console.log("✅ Message saved to database");
     }
 
     // STATE MACHINE LOGIC
     if (progress.bot_state === "intro" && message !== "[START_SESSION]") {
+      console.log("🔄 STATE: intro (user not ready yet)");
       if (
         message.toLowerCase().includes("ready") ||
         message.toLowerCase().includes("start") ||
@@ -1787,11 +1803,24 @@ You've successfully learned **${updatedPlan?.title || "this course"}**! 🎉`;
       );
     }
 
-    // Save bot response
-    await pool.query(
-      `INSERT INTO chat_messages (bot_id, user_id, message_type, content) VALUES ($1, $2, $3, $4)`,
-      [botId, userId, "bot", botResponse]
+    // Save bot response (skip for [START_SESSION] special message)
+    if (message !== "[START_SESSION]") {
+      await pool.query(
+        `INSERT INTO chat_messages (bot_id, user_id, message_type, content) VALUES ($1, $2, $3, $4)`,
+        [botId, userId, "bot", botResponse]
+      );
+      console.log("✅ Bot response saved to database");
+    } else {
+      console.log(
+        "⏭️  Skipping database save for [START_SESSION] special message"
+      );
+    }
+
+    console.log("✅ RESPONSE READY");
+    console.log(
+      `📤 Sending response with greeting: "${botResponse.substring(0, 80)}..."`
     );
+    console.log("🔵 ===== END CHAT-ENHANCED REQUEST =====\n");
 
     return res.json({
       status: "success",
@@ -1804,7 +1833,8 @@ You've successfully learned **${updatedPlan?.title || "this course"}**! 🎉`;
       timestamp,
     });
   } catch (err) {
-    console.error("[chat-enhanced] Error:", err.message);
+    console.error("❌ [chat-enhanced] ERROR:", err.message);
+    console.error("📍 Stack:", err.stack);
     return res.status(500).json({
       error: "Chat processing failed",
       message: err.message,
