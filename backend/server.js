@@ -1750,26 +1750,62 @@ Feel free to ask questions as we go, or say "next" to move forward. Let's do thi
 
       groqMessages.push({ role: "user", content: message });
 
-      const groqRes = await axios.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        {
-          model: "openai/gpt-oss-20b",
-          messages: groqMessages,
-          max_tokens: 1200,
-          temperature: 0.8,
-        },
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${groqApiKey}`,
-          },
-          timeout: 30000,
+      // Retry logic for rate limits
+      let groqRes = null;
+      let retries = 0;
+      const maxRetries = 2;
+      const baseDelay = 1000; // Start with 1 second
+
+      while (retries <= maxRetries && !groqRes) {
+        try {
+          groqRes = await axios.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            {
+              model: "openai/gpt-oss-20b",
+              messages: groqMessages,
+              max_tokens: 1200,
+              temperature: 0.8,
+            },
+            {
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${groqApiKey}`,
+              },
+              timeout: 30000,
+            }
+          );
+          console.log("✅ Groq API call succeeded");
+        } catch (groqErr) {
+          if (groqErr.response?.status === 429) {
+            // Rate limited - retry with backoff
+            retries++;
+            if (retries <= maxRetries) {
+              const delay = baseDelay * Math.pow(2, retries - 1);
+              console.warn(
+                `⚠️ Rate limited (429). Retry ${retries}/${maxRetries} after ${delay}ms...`
+              );
+              await new Promise((resolve) => setTimeout(resolve, delay));
+            } else {
+              console.error(
+                "❌ Max retries exceeded for rate limit. Using fallback response."
+              );
+              // Use fallback - don't crash
+              groqRes = null;
+            }
+          } else {
+            // Other errors - use fallback
+            console.error(
+              `❌ Groq API error (${groqErr.response?.status}):`,
+              groqErr.message
+            );
+            groqRes = null;
+          }
         }
-      );
+      }
 
       botResponse =
         groqRes?.data?.choices?.[0]?.message?.content ||
-        "I encountered an issue. Please try again! 🤔";
+        "That's a great question! Let me think about that... 🤔 Feel free to ask more about this concept, or say 'next' when you're ready to move forward!";
 
       // Check if user completed module
       if (
