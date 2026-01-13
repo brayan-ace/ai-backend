@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import '../services/gemini_services.dart';
 import '../utils/theme.dart';
-import '../widgets/ai_message_bubble.dart';
 import '../widgets/typing_indicator.dart';
 
 class AiScreen extends StatefulWidget {
@@ -149,14 +149,7 @@ class _AiScreenState extends State<AiScreen> {
                   itemCount: _messages.length,
                   itemBuilder: (context, idx) {
                     final m = _messages[idx];
-                    return AiMessageBubble(
-                      text: m.text,
-                      fromUser: m.fromUser,
-                      gradientColors: m.fromUser
-                          ? AppTheme.accentGradient
-                          : AppTheme.surfaceGradient,
-                      detailedByDefault: _detailedMode,
-                    );
+                    return _buildMessageBubble(m);
                   },
                 ),
               ),
@@ -262,6 +255,118 @@ class _AiScreenState extends State<AiScreen> {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMessageBubble(_Message message) {
+    final isUser = message.fromUser;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: AppTheme.spaceMd),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: isUser
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
+        children: [
+          if (!isUser) SizedBox(width: AppTheme.spaceSm),
+          Flexible(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: isUser
+                      ? AppTheme.accentGradient
+                      : AppTheme.surfaceGradient,
+                ),
+                borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              padding: EdgeInsets.all(AppTheme.spaceMd),
+              child: _buildMessageContent(message.text, isUser),
+            ),
+          ),
+          if (isUser) SizedBox(width: AppTheme.spaceSm),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMessageContent(String text, bool isUser) {
+    if (isUser) {
+      return Text(
+        text,
+        style: AppTheme.bodyLarge.copyWith(color: Colors.white, height: 1.5),
+        softWrap: true,
+      );
+    }
+
+    return MarkdownBody(
+      data: text,
+      selectable: true,
+      styleSheet: MarkdownStyleSheet(
+        h1: AppTheme.headlineSmall.copyWith(
+          color: AppTheme.textPrimary,
+          fontWeight: FontWeight.bold,
+          height: 1.6,
+        ),
+        h2: AppTheme.headlineMedium.copyWith(
+          color: AppTheme.textPrimary,
+          fontWeight: FontWeight.bold,
+          height: 1.5,
+        ),
+        h3: AppTheme.bodyLarge.copyWith(
+          color: AppTheme.textPrimary,
+          fontWeight: FontWeight.w600,
+          height: 1.4,
+        ),
+        p: AppTheme.bodyLarge.copyWith(
+          color: AppTheme.textPrimary,
+          height: 1.6,
+        ),
+        em: AppTheme.bodyLarge.copyWith(
+          color: AppTheme.textPrimary,
+          fontStyle: FontStyle.italic,
+          height: 1.6,
+        ),
+        strong: AppTheme.bodyLarge.copyWith(
+          color: AppTheme.textPrimary,
+          fontWeight: FontWeight.bold,
+          height: 1.6,
+        ),
+        code: AppTheme.bodyMedium.copyWith(
+          color: AppTheme.textSecondary,
+          backgroundColor: AppTheme.surfaceCard.withValues(alpha: 0.5),
+          fontFamily: 'monospace',
+        ),
+        blockquote: AppTheme.bodyLarge.copyWith(
+          color: AppTheme.textSecondary,
+          height: 1.6,
+          fontStyle: FontStyle.italic,
+        ),
+        blockquoteDecoration: BoxDecoration(
+          border: Border(
+            left: BorderSide(color: AppTheme.primaryBlue, width: 3),
+          ),
+        ),
+        listBullet: AppTheme.bodyLarge.copyWith(
+          color: AppTheme.textPrimary,
+          height: 1.6,
+        ),
+        horizontalRuleDecoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(
+              color: AppTheme.surfaceElevated.withValues(alpha: 0.3),
+              width: 1,
+            ),
           ),
         ),
       ),

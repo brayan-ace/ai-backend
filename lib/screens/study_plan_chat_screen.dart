@@ -1484,7 +1484,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                                 );
                             final isCurrent =
                                 _botCurrentState == 'learning' &&
-                                progress?.current_module == index;
+                                _botState?.currentModule == index;
 
                             return Container(
                               margin: EdgeInsets.only(bottom: AppTheme.spaceMd),

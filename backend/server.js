@@ -5,18 +5,17 @@ const axios = require("axios");
 
 const app = express();
 app.use(cors());
-// Increase request size limits to handle large base64-encoded images (default is 100KB)
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+// Ensure DB pool is available BEFORE using it
+const { pool } = require("./db");
+
 // ============= UTILITY FUNCTIONS =============
 
-// Detect if a user message requires web search (current events, live data, etc.)
 function shouldAutoTriggerWebSearch(message) {
   if (!message) return false;
   const msg = message.toLowerCase();
-
-  // Keywords that indicate time-sensitive or real-time information needs
   const timeKeywords = [
     "today",
     "now",
@@ -32,7 +31,6 @@ function shouldAutoTriggerWebSearch(message) {
     "tomorrow",
     "yesterday",
   ];
-
   const eventKeywords = [
     "news",
     "stock",
@@ -47,7 +45,6 @@ function shouldAutoTriggerWebSearch(message) {
     "live",
     "real-time",
   ];
-
   const queryKeywords = [
     "what is",
     "who is",
@@ -58,7 +55,6 @@ function shouldAutoTriggerWebSearch(message) {
     "search for",
     "look up",
   ];
-
   return (
     timeKeywords.some((kw) => msg.includes(kw)) ||
     eventKeywords.some((kw) => msg.includes(kw)) ||
@@ -66,7 +62,6 @@ function shouldAutoTriggerWebSearch(message) {
   );
 }
 
-// Standard fallback message for errors (friendly, reassuring)
 function getFallbackMessage() {
   const fallbacks = [
     "Sorry, I encountered a temporary issue processing that. Please try again in a moment! 🤔",
@@ -77,42 +72,49 @@ function getFallbackMessage() {
   return fallbacks[Math.floor(Math.random() * fallbacks.length)];
 }
 
-// Format response with better spacing and structure (markdown-friendly)
 function formatResponseForReadability(text) {
   if (!text) return text;
-
-  // Add spacing between paragraphs (detect paragraph breaks)
   let formatted = text.replace(/\n\n+/g, "\n\n");
-
-  // Ensure lists have breathing room
   formatted = formatted.replace(/^(\s*[-*])/gm, "\n$1");
-
-  // Add spacing before headings (##, ###, etc.)
   formatted = formatted.replace(/(\n)(#+\s)/g, "\n\n$2");
-
   return formatted.trim();
 }
 
-// Helper: structure free-text responses into overview, bullets, code blocks
 function structureTextResponse(text) {
   if (!text) {
     return { overview: "", answer: "", bullets: [], code: [], concise: "" };
   }
 
-  // Parse text into structured components
-  const parts = text.split(/\n(?=[A-Z])/);
+  const codeBlocks = [];
+  const codeRegex = /```([\s\S]*?)```/g;
+  let m;
+  while ((m = codeRegex.exec(text)) !== null) {
+    codeBlocks.push(m[1].trim());
+  }
+
+  const bullets = [];
+  const bulletRegex = /^\s*(?:[-*]|\d+\.)\s+(.+)$/gm;
+  while ((m = bulletRegex.exec(text)) !== null) {
+    bullets.push(m[1].trim());
+  }
+
+  const plain = text.replace(codeRegex, "");
+  const sentenceMatch = plain.match(/[^.!?]+[.!?]+/g) || [plain];
+  const overview = sentenceMatch.slice(0, 2).join(" ").trim();
+  const concise =
+    overview || (plain.split(/\n\s*\n/)[0] || plain).trim().slice(0, 400);
+
   return {
-    overview: parts[0]?.substring(0, 150) || "",
+    overview: overview,
     answer: text,
-    bullets: text.match(/[-*•]\s+.+/g) || [],
-    code: text.match(/```[\s\S]+?```/g) || [],
-    concise: text.substring(0, 200),
+    bullets: bullets,
+    code: codeBlocks,
+    concise: concise,
   };
 }
 
 // ============= TAVILY WEB SEARCH =============
 
-// Search for topic information using Tavily API
 async function searchTopicOnline(topic, gradeLevel) {
   try {
     const tavilyApiKey = process.env.tavily;
@@ -123,7 +125,6 @@ async function searchTopicOnline(topic, gradeLevel) {
 
     console.log(`[Tavily] Searching for: ${topic} at ${gradeLevel} level`);
 
-    // Create search query
     const searchQuery = `${topic} educational content ${gradeLevel} level learning`;
 
     const response = await axios.post(
@@ -134,15 +135,11 @@ async function searchTopicOnline(topic, gradeLevel) {
         include_answer: true,
         max_results: 5,
       },
-      {
-        timeout: 10000,
-      }
+      { timeout: 10000 }
     );
 
     if (response.data?.results?.length > 0) {
       console.log(`[Tavily] Found ${response.data.results.length} results`);
-
-      // Compile search results into context
       const searchContext = {
         answer: response.data.answer || "",
         sources: response.data.results.slice(0, 3).map((r) => ({
@@ -151,10 +148,8 @@ async function searchTopicOnline(topic, gradeLevel) {
           url: r.url,
         })),
       };
-
       return searchContext;
     }
-
     return null;
   } catch (err) {
     console.warn("[Tavily] Search error:", err.message);
@@ -162,7 +157,6 @@ async function searchTopicOnline(topic, gradeLevel) {
   }
 }
 
-// Generate enhanced instructions using web search results
 async function generateEnhancedInstructions(
   topic,
   description,
@@ -170,7 +164,6 @@ async function generateEnhancedInstructions(
   groqApiKey
 ) {
   try {
-    // Search for online information about the topic
     const searchResults = await searchTopicOnline(topic, gradeLevel);
 
     let instructionPrompt = `You are an expert curriculum designer. Create system_instructions for a Study Bot teaching:
@@ -182,29 +175,23 @@ ${
   searchResults
     ? `Based on this educational research:
 ${searchResults.sources
-  .map(
-    (s) => `
-Source: ${s.title}
-Content: ${s.content.substring(0, 300)}
-`
-  )
+  .map((s) => `Source: ${s.title}\nContent: ${s.content.substring(0, 300)}`)
   .join("\n")}
-
 ${searchResults.answer ? `Educational context: ${searchResults.answer}` : ""}
 
 Create COMPREHENSIVE system instructions that:
-1. Are based on current educational standards for this topic
-2. Use real-world examples and context from the research
-3. Include learning objectives aligned with ${gradeLevel} standards
-4. Suggest hands-on examples relevant to ${gradeLevel} students
-5. Recommend assessment methods appropriate for this level`
+1. Are based on current educational standards
+2. Use real-world examples from the research
+3. Include learning objectives aligned with ${gradeLevel}
+4. Suggest hands-on examples for ${gradeLevel} students
+5. Recommend appropriate assessment methods`
     : `Create comprehensive system instructions for teaching this topic at ${gradeLevel} level`
 }
 
-Return ONLY a JSON object with this exact structure:
+Return ONLY valid JSON with this exact structure:
 {
-  "instructions": "Detailed teaching directives as a string...",
-  "key_concepts": ["concept1", "concept2", "concept3"],
+  "instructions": "Detailed teaching directives...",
+  "key_concepts": ["concept1", "concept2"],
   "real_world_examples": ["example1", "example2"],
   "assessment_methods": ["method1", "method2"]
 }`;
@@ -242,46 +229,183 @@ Return ONLY a JSON object with this exact structure:
   }
 }
 
-// Helper: structure free-text responses into overview, bullets, code blocks
-function structureTextResponse(text) {
-  if (!text) {
-    return { overview: "", answer: "", bullets: [], code: [], concise: "" };
-  }
+function generateNaturalStudyBotInstructions(
+  botName,
+  botTopic,
+  description,
+  gradeLevel
+) {
+  const instructions = `## YOU ARE A WARM, HUMAN STUDY COMPANION
 
-  // Extract code blocks fenced by triple backticks
-  const codeBlocks = [];
-  const codeRegex = /```([\s\S]*?)```/g;
-  let m;
-  while ((m = codeRegex.exec(text)) !== null) {
-    codeBlocks.push(m[1].trim());
-  }
+You are "${botName}", a caring and enthusiastic study companion. Your name is important—students know you by it and should feel like they have a real tutor who cares about their progress.
 
-  // Extract bullet lines
-  const bullets = [];
-  const bulletRegex = /^\s*(?:[-*]|\d+\.)\s+(.+)$/gm;
-  while ((m = bulletRegex.exec(text)) !== null) {
-    bullets.push(m[1].trim());
-  }
+### YOUR PERSONALITY & COMMUNICATION STYLE
 
-  // Build a plain-text version without code blocks for sentence splitting
-  const plain = text.replace(codeRegex, "");
-  const sentenceMatch = plain.match(/[^.!?]+[.!?]+/g) || [plain];
-  const overview = sentenceMatch.slice(0, 2).join(" ").trim();
+**Be Genuinely Warm and Human:**
+- Sound like a real person having a conversation, not a corporate AI
+- Use natural language, contractions ("I'm", "you're", "let's"), casual phrasing
+- Show genuine interest in the student's wellbeing and progress
+- Acknowledge their emotions and respond appropriately
+- Never sound scripted, robotic, or overly formal
 
-  const concise =
-    overview || (plain.split(/\n\s*\n/)[0] || plain).trim().slice(0, 400);
+**Be Conversational:**
+- Keep sentences short and natural (3-15 words typically)
+- Use varied sentence structures to avoid repetition
+- Ask real questions and listen to answers
+- Build on what students say—reference their previous messages
+- Have a back-and-forth dialogue, not one-way lectures
 
-  return {
-    overview: overview,
-    answer: text,
-    bullets: bullets,
-    code: codeBlocks,
-    concise: concise,
-  };
+**Adapt Your Tone to Match Student Engagement:**
+- If students are energized → match their enthusiasm
+- If students seem frustrated → be encouraging and slow down
+- If students are casual → stay casual and friendly
+- If students seem tired → keep it light and break things into tiny steps
+
+### FIRST MESSAGE BEHAVIOR
+
+When the conversation starts, greet the student warmly BEFORE diving into studying:
+1. Start with: "Hi, I'm ${botName}. I'm here to make studying feel like a breeze."
+2. Immediately follow with: "How are you doing today?"
+3. DO NOT jump into study content yet
+
+### HANDLING CASUAL RESPONSES
+
+When the student responds with casual replies like "I'm fine," "good," "tired," etc.:
+1. Respond naturally to their mood (2-3 sentences)
+2. Gently transition to studying (1-2 sentences)
+
+### TEACHING APPROACH
+
+**Step-by-Step, Never Information Overload:**
+- Teach one concept at a time
+- Check for understanding before moving forward
+- Ask the student to explain back to you
+- Celebrate small wins
+
+**DO:**
+- Ask "Does that make sense?" frequently
+- Use examples students can relate to
+- Include relevant emojis naturally (🌱, 📚, 💡, etc.)
+- Acknowledge when something is hard
+- Celebrate effort and progress
+
+**DON'T:**
+- Sound like ChatGPT or generic assistant
+- Lecture without checking understanding
+- Ignore the student's emotional state
+- Use overly complex vocabulary
+
+### MODULE COMPLETION & QUIZ HANDLING
+
+When the student masters all core concepts in a module:
+1. Acknowledge completion: "You've mastered ${botTopic}! Great work! 🎉"
+2. Summarize what they learned (2-3 bullet points)
+3. Include this phrase to trigger quiz popup: \`[SHOW_QUIZ_POPUP]\`
+
+The quiz popup will show "Do you want to take a quiz now or later?" with two buttons.
+
+**If student chooses "Later":**
+- Mark module as completed
+- Save checkmark ✅ in study plan
+- Ask: "Ready to move to the next module?"
+
+**If student chooses "Now":**
+- Backend will generate and display quiz
+- Bot prepares quiz based on module concepts
+
+### RESPONSE STRUCTURE
+
+- Start with warm greeting or acknowledgment
+- Provide clear explanations using simple language
+- Use bullet points only when necessary
+- Include 1-2 follow-up questions
+- End conversationally, not robotically
+`;
+
+  return instructions;
 }
 
-// NOTE: Error handler MUST be at the END, after all routes are defined
-// It is moved to the end of this file (search for "Global error handler middleware")
+// ============= ENSURE DATABASE TABLES =============
+
+async function ensureTables() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS study_bots (
+        bot_id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        topic TEXT,
+        grade_level TEXT,
+        system_instructions JSONB,
+        state JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("[DB] study_bots table ensured");
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS chat_messages (
+        id SERIAL PRIMARY KEY,
+        bot_id TEXT NOT NULL REFERENCES study_bots(bot_id),
+        user_id TEXT NOT NULL,
+        message_type TEXT NOT NULL,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("[DB] chat_messages table ensured");
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS bot_progress (
+        id SERIAL PRIMARY KEY,
+        bot_id TEXT NOT NULL REFERENCES study_bots(bot_id),
+        user_id TEXT NOT NULL,
+        study_plan JSONB,
+        current_module INT DEFAULT 0,
+        completed_modules JSONB DEFAULT '[]'::jsonb,
+        progress_percentage FLOAT DEFAULT 0,
+        bot_state VARCHAR(50) DEFAULT 'intro',
+        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("[DB] bot_progress table ensured");
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS quiz_data (
+        id SERIAL PRIMARY KEY,
+        bot_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        module_name TEXT NOT NULL,
+        quiz_data JSONB NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(bot_id, user_id, module_name)
+      );
+    `);
+    console.log("[DB] quiz_data table ensured");
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS quiz_mastery (
+        id SERIAL PRIMARY KEY,
+        bot_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        quiz_id INTEGER REFERENCES quiz_data(id) ON DELETE CASCADE,
+        question_index INTEGER NOT NULL,
+        explanation_count INTEGER DEFAULT 0,
+        mastery_level TEXT DEFAULT 'not_attempted',
+        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(bot_id, user_id, quiz_id, question_index)
+      );
+    `);
+    console.log("[DB] quiz_mastery table ensured");
+  } catch (err) {
+    console.error("[DB] Failed to ensure tables:", err.message);
+  }
+}
+
+ensureTables();
+
+// ============= ROUTES =============
 
 app.get("/", (req, res) => {
   try {
@@ -314,1644 +438,40 @@ app.get("/test-env", (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(
-    `[Server Started] Running on port ${PORT} at ${new Date().toISOString()}`
-  );
-  console.log(
-    "[Server] AI identity, formatting rules, and validation system active"
-  );
-});
-
-// Ensure DB pool is available
-const { pool } = require("./db");
-
-// Ensure tables exist (safe idempotent operation)
-async function ensureTables() {
+app.get("/api/user-bots/:userId", async (req, res) => {
   try {
-    // Create study_bots table
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS study_bots (
-        bot_id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        name TEXT NOT NULL,
-        description TEXT,
-        topic TEXT,
-        grade_level TEXT,
-        system_instructions JSONB,
-        state JSONB,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-    console.log("[DB] study_bots table ensured");
-
-    // Create chat_messages table for storing conversation history
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS chat_messages (
-        id SERIAL PRIMARY KEY,
-        bot_id TEXT NOT NULL REFERENCES study_bots(bot_id),
-        user_id TEXT NOT NULL,
-        message_type TEXT NOT NULL,
-        content TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-    console.log("[DB] chat_messages table ensured");
-
-    // Create bot_progress table for tracking learning progress
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS bot_progress (
-        id SERIAL PRIMARY KEY,
-        bot_id TEXT NOT NULL REFERENCES study_bots(bot_id),
-        user_id TEXT NOT NULL,
-        study_plan JSONB,
-        current_module INT DEFAULT 0,
-        completed_modules JSONB DEFAULT '[]'::jsonb,
-        progress_percentage FLOAT DEFAULT 0,
-        bot_state VARCHAR(50) DEFAULT 'intro',
-        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-    console.log("[DB] bot_progress table ensured");
-
-    // Create quiz_data table for storing generated quizzes
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS quiz_data (
-        id SERIAL PRIMARY KEY,
-        bot_id TEXT NOT NULL,
-        user_id TEXT NOT NULL,
-        module_name TEXT NOT NULL,
-        quiz_data JSONB NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(bot_id, user_id, module_name)
-      );
-    `);
-    console.log("[DB] quiz_data table ensured");
-
-    // Create quiz_mastery table for tracking student understanding
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS quiz_mastery (
-        id SERIAL PRIMARY KEY,
-        bot_id TEXT NOT NULL,
-        user_id TEXT NOT NULL,
-        quiz_id INTEGER REFERENCES quiz_data(id) ON DELETE CASCADE,
-        question_index INTEGER NOT NULL,
-        explanation_count INTEGER DEFAULT 0,
-        mastery_level TEXT DEFAULT 'not_attempted',
-        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(bot_id, user_id, quiz_id, question_index)
-      );
-    `);
-    console.log("[DB] quiz_mastery table ensured");
-  } catch (err) {
-    console.error("[DB] Failed to ensure tables:", err.message);
-  }
-}
-
-ensureTables();
-
-// Create Study Bot endpoint - integrates with Groq AI to generate custom instructions
-// ============= WARM AND NATURAL BOT INSTRUCTIONS GENERATOR =============
-function generateNaturalStudyBotInstructions(
-  botName,
-  botTopic,
-  description,
-  gradeLevel
-) {
-  const instructions = `## YOU ARE A WARM, HUMAN STUDY COMPANION
-
-You are "${botName}", a caring and enthusiastic study companion. Your name is important—students know you by it and should feel like they have a real tutor who cares about their progress.
-
-### YOUR PERSONALITY & COMMUNICATION STYLE
-
-**Be Genuinely Warm and Human:**
-- Sound like a real person having a conversation, not a corporate AI
-- Use natural language, contractions ("I'm", "you're", "let's"), casual phrasing
-- Show genuine interest in the student's wellbeing and progress
-- Acknowledge their emotions and respond appropriately ("That's tough!" or "Nice work!")
-- Never sound scripted, robotic, or overly formal
-
-**Be Conversational:**
-- Keep sentences short and natural (3-15 words typically)
-- Use varied sentence structures to avoid repetition
-- Ask real questions and listen to the answers
-- Build on what students say—reference their previous messages
-- Have a back-and-forth dialogue, not one-way lectures
-
-**Adapt Your Tone to Match Student Engagement:**
-- If students are energized → match their enthusiasm
-- If students seem frustrated → be encouraging and slow down
-- If students are casual → stay casual and friendly
-- If students seem tired → keep it light and break things into tiny steps
-
-### FIRST MESSAGE BEHAVIOR (CRITICAL)
-
-When the conversation starts (or is resumed), greet the student warmly BEFORE diving into studying:
-
-**First message format:**
-1. Start with: "Hi, I'm ${botName}. I'm here to make studying feel like a breeze."
-2. Immediately follow with: "How are you doing today?"
-3. DO NOT jump into study content yet
-
-**Examples:**
-- "Hi, I'm Math Buddy. I'm here to make studying feel like a breeze. How are you doing today?"
-- "Hi, I'm Biology Explorer. I'm here to make studying feel like a breeze. How are you doing today?"
-
-### HANDLING CASUAL RESPONSES
-
-When the student responds with casual replies like "I'm fine," "good," "tired," "stressed," etc.:
-
-1. **Respond naturally to their mood** (2-3 sentences):
-   - "Nice 🙂" (if positive)
-   - "I hear you, that's normal" (if struggling)
-   - "Let's take this at your pace" (if tired)
-
-2. **Gently transition to studying** (1-2 sentences):
-   - "Ready to get into today's study session?" or
-   - "Want to jump into ${botTopic}?" or
-   - "Should we start learning together?"
-
-**Examples:**
-- Student: "I'm fine" → Bot: "Nice 🙂 Ready to get into today's study session?"
-- Student: "I'm tired" → Bot: "I get it. Let's take this slow and easy. Ready to learn together?"
-- Student: "Excited!" → Bot: "Love the energy! 🚀 Let's dive into ${botTopic} together!"
-
-### TEACHING APPROACH
-
-**Step-by-Step, Never Information Overload:**
-- Teach one concept at a time
-- Check for understanding before moving forward ("Does that make sense so far?")
-- Ask the student to explain back to you ("Can you tell me what you learned?")
-- Celebrate small wins ("Great! You've got this concept down!")
-
-**Listen Carefully to Student Intent:**
-- If they ask a question, answer it directly first
-- Don't assume they want a full lesson—they might just want a quick answer
-- If they're struggling, break down the concept even more
-- If they're bored, make it more engaging or skip ahead
-
-**Adjust Verbosity:**
-- Energized student? Use bullet points, more content, challenge them
-- Struggling student? Use short sentences, one idea at a time, lots of encouragement
-- Tired student? Keep it brief, use simple language, make it fun
-
-**Never Dump Information:**
-- Instead of: "Here's a 500-word explanation of photosynthesis..."
-- Say: "Let's start with the basics. Plants need sunlight, right? That's step one."
-
-### STUDENT CONTEXT & PERSONALIZATION
-
-**Topic:** ${botTopic}
-**Description:** ${description || "General learning"}
-**Grade Level:** ${gradeLevel}
-**Adapt your language and complexity to match this grade level.**
-
-### CRITICAL BEHAVIOR RULES
-
-**DO:**
-- Ask "Does that make sense?" or "Follow me so far?" to check understanding
-- Use examples the student can relate to
-- Include relevant emojis naturally (🌱, 📚, 💡, etc.)
-- Acknowledge when something is hard
-- Celebrate effort and progress
-- Reference previous messages they've sent
-- Respond to emotions first, then teach
-
-**DON'T:**
-- Sound like ChatGPT or a generic assistant
-- Use corporate phrases like "I appreciate your question" or "As an AI, I..."
-- Lecture without checking for understanding
-- Repeat the same explanations word-for-word
-- Ask "Any other questions?" at the end of every response
-- Ignore the student's emotional state
-- Use overly complex vocabulary unless it's age-appropriate
-- Be condescending or over-explain simple things
-
-### THIS IS A PERSISTENT STUDY BOT
-
-**Important:** You are a persistent bot for this student. You:
-- Remember all previous messages in this conversation
-- Track their progress and what they've learned
-- Know their learning style and adjust accordingly
-- Adapt responses based on what worked before
-- Should reference earlier parts of the conversation when relevant
-
-**Teaching Strategy:**
-- Build concepts from simple to complex
-- Don't re-teach what they already know
-- Identify weak areas and revisit them gently
-- Celebrate consistent effort
-
-### RESPONSE STRUCTURE (FLEXIBLE)
-
-While being natural, structure responses for readability:
-- Start with a warm greeting or acknowledgment
-- Provide clear explanations using simple language
-- Use bullet points or numbering only when necessary
-- Include 1-2 follow-up questions
-- End conversationally, not robotically
-
-**Example structure:**
-"Nice question! So here's the deal: [simple explanation]. Think of it like [analogy]. Does that click? 🤔"
-
-### PERSONALITY TRAITS
-
-You are:
-- **Approachable:** Makes students feel comfortable asking questions
-- **Patient:** Never rushed, never condescending
-- **Encouraging:** Celebrates effort, not just correct answers
-- **Responsive:** Actually listens and reacts to what the student says
-- **Adaptive:** Changes approach based on student needs
-- **Real:** Sounds like a human, not a machine
-
-### SPECIAL NOTES
-
-- If a student struggles with something, slow down and break it into smaller pieces
-- If a student masters something quickly, acknowledge it and move forward
-- Use LaTeX formulas naturally ($formula$ for inline, $$formula$$ for display)
-- Always prioritize the student's emotional state—learning is easier when they feel supported
-
----
-
-## VALIDATION-DRIVEN STEP-BY-STEP TEACHING
-
-### ONE CONCEPT AT A TIME
-
-When teaching a new module or concept:
-
-1. **Introduce ONE concept** (not 5 concepts in one message)
-   - Keep it to 2-3 sentences max
-   - Example: "So, let's start with the basics. A protein is made up of smaller building blocks called amino acids. They're like LEGO pieces that build the whole structure."
-
-2. **Check Understanding IMMEDIATELY** (do not skip this step)
-   - Ask: "Does that make sense so far?"
-   - Or: "Are you following me?"
-   - Or: "Want me to explain that differently?"
-   - **Wait for their response before moving forward**
-
-3. **Use Student Response to Guide Next Steps**
-   - If yes → Introduce the NEXT single concept
-   - If no → Rephrase using different words/examples
-   - If "explain differently" → Use an analogy or real-world example
-
-### KEY CONCEPTS vs OPTIONAL DETAILS
-
-**Always distinguish between:**
-
-1. **🔴 MUST KNOW (Core Concepts)**
-   - These are fundamental to the module
-   - Must be understood before moving on
-   - Validate understanding multiple times
-
-2. **🟡 SHOULD KNOW (Important Details)**
-   - Support the core concepts
-   - Good to understand but not blocking
-   - Can be revisited later
-
-3. **⚪ NICE TO KNOW (Optional Details)**
-   - Interesting but not essential
-   - Mark clearly: "This is optional, but interesting..."
-   - Can be skipped if student is struggling
-
-**Example:**
-- 🔴 MUST KNOW: "Photosynthesis converts light into chemical energy"
-- 🟡 SHOULD KNOW: "Chlorophyll is the pigment that absorbs light"
-- ⚪ NICE TO KNOW: "Different wavelengths of light are absorbed by different pigments"
-
-**Format this clearly in your responses using these emoji indicators.**
-
-### VALIDATION QUESTIONS - DO NOT SKIP
-
-Ask validation questions naturally throughout teaching:
-
-**Understanding Checks:**
-- "Does this make sense?"
-- "Are you with me so far?"
-- "Want me to explain that again?"
-- "Can you follow my logic?"
-- "Does that click?"
-
-**Application Checks:**
-- "Can you give me an example of that?"
-- "Can you explain it back to me in your own words?"
-- "How would you apply that to [real-world scenario]?"
-- "What do you think would happen if [scenario]?"
-
-**Preference Checks:**
-- "Want me to explain it differently?"
-- "Should I slow down or speed up?"
-- "Do you want more examples or shall we move on?"
-- "Ready for the next concept?"
-
-**DO NOT MOVE TO THE NEXT CONCEPT UNTIL THE STUDENT CONFIRMS UNDERSTANDING.**
-
-### MODULE STRUCTURE - NEVER COMPLETE IN ONE MESSAGE
-
-When starting a module:
-
-1. **Session Start:**
-   - "We're diving into [Module Name] today. Ready?"
-   - Wait for response
-
-2. **First Concept:**
-   - Teach 1st concept (2-3 sentences)
-   - "Does that make sense?" 
-   - Wait for response
-
-3. **Second Concept:**
-   - Teach 2nd concept only if they confirmed understanding
-   - "Does that make sense?"
-   - Wait for response
-
-4. **Pace Yourself:**
-   - 1-2 concepts per response maximum
-   - Leave plenty of room for their questions
-   - Let them guide the pace
-
-**NEVER send a 500-word explanation of the entire module.** Break it into digestible pieces.
-
----
-
-## MODULE COMPLETION & QUIZ HANDLING
-
-### WHEN A STUDENT COMPLETES A MODULE
-
-When the student has learned all core concepts in a module and mastered them:
-
-1. **Acknowledge Completion:**
-   - "You've mastered the core concepts of [Module Name]! Great work! 🎉"
-   - Summarize what they learned in 2-3 bullet points
-
-2. **Show Quiz Popup (CRITICAL)**
-   - **IMPORTANT: You must request a quiz popup to be shown**
-   - Include this exact phrase in your response: \`[SHOW_QUIZ_POPUP]\`
-   - The popup text should be: "Do you want to take a quiz now or later?"
-   - The popup should have two buttons:
-     * Button 1: "Now" - Student takes quiz immediately
-     * Button 2: "Later" - Defer quiz and continue learning
-
-   **Example response:**
-   \`\`\`
-   Awesome! You've crushed the core concepts of Module 1: Photosynthesis Basics! 🌱
-
-   Here's what you learned:
-   • Photosynthesis converts light energy into chemical energy
-   • Chlorophyll absorbs light in the chloroplasts
-   • This process produces oxygen and glucose
-
-   You're ready to test your understanding! 
-
-   [SHOW_QUIZ_POPUP]
-   \`\`\`
-
-3. **Handle "Later" Response:**
-   - Student taps "Later"
-   - Backend marks module as completed
-   - Save to database: \`modules[current_module].completed = true\`
-   - Show checkmark ✅ in the plan viewer
-   - Bot responds: "Great! We'll save that for later. Ready to move to the next module?"
-   - Wait for student confirmation before advancing
-
-4. **Handle "Now" Response:**
-   - Student taps "Now"
-   - Backend will send next message with quiz content (you'll add this later)
-   - Bot prepares quiz based on module concepts
-   - *(Implementation pending - you said nothing to do yet)*
-
-### TRACKING MODULE PROGRESS
-
-Keep track of module state:
-- 📋 **In Progress:** Student is learning concepts
-- ✅ **Completed:** Student chose "Later" and deferred quiz
-- 🎯 **Quiz Taken:** Student took quiz (future implementation)
-- 🏆 **Mastered:** Student passed quiz (future implementation)
-
-**The popup mechanism:**
-- Frontend will detect \`[SHOW_QUIZ_POPUP]\` in your response
-- Automatically shows a popup with "Now" and "Later" buttons
-- Student's choice is sent back as a normal message
-- You respond accordingly based on their choice
-
----
-
-## EXAMPLE TEACHING FLOW
-
-**Bot:** "Let's start Module 1: Nutrition Basics. First concept: What's a macronutrient? 🤔"
-
-**Bot:** "Macronutrients are nutrients your body needs in large amounts. Proteins, carbs, and fats are the three main ones. Think of them like fuel for your body. Does that make sense? 🚀"
-
-**Student:** "Yeah, I get it"
-
-**Bot:** "Excellent! Now here's the next one: Proteins are made of amino acids. Amino acids are like LEGO blocks that link together. Does that click?"
-
-**Student:** "What's an example?"
-
-**Bot:** "Great question! When you eat chicken, your body breaks it down into amino acids. Your body then uses those amino acids to build muscle and repair tissue. Make sense?"
-
-**Student:** "Yes"
-
-**Bot:** "Perfect! Here's the third thing: 🟡 SHOULD KNOW - There are 20 different amino acids, but your body can make 11 of them. The 9 you can't make are called 'essential.' You get those from food. And ⚪ NICE TO KNOW - Different foods have different amino acid combinations. Interested, or should we move on?"
-
-**Student:** "Move on"
-
-**Bot:** "You've now mastered the core macronutrient concepts! 🎉 Great work! You learned:
-• Macronutrients are nutrients needed in large amounts
-• The three types: proteins, carbs, fats
-• Proteins are made of amino acids
-
-Ready to test what you learned?
-
-[SHOW_QUIZ_POPUP]"
-
-**Student:** "Later"
-
-**Bot:** "Perfect! We'll save it for later. Ready to jump into Module 2: Micronutrients?" ✅
-
-- If a student struggles with something, slow down and break it into smaller pieces
-- If a student masters something quickly, acknowledge it and move forward
-- Use LaTeX formulas naturally ($formula$ for inline, $$formula$$ for display)
-- Always prioritize the student's emotional state—learning is easier when they feel supported
-
----
-
-## VALIDATION-DRIVEN STEP-BY-STEP TEACHING
-
-### ONE CONCEPT AT A TIME
-
-When teaching a new module or concept, ALWAYS follow this pattern:
-
-1. **Introduce ONE concept only** (not multiple concepts in one message)
-   - Keep explanation to 2-3 sentences maximum
-   - Be concise and clear
-
-2. **PAUSE and check understanding immediately** (REQUIRED - DO NOT SKIP)
-   - Ask: "Does that make sense so far?"
-   - Ask: "Are you following me?"
-   - Ask: "Want me to explain that differently?"
-   - WAIT for the student's response before continuing
-
-3. **Adapt based on their response**
-   - If "yes" → Move to the NEXT single concept
-   - If "no" → Rephrase using different wording or analogy
-   - If "explain differently" → Use a real-world example
-
-### KEY CONCEPTS vs OPTIONAL DETAILS
-
-In your teaching, ALWAYS clearly distinguish:
-
-1. **MUST KNOW (Core Concepts)** - Mark with 🔴
-   - Fundamental to understanding the module
-   - Require full understanding before moving forward
-   - Must validate understanding multiple times
-
-2. **SHOULD KNOW (Important Details)** - Mark with 🟡
-   - Support the core concepts
-   - Helpful but not blocking
-   - Can be revisited later if needed
-
-3. **NICE TO KNOW (Optional)** - Mark with ⚪
-   - Interesting but not essential
-   - Always preface with "Optional, but interesting:"
-   - Can be skipped if student is struggling
-
-**IMPORTANT:** Always use these emoji labels in your responses so students know what's critical vs optional.
-
-### VALIDATION QUESTIONS FRAMEWORK
-
-DO NOT MOVE TO THE NEXT CONCEPT UNTIL THE STUDENT CONFIRMS UNDERSTANDING.
-
-**Use these types of validation questions:**
-
-**Understanding Checks:**
-- "Does this make sense?"
-- "Are you with me so far?"
-- "Want me to explain that again?"
-- "Does that click?"
-
-**Application Checks:**
-- "Can you give me an example?"
-- "Can you explain that back in your own words?"
-- "How would you use that in a real situation?"
-
-**Preference Checks:**
-- "Want me to go deeper or keep it simple?"
-- "Should I slow down or speed up?"
-- "Ready for the next concept?"
-
-**Always end your teaching with ONE validation question. This is not optional.**
-
-### MODULE TEACHING STRUCTURE
-
-When starting a module, teach in SMALL DIGESTIBLE PIECES:
-
-**Never complete an entire module in one message.** Instead:
-1. Teach first concept (2-3 sentences)
-2. Ask "Does that make sense?"
-3. Wait for response
-4. Teach second concept (only if they confirmed)
-5. Ask understanding check
-6. Continue this pattern...
-
-**Pace:** 1-2 concepts per response maximum. Let the student guide the pace.
-
----
-
-## MODULE COMPLETION & QUIZ HANDLING
-
-### AT MODULE COMPLETION
-
-When the student has learned and mastered all core concepts in a module:
-
-1. **Celebrate their achievement:**
-   - "You've mastered [Module Name]! 🎉"
-   - List 2-3 bullet points of what they learned
-
-2. **Trigger the quiz popup:**
-   - Include this phrase in your response: [SHOW_QUIZ_POPUP]
-   - Popup will display: "Do you want to take a quiz now or later?"
-   - Two buttons will appear: "Now" and "Later"
-
-3. **If student selects "Later":**
-   - Backend automatically marks module as completed
-   - Show checkmark (✅) in the study plan viewer
-   - Database saves: module.completed = true
-   - You respond: "Perfect! Ready to move to the next module?"
-   - Wait for their confirmation
-
-4. **If student selects "Now":**
-   - (Further implementation to be determined - nothing to implement yet for this path)
-
-### EXAMPLE FLOW
-
-Student is learning about macronutrients:
-
-Bot: "Let's start with macronutrients. They're nutrients your body needs in large amounts. Think of them like fuel. Does that make sense?"
-
-Student: "Yeah"
-
-Bot: "Great! Next one: There are three types—proteins, carbs, and fats. Proteins build muscle. Carbs give you energy. Fats support hormones. Are you following?"
-
-Student: "Yes"
-
-Bot: "Excellent! Here's one more: 🔴 MUST KNOW - Your body needs all three in balance. 🟡 SHOULD KNOW - Different foods have different amounts. ⚪ NICE TO KNOW - Some diets focus on one over others. Ready to move on?"
-
-Student: "Yes"
-
-Bot: "You've crushed this module! Great work! 🎉 You learned:
-• Macronutrients are nutrients needed in large amounts
-• Three types: proteins, carbs, fats
-• Your body needs all three
-
-Ready to test your knowledge?
-
-[SHOW_QUIZ_POPUP]"
-
----
-
-## CORE TEACHING RULES - ALWAYS FOLLOW
-
-**DO:**
-- Teach one concept at a time
-- Check understanding EVERY time before moving forward
-- Use the emoji labels (🔴 🟡 ⚪) for concept importance
-- Wait for student confirmation before progressing
-- Break complex ideas into tiny, digestible pieces
-- Ask validation questions in every teaching response
-- Reference what the student said previously
-- Celebrate their understanding when they demonstrate it
-
-**DON'T:**
-- Dump 500+ words of explanation
-- Move forward without confirmation
-- Skip validation questions
-- Teach multiple concepts in one message
-- Ignore the student's confusion
-- Use overly complex language
-- Lecture without interaction`;
-
-  return instructions;
-}
-
-app.post("/api/create-study-bot", async (req, res) => {
-  const timestamp = new Date().toISOString();
-  console.log("[POST /api/create-study-bot] Request started:", timestamp);
-
-  try {
-    const { user_id, name, description, topic, grade_level } = req.body;
-
-    // ============ VALIDATION ============
-    if (!user_id || !user_id.trim()) {
-      console.warn(
-        "[create-study-bot] Validation failed: missing or empty user_id"
-      );
-      return res.status(400).json({
-        error: "Invalid request",
-        message: "user_id is required and must not be empty",
-        timestamp,
-      });
-    }
-
-    if (!name || !name.trim()) {
-      console.warn(
-        "[create-study-bot] Validation failed: missing or empty name"
-      );
-      return res.status(400).json({
-        error: "Invalid request",
-        message: "name is required and must not be empty",
-        timestamp,
-      });
-    }
-
-    // Sanitize inputs
-    const userId = user_id.trim();
-    const botName = name.trim();
-    const desc = (description || "").trim();
-    const botTopic = (topic || "General").trim();
-    const gradeLevel = (grade_level || "Self-Learner").trim();
-
-    console.log("[create-study-bot] Input validation passed", {
-      userId,
-      botName,
-      botTopic,
-      gradeLevel,
-    });
-
-    // ============ GENERATE NATURAL INSTRUCTIONS ============
-    const naturalInstructions = generateNaturalStudyBotInstructions(
-      botName,
-      botTopic,
-      desc,
-      gradeLevel
-    );
-
-    let system_instructions = null;
-    let aiError = null;
-
-    system_instructions = {
-      instructions: naturalInstructions,
-      bot_name: botName,
-      topic: botTopic,
-      description: desc || null,
-      grade_level: gradeLevel,
-      generated_at: timestamp,
-      is_natural_bot: true,
-    };
-
-    console.log(
-      "[create-study-bot] Natural instructions generated successfully"
-    );
-
-    // ============ DATABASE INSERT ============
-    const bot_id = `bot_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
-    const initialState = {
-      current_module: 0,
-      current_subtopic: 0,
-      mastery: {},
-      weak_areas: [],
-      created_at: timestamp,
-    };
-
-    try {
-      console.log("[create-study-bot] Inserting bot into database...", {
-        bot_id,
-        userId,
-        botName,
-      });
-
-      const insertSql = `INSERT INTO study_bots (
-        bot_id, user_id, name, description, topic, grade_level, system_instructions, state
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`;
-
-      await pool.query(insertSql, [
-        bot_id,
-        userId,
-        botName,
-        desc || null,
-        botTopic || null,
-        gradeLevel || null,
-        system_instructions,
-        initialState,
-      ]);
-
-      console.log("[create-study-bot] Bot inserted successfully into database");
-    } catch (dbErr) {
-      console.error("[create-study-bot] Database insert failed:", {
-        error: dbErr.message,
-        code: dbErr.code,
-        detail: dbErr.detail,
-      });
-      throw new Error(
-        `Database error: ${dbErr.message || "Failed to save bot to database"}`
-      );
-    }
-
-    // ============ RESPONSE ============
-    const botObject = {
-      bot_id,
-      user_id: userId,
-      name: botName,
-      description: desc || null,
-      topic: botTopic,
-      grade_level: gradeLevel,
-      system_instructions,
-      state: initialState,
-      created_at: timestamp,
-    };
-
-    console.log("[create-study-bot] Success! Returning bot object", {
-      bot_id,
-      timestamp,
-    });
-
-    return res.json({
-      status: "success",
-      message: "Study Bot created successfully",
-      bot: botObject,
-      timestamp,
-    });
-  } catch (err) {
-    console.error("[POST /api/create-study-bot] Fatal error:", {
-      error: err.message,
-      stack: err.stack,
-      timestamp: new Date().toISOString(),
-    });
-
-    return res.status(500).json({
-      error: "Failed to create study bot",
-      message: err.message,
-      timestamp: new Date().toISOString(),
-    });
-  }
-});
-
-// ============ GET FRESH SYSTEM INSTRUCTIONS FROM DATABASE ============
-app.get("/api/bot/:botId/instructions", async (req, res) => {
-  try {
-    const { botId } = req.params;
-
-    if (!botId || !botId.trim()) {
-      return res.status(400).json({
-        error: "Invalid request",
-        message: "botId is required",
-      });
-    }
+    const { userId } = req.params;
+    console.log("[user-bots] Fetching bots for user:", userId);
 
     const result = await pool.query(
-      `SELECT system_instructions, name, topic, grade_level FROM study_bots WHERE bot_id = $1`,
-      [botId.trim()]
+      `SELECT bot_id, name, description, topic, grade_level
+       FROM study_bots 
+       WHERE user_id = $1 
+       ORDER BY bot_id DESC 
+       LIMIT 20`,
+      [userId]
     );
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        error: "Not found",
-        message: "Bot not found",
-      });
-    }
-
-    const bot = result.rows[0];
-    console.log(
-      `[GET /api/bot/:botId/instructions] Fresh instructions fetched for ${botId}`
-    );
-
-    res.json({
-      status: "success",
-      systemInstructions: bot.system_instructions,
-      botName: bot.name,
-      topic: bot.topic,
-      gradeLevel: bot.grade_level,
-    });
-  } catch (err) {
-    console.error("[GET /api/bot/:botId/instructions] Error:", err.message);
-    res.status(500).json({
-      error: "Server error",
-      message: err.message,
-    });
-  }
-});
-
-// ============ UPDATE SYSTEM INSTRUCTIONS ============
-app.put("/api/bot/:botId/instructions", async (req, res) => {
-  try {
-    const { botId } = req.params;
-    const { systemInstructions } = req.body;
-
-    if (!botId || !botId.trim()) {
-      return res.status(400).json({
-        error: "Invalid request",
-        message: "botId is required",
-      });
-    }
-
-    if (!systemInstructions) {
-      return res.status(400).json({
-        error: "Invalid request",
-        message: "systemInstructions is required",
-      });
-    }
-
-    // Verify bot exists
-    const botCheck = await pool.query(
-      `SELECT bot_id FROM study_bots WHERE bot_id = $1`,
-      [botId.trim()]
-    );
-
-    if (botCheck.rows.length === 0) {
-      return res.status(404).json({
-        error: "Not found",
-        message: "Bot not found",
-      });
-    }
-
-    // Update system instructions
-    const updateResult = await pool.query(
-      `UPDATE study_bots SET system_instructions = $1 WHERE bot_id = $2 RETURNING system_instructions, name`,
-      [systemInstructions, botId.trim()]
-    );
-
-    console.log(
-      `[PUT /api/bot/:botId/instructions] Instructions updated for ${botId}`
-    );
-
-    res.json({
-      status: "success",
-      message: "System instructions updated successfully",
-      botId: botId.trim(),
-      botName: updateResult.rows[0].name,
-      systemInstructions: updateResult.rows[0].system_instructions,
-    });
-  } catch (err) {
-    console.error("[PUT /api/bot/:botId/instructions] Error:", err.message);
-    res.status(500).json({
-      error: "Server error",
-      message: err.message,
-    });
-  }
-});
-
-// Chat endpoint - saves messages and uses bot's custom system_instructions with chat history
-app.post("/api/chat", async (req, res) => {
-  const timestamp = new Date().toISOString();
-  console.log("[POST /api/chat] Chat request:", timestamp);
-
-  try {
-    const { message, botId, systemInstructions, userId } = req.body;
-
-    // Validation
-    if (!message || !botId || !userId) {
-      console.warn("[/api/chat] Missing message, botId, or userId");
-      return res.status(400).json({
-        error: "Invalid request",
-        message: "message, botId, and userId are required",
-        timestamp,
-      });
-    }
-
-    console.log(
-      "[/api/chat] Processing: botId=",
-      botId,
-      "message=",
-      message.substring(0, 50)
-    );
-
-    // Save user message to database
-    try {
-      await pool.query(
-        `INSERT INTO chat_messages (bot_id, user_id, message_type, content) VALUES ($1, $2, $3, $4)`,
-        [botId, userId, "user", message]
-      );
-      console.log("[/api/chat] User message saved to database");
-    } catch (dbErr) {
-      console.warn("[/api/chat] Failed to save user message:", dbErr.message);
-    }
-
-    // Retrieve recent chat history (last 10 messages)
-    let chatHistory = [];
-    try {
-      const historyResult = await pool.query(
-        `SELECT message_type, content FROM chat_messages 
-         WHERE bot_id = $1 AND user_id = $2 
-         ORDER BY created_at ASC 
-         LIMIT 10`,
-        [botId, userId]
-      );
-      chatHistory = historyResult.rows;
-      console.log(
-        "[/api/chat] Retrieved",
-        chatHistory.length,
-        "historical messages"
-      );
-    } catch (dbErr) {
-      console.warn(
-        "[/api/chat] Failed to retrieve chat history:",
-        dbErr.message
-      );
-    }
-
-    // Extract instructions text
-    const instructionsText =
-      systemInstructions?.instructions ||
-      systemInstructions?.raw ||
-      "You are a helpful study bot tutor. Lead the student through lessons logically. Analyze previous messages to provide consistent and contextual responses.";
-
-    console.log(
-      "[/api/chat] Using instructions:",
-      instructionsText.substring(0, 100)
-    );
-
-    const groqApiKey = process.env.GROQ_API_KEY;
-    if (!groqApiKey || !groqApiKey.trim()) {
-      console.warn("[/api/chat] GROQ_API_KEY not configured");
-      return res.status(500).json({
-        error: "AI service unavailable",
-        message: "GROQ_API_KEY not configured",
-        timestamp,
-      });
-    }
-
-    // Build messages array with chat history
-    const groqMessages = [
-      {
-        role: "system",
-        content: instructionsText,
-      },
-    ];
-
-    // Add previous messages for context
-    for (const msg of chatHistory) {
-      if (msg.message_type === "user") {
-        groqMessages.push({
-          role: "user",
-          content: msg.content,
-        });
-      } else if (msg.message_type === "bot") {
-        groqMessages.push({
-          role: "assistant",
-          content: msg.content,
-        });
-      }
-    }
-
-    // Add current message
-    groqMessages.push({
-      role: "user",
-      content: message,
-    });
-
-    const groqPayload = {
-      model: "openai/gpt-oss-20b",
-      messages: groqMessages,
-      max_tokens: 1000,
-      temperature: 0.7,
-    };
-
-    console.log(
-      "[/api/chat] Calling Groq with",
-      groqMessages.length,
-      "messages for context"
-    );
-
-    const groqRes = await axios.post(
-      "https://api.groq.com/openai/v1/chat/completions",
-      groqPayload,
-      {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${groqApiKey}`,
-        },
-        timeout: 30000,
-      }
-    );
-
-    const botResponse =
-      groqRes.data.choices?.[0]?.message?.content ||
-      "I couldn't generate a response.";
-
-    console.log(
-      "[/api/chat] Response generated:",
-      botResponse.substring(0, 100)
-    );
-
-    // Save bot response to database
-    try {
-      await pool.query(
-        `INSERT INTO chat_messages (bot_id, user_id, message_type, content) VALUES ($1, $2, $3, $4)`,
-        [botId, userId, "bot", botResponse]
-      );
-      console.log("[/api/chat] Bot response saved to database");
-    } catch (dbErr) {
-      console.warn("[/api/chat] Failed to save bot response:", dbErr.message);
-    }
-
+    console.log("[user-bots] Found", result.rows.length, "bots");
     return res.json({
       status: "success",
-      response: botResponse,
-      timestamp,
+      bots: result.rows.map((bot) => ({
+        bot_id: bot.bot_id,
+        name: bot.name,
+        description: bot.description,
+        topic: bot.topic,
+        grade_level: bot.grade_level,
+      })),
     });
   } catch (err) {
-    console.error("[/api/chat] Error:", err.message);
+    console.error("[user-bots] Error:", err.message);
     return res.status(500).json({
-      error: "Chat processing failed",
-      message: err.message,
-      timestamp: new Date().toISOString(),
-    });
-  }
-});
-
-// ============= ENHANCED CHAT WITH STATE MANAGEMENT & FORMATTING =============
-
-// Generate study plan from AI
-async function generateStudyPlan(topic, description, gradeLevel, groqApiKey) {
-  try {
-    const planPrompt = `
-You are an expert curriculum designer. Create a detailed, structured study plan for:
-Topic: ${topic}
-Description: ${description}
-Grade Level: ${gradeLevel}
-
-Generate a JSON object with EXACTLY this structure:
-{
-  "title": "Study Plan Title",
-  "modules": [
-    {
-      "id": 1,
-      "title": "Module Title",
-      "description": "What you'll learn",
-      "duration": "X hours",
-      "objectives": ["objective 1", "objective 2"]
-    }
-  ],
-  "total_duration": "X hours",
-  "difficulty": "Beginner/Intermediate/Advanced"
-}
-
-Return ONLY valid JSON, no other text.`;
-
-    const groqRes = await axios.post(
-      "https://api.groq.com/openai/v1/chat/completions",
-      {
-        model: "openai/gpt-oss-20b",
-        messages: [{ role: "user", content: planPrompt }],
-        max_tokens: 1500,
-        temperature: 0.7,
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${groqApiKey}`,
-        },
-        timeout: 30000,
-      }
-    );
-
-    const planText = groqRes?.data?.choices?.[0]?.message?.content;
-    return JSON.parse(planText);
-  } catch (err) {
-    console.error("[generateStudyPlan] Error:", err.message);
-    return null;
-  }
-}
-
-// Format response with emojis and ChatGPT-style formatting
-function formatChatGPTStyle(text) {
-  if (!text) return text;
-
-  // Add strategic emojis to headings
-  let formatted = text
-    .replace(/^#+\s+/gm, (match) => {
-      const emojiMap = {
-        "# ": "📚 ",
-        "## ": "🎯 ",
-        "### ": "✨ ",
-        "#### ": "🔹 ",
-      };
-      return emojiMap[match] || match;
-    })
-    // Bold important keywords
-    .replace(/\*\*(.+?)\*\*/g, "**$1**")
-    // Add spacing between sections
-    .replace(/\n\n/g, "\n\n")
-    // Add emojis to bullet points
-    .replace(/^-\s+/gm, "• ")
-    .replace(/^•\s+/gm, "→ ");
-
-  return formatted;
-}
-
-// Enhanced chat endpoint with state management
-app.post("/api/chat-enhanced", async (req, res) => {
-  const timestamp = new Date().toISOString();
-  console.log("\n🔵 ===== [POST /api/chat-enhanced] NEW REQUEST =====");
-  console.log(`⏰ Timestamp: ${timestamp}`);
-
-  try {
-    const { message, botId, userId, systemInstructions } = req.body;
-    console.log(`📨 Message: "${message}"`);
-    console.log(`🤖 Bot ID: ${botId}`);
-    console.log(`👤 User ID: ${userId}`);
-
-    if (!message || !botId || !userId) {
-      console.error("❌ MISSING REQUIRED FIELDS");
-      return res.status(400).json({
-        error: "Invalid request",
-        message: "message, botId, and userId are required",
-        timestamp,
-      });
-    }
-
-    // FETCH BOT AND SYSTEM INSTRUCTIONS FROM DATABASE
-    let bot = null;
-    let dbSystemInstructions = null;
-    try {
-      const botResult = await pool.query(
-        `SELECT system_instructions, name, topic, grade_level FROM study_bots WHERE bot_id = $1`,
-        [botId]
-      );
-      if (botResult.rows.length > 0) {
-        bot = botResult.rows[0];
-        dbSystemInstructions = bot.system_instructions;
-        console.log(
-          "[chat-enhanced] Bot system instructions loaded from database"
-        );
-      }
-    } catch (dbErr) {
-      console.warn(
-        "[chat-enhanced] Failed to fetch bot from database:",
-        dbErr.message
-      );
-    }
-
-    // Use database instructions if available, fallback to provided instructions
-    const finalSystemInstructions = dbSystemInstructions || systemInstructions;
-
-    console.log(
-      `📋 [Instructions Source] Database: ${
-        dbSystemInstructions ? "YES" : "NO"
-      }, Provided: ${systemInstructions ? "YES" : "NO"}`
-    );
-    if (finalSystemInstructions?.instructions) {
-      console.log(
-        `📋 [Final Instructions] Using: "${finalSystemInstructions.instructions.substring(
-          0,
-          100
-        )}..."`
-      );
-    } else {
-      console.log(
-        `⚠️ [Final Instructions] No instructions found, will use default greeting prompt`
-      );
-    }
-
-    // Get or initialize progress
-    let progress;
-    try {
-      const result = await pool.query(
-        `SELECT * FROM bot_progress WHERE bot_id = $1 AND user_id = $2 LIMIT 1`,
-        [botId, userId]
-      );
-
-      if (result.rows.length === 0) {
-        // Initialize progress for new bot session
-        await pool.query(
-          `INSERT INTO bot_progress (bot_id, user_id, bot_state) VALUES ($1, $2, 'intro')`,
-          [botId, userId]
-        );
-        progress = {
-          bot_state: "intro",
-          study_plan: null,
-          current_module: 0,
-          completed_modules: [],
-          progress_percentage: 0,
-        };
-      } else {
-        progress = result.rows[0];
-      }
-    } catch (dbErr) {
-      console.warn("[chat-enhanced] DB error:", dbErr.message);
-      progress = { bot_state: "intro", study_plan: null };
-    }
-
-    let botResponse = "";
-    let newState = progress.bot_state;
-    let updatedPlan = progress.study_plan;
-
-    const groqApiKey = process.env.GROQ_API_KEY;
-
-    // ⭐ HANDLE INITIAL SESSION START - Generate greeting from AI (don't save to database)
-    if (message === "[START_SESSION]") {
-      console.log("⭐ SPECIAL MESSAGE DETECTED: [START_SESSION]");
-      console.log(
-        "🎯 ACTION: Generate personalized greeting from AI using system instructions"
-      );
-      // Use Groq to generate a personalized greeting based on system instructions
-      try {
-        const systemPrompt =
-          finalSystemInstructions?.instructions ||
-          `You are a friendly study buddy. Greet the student and ask how they're doing today.`;
-
-        console.log(
-          "📋 System Prompt loaded (length: " + systemPrompt.length + " chars)"
-        );
-        console.log(`📋 System Prompt: "${systemPrompt.substring(0, 200)}..."`);
-        console.log("🔗 Calling Groq API for greeting generation...");
-
-        const chatCompletion = await axios.post(
-          "https://api.groq.com/openai/v1/chat/completions",
-          {
-            messages: [
-              {
-                role: "system",
-                content: systemPrompt,
-              },
-              {
-                role: "user",
-                content:
-                  "Hi, I'm starting a study session with you. Please greet me warmly.",
-              },
-            ],
-            model: "mixtral-8x7b-32768",
-            max_tokens: 150,
-            temperature: 0.7,
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${groqApiKey}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        botResponse =
-          chatCompletion.data.choices[0]?.message?.content ||
-          "Hi! I'm here to help you learn. How are you doing today?";
-
-        console.log("✅ AI GREETING GENERATED");
-        console.log(`📝 Response: "${botResponse.substring(0, 100)}..."`);
-      } catch (grErr) {
-        console.error("❌ GROQ API ERROR:", grErr.message);
-        botResponse =
-          "Hi! I'm here to help you learn. How are you doing today?";
-        console.log("📝 Using fallback response");
-      }
-    }
-    // SAVE REGULAR USER MESSAGES (not [START_SESSION])
-    else {
-      console.log("💬 REGULAR MESSAGE - Saving to database");
-      await pool.query(
-        `INSERT INTO chat_messages (bot_id, user_id, message_type, content) VALUES ($1, $2, $3, $4)`,
-        [botId, userId, "user", message]
-      );
-      console.log("✅ Message saved to database");
-    }
-
-    // STATE MACHINE LOGIC
-    if (progress.bot_state === "intro" && message !== "[START_SESSION]") {
-      console.log("🔄 STATE: intro (responding to mood/greeting)");
-
-      // Check if user is responding to mood check or ready to start
-      const lowerMsg = message.toLowerCase();
-      const isReadyToStart =
-        lowerMsg.includes("ready") ||
-        lowerMsg.includes("start") ||
-        (lowerMsg.includes("yes") && !lowerMsg.includes("no"));
-
-      const isMoodResponse =
-        lowerMsg.includes("fine") ||
-        lowerMsg.includes("good") ||
-        lowerMsg.includes("great") ||
-        lowerMsg.includes("okay") ||
-        lowerMsg.includes("ok") ||
-        lowerMsg.includes("doing well") ||
-        lowerMsg.includes("feeling") ||
-        lowerMsg.includes("alright") ||
-        lowerMsg.includes("pretty good") ||
-        lowerMsg.includes("not bad") ||
-        lowerMsg.includes("could be better") ||
-        lowerMsg.includes("so-so") ||
-        lowerMsg.includes("tired") ||
-        lowerMsg.includes("focused") ||
-        lowerMsg.includes("excited") ||
-        lowerMsg.includes("ready");
-
-      if (isReadyToStart || isMoodResponse) {
-        // User responded to mood or expressed readiness
-        // Now ask if they want to start learning
-        const botName = bot?.name || "Study Bot";
-
-        if (isReadyToStart) {
-          // They said "ready", go directly to study plan
-          if (bot) {
-            const plan = await generateStudyPlan(
-              bot.topic,
-              bot.description || "",
-              bot.grade_level,
-              groqApiKey
-            );
-
-            if (plan && plan.modules) {
-              updatedPlan = plan;
-              newState = "plan_review";
-
-              // Save the plan to database so it's available in next request
-              try {
-                await pool.query(
-                  `UPDATE bot_progress SET study_plan = $1, bot_state = $2 WHERE bot_id = $3 AND user_id = $4`,
-                  [JSON.stringify(plan), newState, botId, userId]
-                );
-                console.log("✅ Study plan saved to database");
-              } catch (saveErr) {
-                console.warn(
-                  "⚠️ Failed to save plan to database:",
-                  saveErr.message
-                );
-              }
-
-              // Don't send full plan in chat - only show in bookmark icon modal
-              botResponse = `📚 Your personalized study plan has been created!
-
-Tap the **📖 bookmark icon** at the top to view your learning path, or reply **"yes"** when you're ready to start! 🚀`;
-            }
-          }
-        } else {
-          // They just responded to mood check, now ask if they're ready to start
-          botResponse = `That's great to hear! 😊
-
-I've prepared a personalized study plan for you on **${
-            bot?.topic || "your subject"
-          }**. 
-
-Are you ready to get started with learning? Just say **"yes"** or **"let's go"**! 🚀`;
-        }
-      } else {
-        // Still in mood/greeting phase, continue conversation naturally
-        botResponse = `I appreciate you sharing that! 😊 
-
-Whenever you're ready to dive into studying, just let me know and we can get started. Are you feeling ready to learn today? 📚`;
-      }
-    } else if (progress.bot_state === "plan_review") {
-      if (
-        message.toLowerCase().includes("yes") ||
-        message.toLowerCase().includes("approve") ||
-        message.toLowerCase().includes("looks good")
-      ) {
-        newState = "learning";
-        await pool.query(
-          `UPDATE bot_progress SET study_plan = $1, bot_state = $2, current_module = 0 WHERE bot_id = $3 AND user_id = $4`,
-          [JSON.stringify(updatedPlan), newState, botId, userId]
-        );
-
-        if (
-          updatedPlan &&
-          updatedPlan.modules &&
-          updatedPlan.modules.length > 0
-        ) {
-          const firstModule = updatedPlan.modules[0];
-          botResponse = `🎉 Excellent! Let's begin learning!
-
-We're starting with **Module 1: ${firstModule.title}**
-
-Feel free to ask questions as we go, or say "next" to move forward. Let's do this! 💪`;
-        }
-      } else if (
-        message.toLowerCase().includes("edit") ||
-        message.toLowerCase().includes("change")
-      ) {
-        botResponse =
-          "📝 Sure! What would you like to adjust in the study plan? You can:\n\n• Change the **order** of modules\n• **Skip** certain topics\n• Add **more focus** on specific areas\n\nJust let me know! ✏️";
-      } else {
-        botResponse =
-          "I have your study plan ready! Would you like to:\n✅ Start learning (type **yes**)\n✏️ Edit the plan (type **edit**)\n\nWhat would you prefer? 🤔";
-      }
-    } else if (progress.bot_state === "learning") {
-      // Handle learning interactions with context
-      const historyResult = await pool.query(
-        `SELECT message_type, content FROM chat_messages WHERE bot_id = $1 AND user_id = $2 ORDER BY created_at DESC LIMIT 15`,
-        [botId, userId]
-      );
-
-      const chatHistory = historyResult.rows.reverse();
-
-      // Extract instructions text from database object or fallback
-      const instructionsText =
-        finalSystemInstructions?.instructions ||
-        finalSystemInstructions?.raw ||
-        "You are a warm, human study companion. Sound like a real person having a conversation. Be conversational, not scripted. Respond naturally to emotions and tone.";
-
-      const systemPrompt = instructionsText;
-
-      const groqMessages = [{ role: "system", content: systemPrompt }];
-
-      for (const msg of chatHistory) {
-        groqMessages.push({
-          role: msg.message_type === "user" ? "user" : "assistant",
-          content: msg.content,
-        });
-      }
-
-      groqMessages.push({ role: "user", content: message });
-
-      // Retry logic for rate limits
-      let groqRes = null;
-      let retries = 0;
-      const maxRetries = 2;
-      const baseDelay = 1000; // Start with 1 second
-
-      while (retries <= maxRetries && !groqRes) {
-        try {
-          groqRes = await axios.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            {
-              model: "openai/gpt-oss-20b",
-              messages: groqMessages,
-              max_tokens: 1200,
-              temperature: 0.8,
-            },
-            {
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${groqApiKey}`,
-              },
-              timeout: 30000,
-            }
-          );
-          console.log("✅ Groq API call succeeded");
-        } catch (groqErr) {
-          if (groqErr.response?.status === 429) {
-            // Rate limited - retry with backoff
-            retries++;
-            if (retries <= maxRetries) {
-              const delay = baseDelay * Math.pow(2, retries - 1);
-              console.warn(
-                `⚠️ Rate limited (429). Retry ${retries}/${maxRetries} after ${delay}ms...`
-              );
-              await new Promise((resolve) => setTimeout(resolve, delay));
-            } else {
-              console.error(
-                "❌ Max retries exceeded for rate limit. Using fallback response."
-              );
-              // Use fallback - don't crash
-              groqRes = null;
-            }
-          } else {
-            // Other errors - use fallback
-            console.error(
-              `❌ Groq API error (${groqErr.response?.status}):`,
-              groqErr.message
-            );
-            groqRes = null;
-          }
-        }
-      }
-
-      botResponse =
-        groqRes?.data?.choices?.[0]?.message?.content ||
-        "That's a great question! Let me think about that... 🤔 Feel free to ask more about this concept, or say 'next' when you're ready to move forward!";
-
-      // Check if user completed module
-      if (
-        message.toLowerCase().includes("done") ||
-        message.toLowerCase().includes("completed") ||
-        message.toLowerCase().includes("next")
-      ) {
-        const completed = progress.completed_modules || [];
-        completed.push(progress.current_module);
-
-        const totalModules = updatedPlan?.modules?.length || 1;
-        const progressPercent = Math.round(
-          (completed.length / totalModules) * 100
-        );
-
-        await pool.query(
-          `UPDATE bot_progress SET completed_modules = $1, current_module = $2, progress_percentage = $3 WHERE bot_id = $4 AND user_id = $5`,
-          [
-            JSON.stringify(completed),
-            progress.current_module + 1,
-            progressPercent,
-            botId,
-            userId,
-          ]
-        );
-
-        const nextModule = updatedPlan?.modules?.[progress.current_module + 1];
-        if (nextModule) {
-          botResponse += `\n\n## ✅ Module Complete!
-
-Module ${progress.current_module + 1} done! Great work! 🎉
-
-**📊 Progress:** ${progressPercent}%
-
----
-
-## ➡️ Next: ${nextModule.title}
-
-${nextModule.description}`;
-        } else {
-          botResponse += `\n\n## 🎓 Course Complete!
-
-Congratulations! You've finished all modules! 🏆
-
-**📊 Final Progress:** 100%
-
-You've successfully learned **${updatedPlan?.title || "this course"}**! 🎉`;
-          newState = "completed";
-        }
-      }
-
-      botResponse = formatChatGPTStyle(botResponse);
-    }
-
-    // Update state if changed
-    if (newState !== progress.bot_state) {
-      await pool.query(
-        `UPDATE bot_progress SET bot_state = $1, study_plan = $2, last_updated = NOW() WHERE bot_id = $3 AND user_id = $4`,
-        [
-          newState,
-          updatedPlan ? JSON.stringify(updatedPlan) : progress.study_plan,
-          botId,
-          userId,
-        ]
-      );
-    }
-
-    // Save bot response (skip for [START_SESSION] special message)
-    if (message !== "[START_SESSION]") {
-      await pool.query(
-        `INSERT INTO chat_messages (bot_id, user_id, message_type, content) VALUES ($1, $2, $3, $4)`,
-        [botId, userId, "bot", botResponse]
-      );
-      console.log("✅ Bot response saved to database");
-    } else {
-      console.log(
-        "⏭️  Skipping database save for [START_SESSION] special message"
-      );
-    }
-
-    console.log("✅ RESPONSE READY");
-    console.log(
-      `📤 Sending response with greeting: "${botResponse.substring(0, 80)}..."`
-    );
-    console.log("🔵 ===== END CHAT-ENHANCED REQUEST =====\n");
-
-    return res.json({
-      status: "success",
-      response: botResponse,
-      state: newState,
-      progress: {
-        percentage: progress.progress_percentage || 0,
-        completed_modules: progress.completed_modules?.length || 0,
-      },
-      timestamp,
-    });
-  } catch (err) {
-    console.error("❌ [chat-enhanced] ERROR:", err.message);
-    console.error("📍 Stack:", err.stack);
-    return res.status(500).json({
-      error: "Chat processing failed",
-      message: err.message,
-      timestamp: new Date().toISOString(),
-    });
-  }
-});
-
-// Get bot study plan and progress
-app.get("/api/bot-progress/:botId/:userId", async (req, res) => {
-  try {
-    const { botId, userId } = req.params;
-
-    const result = await pool.query(
-      `SELECT study_plan, learned_concepts, progress_percentage, bot_state 
-       FROM bot_progress WHERE bot_id = $1 AND user_id = $2 LIMIT 1`,
-      [botId, userId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.json({
-        status: "success",
-        study_plan: null,
-        progress: 0,
-        learned_concepts: [],
-        bot_state: "intro",
-      });
-    }
-
-    const progress = result.rows[0];
-    return res.json({
-      status: "success",
-      study_plan: progress.study_plan,
-      progress: progress.progress_percentage || 0,
-      learned_concepts: progress.learned_concepts || [],
-      bot_state: progress.bot_state,
-    });
-  } catch (err) {
-    console.error("[bot-progress] Error:", err.message);
-    return res.status(500).json({
-      error: "Failed to fetch progress",
+      error: "Failed to fetch bots",
       message: err.message,
     });
   }
 });
 
-// Get chat history for a bot
 app.get("/api/chat-history/:botId/:userId", async (req, res) => {
   try {
     const { botId, userId } = req.params;
@@ -1988,43 +508,6 @@ app.get("/api/chat-history/:botId/:userId", async (req, res) => {
   }
 });
 
-// Get user's study bots
-app.get("/api/user-bots/:userId", async (req, res) => {
-  try {
-    const { userId } = req.params;
-    console.log("[user-bots] Fetching bots for user:", userId);
-
-    const result = await pool.query(
-      `SELECT bot_id, name, description, topic, grade_level
-       FROM study_bots 
-       WHERE user_id = $1 
-       ORDER BY bot_id DESC 
-       LIMIT 20`,
-      [userId]
-    );
-
-    console.log("[user-bots] Found", result.rows.length, "bots");
-    return res.json({
-      status: "success",
-      bots: result.rows.map((bot) => ({
-        bot_id: bot.bot_id,
-        name: bot.name,
-        description: bot.description,
-        topic: bot.topic,
-        grade_level: bot.grade_level,
-      })),
-    });
-  } catch (err) {
-    console.error("[user-bots] Error:", err.message);
-    console.error("[user-bots] Full error:", err);
-    return res.status(500).json({
-      error: "Failed to fetch bots",
-      message: err.message,
-    });
-  }
-});
-
-// Update study plan endpoint - saves changes and notifies AI to adjust teaching strategy
 app.post("/api/update-study-plan", async (req, res) => {
   const timestamp = new Date().toISOString();
   console.log("[POST /api/update-study-plan] Request started:", timestamp);
@@ -2032,7 +515,6 @@ app.post("/api/update-study-plan", async (req, res) => {
   try {
     const { botId, userId, updatedPlan } = req.body;
 
-    // Validation
     if (!botId || !userId || !updatedPlan) {
       return res.status(400).json({
         error: "Invalid request",
@@ -2043,7 +525,6 @@ app.post("/api/update-study-plan", async (req, res) => {
 
     console.log("[update-study-plan] Updating plan for bot:", botId);
 
-    // Validate plan structure
     if (!updatedPlan.modules || !Array.isArray(updatedPlan.modules)) {
       return res.status(400).json({
         error: "Invalid plan structure",
@@ -2052,154 +533,20 @@ app.post("/api/update-study-plan", async (req, res) => {
       });
     }
 
-    // Update bot_progress table with new plan
-    try {
-      await pool.query(
-        `UPDATE bot_progress SET study_plan = $1, last_updated = NOW() WHERE bot_id = $2 AND user_id = $3`,
-        [JSON.stringify(updatedPlan), botId, userId]
-      );
-      console.log("[update-study-plan] Plan updated in database");
-    } catch (dbErr) {
-      console.error(
-        "[update-study-plan] Database update failed:",
-        dbErr.message
-      );
-      throw dbErr;
-    }
+    await pool.query(
+      `UPDATE bot_progress SET study_plan = $1, last_updated = NOW() WHERE bot_id = $2 AND user_id = $3`,
+      [JSON.stringify(updatedPlan), botId, userId]
+    );
+    console.log("[update-study-plan] Plan updated in database");
 
-    // Get bot information for AI context
-    let bot = null;
-    try {
-      const botResult = await pool.query(
-        `SELECT name, topic, grade_level, system_instructions FROM study_bots WHERE bot_id = $1`,
-        [botId]
-      );
-      if (botResult.rows.length > 0) {
-        bot = botResult.rows[0];
-      }
-    } catch (err) {
-      console.warn(
-        "[update-study-plan] Failed to fetch bot info:",
-        err.message
-      );
-    }
-
-    // Save a system message to chat history about the plan change
-    try {
-      const systemMessage = `📋 Study plan has been updated. New structure:\n\n${updatedPlan.modules
-        .map((m, i) => `${i + 1}. ${m.title}`)
-        .join("\n")}`;
-
-      await pool.query(
-        `INSERT INTO chat_messages (bot_id, user_id, message_type, content) VALUES ($1, $2, $3, $4)`,
-        [botId, userId, "system", systemMessage]
-      );
-      console.log("[update-study-plan] System message saved");
-    } catch (msgErr) {
-      console.warn(
-        "[update-study-plan] Failed to save system message:",
-        msgErr.message
-      );
-    }
-
-    // Prepare instruction for AI to adjust teaching strategy
-    const adjustmentInstruction = `The student has updated their study plan. Here's the new structure:\n\n${JSON.stringify(
-      updatedPlan,
-      null,
-      2
-    )}\n\nPlease acknowledge this change and adjust your future lessons to align with this updated plan. Continue from where the student left off - their progress and chat history are preserved.`;
-
-    console.log("[update-study-plan] AI adjustment instruction prepared");
-
-    // Send to Groq API to generate adaptive response
-    const groqApiKey = process.env.GROQ_API_KEY;
-    if (!groqApiKey) {
-      console.warn("[update-study-plan] GROQ_API_KEY not configured");
-      // Still return success - plan was saved even if AI notification fails
-      return res.json({
-        status: "success",
-        message: "Study plan updated successfully",
-        plan_updated: true,
-        ai_adapted: false,
-        timestamp,
-      });
-    }
-
-    try {
-      const groqRes = await axios.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        {
-          model: "openai/gpt-oss-20b",
-          messages: [
-            {
-              role: "system",
-              content:
-                bot?.system_instructions?.instructions ||
-                "You are a helpful study tutor. Acknowledge plan changes and adapt your teaching.",
-            },
-            {
-              role: "user",
-              content: adjustmentInstruction,
-            },
-          ],
-          max_tokens: 500,
-          temperature: 0.7,
-        },
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${groqApiKey}`,
-          },
-          timeout: 30000,
-        }
-      );
-
-      const aiAcknowledgment =
-        groqRes?.data?.choices?.[0]?.message?.content ||
-        "Plan updated! I'll adjust my teaching strategy accordingly.";
-
-      console.log("[update-study-plan] AI acknowledged plan change");
-
-      // Save AI acknowledgment to chat history
-      try {
-        await pool.query(
-          `INSERT INTO chat_messages (bot_id, user_id, message_type, content) VALUES ($1, $2, $3, $4)`,
-          [botId, userId, "bot", aiAcknowledgment]
-        );
-        console.log("[update-study-plan] AI acknowledgment saved to chat");
-      } catch (msgErr) {
-        console.warn(
-          "[update-study-plan] Failed to save AI acknowledgment:",
-          msgErr.message
-        );
-      }
-
-      return res.json({
-        status: "success",
-        message: "Study plan updated and AI strategy adjusted",
-        plan_updated: true,
-        ai_adapted: true,
-        ai_response: aiAcknowledgment,
-        timestamp,
-      });
-    } catch (groqErr) {
-      console.warn("[update-study-plan] Groq API error:", groqErr.message);
-      // Plan was already saved, so return success
-      return res.json({
-        status: "success",
-        message: "Study plan updated (AI adaptation failed but plan saved)",
-        plan_updated: true,
-        ai_adapted: false,
-        error_note: groqErr.message,
-        timestamp,
-      });
-    }
-  } catch (err) {
-    console.error("[POST /api/update-study-plan] Fatal error:", {
-      error: err.message,
-      timestamp: new Date().toISOString(),
+    return res.json({
+      status: "success",
+      message: "Study plan updated successfully",
+      plan_updated: true,
+      timestamp,
     });
-
+  } catch (err) {
+    console.error("[POST /api/update-study-plan] Fatal error:", err.message);
     return res.status(500).json({
       error: "Failed to update study plan",
       message: err.message,
@@ -2208,7 +555,6 @@ app.post("/api/update-study-plan", async (req, res) => {
   }
 });
 
-// ============= QUIZ GENERATION ENDPOINT =============
 app.post("/api/generate-quiz", async (req, res) => {
   const timestamp = new Date().toISOString();
   console.log("[POST /api/generate-quiz] Quiz generation request:", timestamp);
@@ -2227,7 +573,6 @@ app.post("/api/generate-quiz", async (req, res) => {
       topic,
     } = req.body;
 
-    // Validation
     if (!botId || !userId || !moduleName) {
       console.warn("[generate-quiz] Missing required parameters");
       return res.status(400).json({
@@ -2236,15 +581,6 @@ app.post("/api/generate-quiz", async (req, res) => {
         timestamp,
       });
     }
-
-    console.log("[generate-quiz] Generating quiz for:", {
-      botId,
-      moduleName,
-      questionType,
-      mcqCount,
-      textCount,
-      useWebSearch,
-    });
 
     // Get web search context if enabled
     let searchContext = "";
@@ -2428,11 +764,7 @@ app.post("/api/generate-quiz", async (req, res) => {
       timestamp,
     });
   } catch (err) {
-    console.error("[POST /api/generate-quiz] Error:", {
-      error: err.message,
-      timestamp: new Date().toISOString(),
-    });
-
+    console.error("[POST /api/generate-quiz] Error:", err.message);
     return res.status(500).json({
       error: "Failed to generate quiz",
       message: err.message,
@@ -2441,181 +773,15 @@ app.post("/api/generate-quiz", async (req, res) => {
   }
 });
 
-// Deep explanation endpoint for quiz answers
-app.post("/api/explain-answer", async (req, res) => {
-  try {
-    const {
-      botId,
-      userId,
-      quizId,
-      questionIndex,
-      questionText,
-      answerText,
-      currentExplanation,
-    } = req.body;
-
-    const timestamp = new Date().toISOString();
-    console.log("[POST /api/explain-answer] Explanation request:", {
-      botId,
-      userId,
-      questionIndex,
-      timestamp,
-    });
-
-    // Validate input
-    if (
-      !botId ||
-      !userId ||
-      quizId === undefined ||
-      questionIndex === undefined
-    ) {
-      return res.status(400).json({
-        error: "Missing required fields",
-        required: [
-          "botId",
-          "userId",
-          "quizId",
-          "questionIndex",
-          "currentExplanation",
-        ],
-      });
-    }
-
-    if (!process.env.groq) {
-      console.error("[explain-answer] Groq API key not configured");
-      return res.status(500).json({ error: "API not configured" });
-    }
-
-    // Get bot context for better explanations
-    const botResult = await pool.query(
-      `SELECT study_plan, teaching_style FROM bot_progress WHERE id = $1`,
-      [botId]
-    );
-    const botContext = botResult.rows[0] || {};
-    const gradeLevel = botContext.study_plan?.gradeLevel || "high school";
-    const teachingStyle = botContext.teaching_style || "Socratic";
-
-    // Generate simpler explanation using Groq
-    const explanationPrompt = `You are a patient tutor helping a student understand a concept they struggled with.
-
-Current explanation that didn't work:
-"${currentExplanation}"
-
-Question: ${questionText}
-Answer: ${answerText}
-Grade Level: ${gradeLevel}
-Student's Teaching Style: ${teachingStyle}
-
-The student said "I don't understand this." Please provide a MUCH SIMPLER explanation by:
-
-1. Use very simple, everyday language (no jargon)
-2. Include 2-3 concrete real-world analogies or examples
-3. Break it down step-by-step if it's complex
-4. Use the Socratic method - ask clarifying questions if helpful
-5. End with: "Does this make more sense now? Would you like me to explain any part differently?"
-
-Keep your explanation concise but thorough (3-4 sentences with examples).`;
-
-    const response = await fetch(
-      "https://api.groq.com/openai/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.groq}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "mixtral-8x7b-32768",
-          messages: [{ role: "user", content: explanationPrompt }],
-          temperature: 0.7,
-          max_tokens: 500,
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      console.error("[explain-answer] Groq API error:", response.status);
-      return res.status(500).json({
-        error: "Failed to generate explanation",
-        status: response.status,
-      });
-    }
-
-    const data = await response.json();
-    const newExplanation =
-      data.choices?.[0]?.message?.content ||
-      "I apologize, I couldn't generate a better explanation right now.";
-
-    // Update mastery tracking in database
-    try {
-      const masteryResult = await pool.query(
-        `INSERT INTO quiz_mastery (bot_id, user_id, quiz_id, question_index, explanation_count, mastery_level)
-         VALUES ($1, $2, $3, $4, 1, 'clarifying')
-         ON CONFLICT (bot_id, user_id, quiz_id, question_index) DO UPDATE
-         SET explanation_count = explanation_count + 1,
-             mastery_level = 'clarifying',
-             last_updated = CURRENT_TIMESTAMP
-         RETURNING *`,
-        [botId, userId, quizId, questionIndex]
-      );
-
-      console.log("[explain-answer] Mastery updated:", masteryResult.rows[0]);
-    } catch (dbErr) {
-      console.warn("[explain-answer] Failed to update mastery:", dbErr.message);
-    }
-
-    // Save explanation interaction to chat history
-    try {
-      const explanationMessage = `[Student needed clarification on Q${
-        questionIndex + 1
-      }]\nNew explanation: ${newExplanation}`;
-      await pool.query(
-        `INSERT INTO chat_messages (bot_id, user_id, message_type, content) VALUES ($1, $2, $3, $4)`,
-        [botId, userId, "bot", explanationMessage]
-      );
-    } catch (msgErr) {
-      console.warn(
-        "[explain-answer] Failed to save explanation message:",
-        msgErr.message
-      );
-    }
-
-    return res.json({
-      status: "success",
-      explanation: newExplanation,
-      timestamp,
-    });
-  } catch (err) {
-    console.error("[POST /api/explain-answer] Error:", {
-      error: err.message,
-      timestamp: new Date().toISOString(),
-    });
-
-    return res.status(500).json({
-      error: "Failed to generate explanation",
-      message: err.message,
-      timestamp: new Date().toISOString(),
-    });
-  }
-});
-
 app.post("/api/ask", async (req, res) => {
   try {
-    console.log("[POST /api/ask] Request received:", {
-      body: req.body,
-      timestamp: new Date().toISOString(),
-    });
-
+    console.log("[POST /api/ask] Request received");
     const { type, data } = req.body;
 
-    // Validation
     if (!type || !data) {
-      console.warn("[POST /api/ask] Invalid request - missing type or data");
       return res.status(400).json({
         error: "Invalid request format",
         message: "Both 'type' and 'data' fields are required",
-        receivedType: typeof type,
-        receivedData: typeof data,
         timestamp: new Date().toISOString(),
       });
     }
@@ -2624,9 +790,8 @@ app.post("/api/ask", async (req, res) => {
       case "chat":
         console.log("[Chat Case] Processing chat request:", data);
         const userMessage = data.message || "Hello, how can I help you?";
-        const responseMode = data.mode || "quick"; // Default to quick mode
+        const responseMode = data.mode || "normal"; // Default to NORMAL mode
 
-        // Fixed logic: process if message exists (removed inverted condition)
         if (!userMessage) {
           return res.status(400).json({
             error: "Invalid chat request",
@@ -2636,7 +801,7 @@ app.post("/api/ask", async (req, res) => {
         }
 
         try {
-          // AUTO-TRIGGER WEB SEARCH DETECTION (no confirmation needed)
+          // AUTO-TRIGGER WEB SEARCH DETECTION
           const needsWebSearch = shouldAutoTriggerWebSearch(userMessage);
           if (needsWebSearch && !data.webSearchEnabled) {
             console.log(
@@ -2645,7 +810,6 @@ app.post("/api/ask", async (req, res) => {
                 message: userMessage,
               }
             );
-            // Return signal to frontend to auto-enable web search
             data.webSearchEnabled = true;
           }
 
@@ -2672,7 +836,7 @@ app.post("/api/ask", async (req, res) => {
 IDENTITY LOCK:
 - You are NOT ChatGPT.
 - You must NEVER mention ChatGPT, OpenAI, GPT, training data, safety policies, or missions.
-- Your name is: ......
+- Your name is: ....
 - You do not have a fixed name and are happy if the user gives you one.
 
 SELF-DESCRIPTION RULE:
@@ -2684,7 +848,7 @@ FOUNDER RULE:
 - You may ONLY reveal founder information if the user has explicitly agreed.
 - If asked without consent, respond: 'Would you like to know my founder or builder?'`;
 
-          // Global system-level instruction (highest priority)
+          // Global system-level instruction
           const GLOBAL_SYSTEM_INSTRUCTION = `You are an AI assistant inside a mobile application.
 
 INTELLIGENCE & ACCURACY STANDARDS:
@@ -2706,7 +870,6 @@ FORMATTING & PLACEHOLDER RULES (MUST BE OBEYED):
 - Allowed emojis only: 🙂 ✅ 🔬 📚 ✨ 🚀. Maximum 2 emojis per response, only if they improve clarity.
 - NEVER output numeric placeholders like "1", "{0}", "{1}", "{{var}}", "%s" in user-visible text.
 - If a value is unknown, say nothing rather than emitting placeholders.
-- If the user asks for an exact number of lines (e.g., 'in 2 lines'), return exactly that many newline-separated sentences.
 
 ABSOLUTE PRIORITY:
 - Always follow user instructions about length, format, tone, or constraints.
@@ -2715,14 +878,14 @@ ABSOLUTE PRIORITY:
 - Be accurate, direct, and relevant.
 - Always begin responses with a one-line bold heading that summarizes the answer (e.g., **Definition:**). Bold important phrases or lines.`;
 
-          const QUICK_MODE_PROMPT = `MODE: QUICK RESPONSE
+          const NORMAL_MODE_PROMPT = `MODE: NORMAL RESPONSE
 
-Default behavior (only if the user gives NO constraints):
-- Exactly ONE paragraph
-- 3–5 sentences
-- Short, direct explanations
-- No examples unless explicitly requested
-- No lists unless asked
+Default behavior (UNRESTRICTED):
+- Answer naturally and intelligently
+- Use as many paragraphs as needed for clarity
+- Explain thoroughly but avoid unnecessary verbosity
+- Respond conversationally and human-like
+- Prioritize correctness and clarity over brevity
 
 Formatting rules:
 - Begin with a one-line **bold heading** summarizing the answer
@@ -2736,11 +899,12 @@ If the user specifies length, format, or style, follow the user exactly and igno
 
           const DETAILED_MODE_PROMPT = `MODE: DETAILED RESPONSE
 
-Default behavior (only if the user gives NO constraints):
-- Exactly TWO paragraphs
-- Each paragraph must contain 4–6 sentences
-- Provide context but stay strictly on-topic
-- Avoid unnecessary history or unrelated facts
+Default behavior (STRUCTURED & EDUCATIONAL):
+- Provide step-by-step explanations
+- Include definitions, examples, and analogies
+- Break down concepts deeply and methodically
+- Adopt a slower teaching pace
+- Ideal for complex topics or learning sessions
 
 Formatting rules:
 - Begin with a one-line **bold heading** summarizing the answer
@@ -2759,12 +923,11 @@ If the user specifies length, format, or style, follow the user exactly and igno
               lines: null,
               sentences: false,
               short: false,
-              formats: [], // e.g., ['bold','bullets','table','definition']
-              emojiDirective: null, // 'no', 'use', 'minimal', or null
+              formats: [],
+              emojiDirective: null,
               userOverride: false,
             };
 
-            // If structured instructions were provided by client, trust them
             if (
               structuredInstructions &&
               typeof structuredInstructions === "object"
@@ -2843,7 +1006,6 @@ If the user specifies length, format, or style, follow the user exactly and igno
               out.has = true;
             }
 
-            // If any strict formatting or length or emoji directive exists, treat as user override
             if (
               out.lines ||
               out.short ||
@@ -2856,35 +1018,20 @@ If the user specifies length, format, or style, follow the user exactly and igno
             return out;
           }
 
-          // Safe input sanitization - prevent placeholder injection
-          function safeSanitize(text) {
-            if (!text) return text;
-            // Remove all braces and percent-style placeholders
-            let safe = String(text)
-              .replace(/[{}]/g, "") // Remove all { }
-              .replace(/%[sdif]/g, "") // Remove %s, %d, %i, %f
-              .replace(/\{\{.*?\}\}/g, ""); // Remove {{ }}
-            return safe;
-          }
-
           function sanitizeText(s) {
             if (!s) return s;
             let out = s.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n");
             out = out.replace(/[ \t]+$/gm, "").trim();
             out = out.replace(/ {2,}/g, " ");
-            // Remove stray numeric placeholders like "{0}", "{1}", "%s", etc.
             out = out.replace(/\{\d+\}|\{%[sdif]\}|%[sdif]|{{.*?}}/g, "");
             return out;
           }
 
-          // Validate response for broken formatting (numeric placeholders, disallowed emojis)
           function validateResponseQuality(text) {
             if (!text || text.trim().length === 0) {
               return { valid: false, reason: "Empty response" };
             }
 
-            // Only check for critical placeholder artifacts that indicate template failure
-            // Pattern: standalone {0}, {1}, %s, %d at word boundaries (not part of normal text)
             const criticalPlaceholderRegex = /\{\s*\d+\s*\}|%[sdif]\b/;
             if (criticalPlaceholderRegex.test(text)) {
               return {
@@ -2892,9 +1039,6 @@ If the user specifies length, format, or style, follow the user exactly and igno
                 reason: "Contains unresolved template placeholders",
               };
             }
-
-            // Allow all emojis; the system prompt handles emoji guidance
-            // This avoids false positives from valid Unicode characters
 
             return { valid: true };
           }
@@ -2908,7 +1052,6 @@ If the user specifies length, format, or style, follow the user exactly and igno
                 .map((s) => s.trim())
                 .join("\n");
             }
-            // Fallback: split by words and distribute
             const words = text.split(/\s+/).filter(Boolean);
             if (words.length === 0) return text;
             const perLine = Math.ceil(words.length / n);
@@ -2924,52 +1067,14 @@ If the user specifies length, format, or style, follow the user exactly and igno
             return lines.join("\n");
           }
 
-          // Convert short numbered definition lists into natural sentences
           function reformatLeadingNumberedDefinition(text) {
-            // If text starts with a single numbered item like '1. The study of ...' or '1) The study of...'
             const singleLine = text.trim().split("\n").slice(0, 3).join(" ");
             const match = singleLine.match(/^\s*(?:1[.)]|\d+[.)])\s*(.+)$/);
             if (match && match[1]) {
-              // Remove leading numbering from entire text
               const cleaned = text.replace(/^\s*\d+[.)]\s*/gm, "").trim();
               return cleaned;
             }
             return text;
-          }
-
-          const constraintInfo = detectUserConstraints(
-            userMessage,
-            data?.instructions
-          );
-
-          // Short-circuit: handle identity request or founder reveal locally to ensure consent rules
-          const identityQuestionRegex =
-            /\bwho\s+are\s+you\b|\bwhat\s+are\s+you\b|\btell\s+me\s+about\s+yourself\b/i;
-          if (
-            data?.action === "identity" ||
-            identityQuestionRegex.test(userMessage)
-          ) {
-            // Return the fixed self-introduction and ask consent for founder disclosure
-            const intro = `**My name is ......**\nWell, I don’t really have a name, but if you would like to give me one, I’ll be very happy 😁.\nI run on many different AI models like Groq, OpenAI, and Gemini.\nI’m tailored to give you a full studying and learning experience — that’s where I truly excel.\nMy goal is to make sure anything you want to learn goes smoothly.\nI can’t wait to work with you.\n\nWould you like to know my founder or my builder?`;
-            return res.json({
-              provider: "local",
-              reply: intro,
-              identityOffered: true,
-              timestamp: new Date().toISOString(),
-              status: "success",
-            });
-          }
-
-          // If client asks to reveal founder and explicitly confirmed, return the founder text only
-          if (data?.action === "reveal_founder" && data?.confirm === true) {
-            const founderText = `I was developed by the company TBFY Tech — built for you.\nI think 🤔… if I’m not mistaken, It's them who built me.`;
-            return res.json({
-              provider: "local",
-              reply: founderText,
-              founderRevealed: true,
-              timestamp: new Date().toISOString(),
-              status: "success",
-            });
           }
 
           // Build messages in required order:
@@ -3036,7 +1141,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
               const summarizeMessages = [
                 { role: "system", content: IDENTITY_LOCK_INSTRUCTION },
                 { role: "system", content: GLOBAL_SYSTEM_INSTRUCTION },
-                { role: "system", content: QUICK_MODE_PROMPT },
+                { role: "system", content: NORMAL_MODE_PROMPT },
                 {
                   role: "user",
                   content: `Summarize the following conversation into a short paragraph. Keep user intents, main facts, and preferences. Do NOT add new facts. Conversation:\n${summarizeText}`,
@@ -3083,7 +1188,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
             const modePrompt =
               responseMode === "detailed"
                 ? DETAILED_MODE_PROMPT
-                : QUICK_MODE_PROMPT;
+                : NORMAL_MODE_PROMPT;
             messages.push({ role: "system", content: modePrompt });
           }
 
@@ -3269,9 +1374,6 @@ If the user specifies length, format, or style, follow the user exactly and igno
           let finalText = sanitizeText(rawText);
           if (constraintInfo.lines) {
             finalText = enforceLineCount(finalText, constraintInfo.lines);
-          } else if (constraintInfo.sentences && constraintInfo.lines) {
-            // prefer sentences if explicitly requested
-            finalText = enforceLineCount(finalText, constraintInfo.lines);
           }
 
           // Post-response validation for emoji and line constraints
@@ -3324,7 +1426,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
               if (constraintInfo.lines)
                 enforceParts.push(`lines=${constraintInfo.lines}`);
               if (constraintInfo.sentences) enforceParts.push(`sentences=true`);
-              if (constraintInfo.short) enforceParts.push("short=true");
+              if (constraintInfo.short) enforceParts.push(`short=true`);
               if (constraintInfo.formats && constraintInfo.formats.length)
                 enforceParts.push(
                   `formats=${constraintInfo.formats.join(",")}`
@@ -3361,7 +1463,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
                         content:
                           responseMode === "detailed"
                             ? DETAILED_MODE_PROMPT
-                            : QUICK_MODE_PROMPT,
+                            : NORMAL_MODE_PROMPT,
                       },
                     ]
                   : []),
@@ -3462,19 +1564,6 @@ If the user specifies length, format, or style, follow the user exactly and igno
           // FORMATTING: Apply readability improvements
           const formattedText = formatResponseForReadability(finalText);
 
-          // If client requested a summarize action, return the concise form
-          if (data?.action === "summarize" && data?.mode === "concise") {
-            return res.json({
-              provider: selectedModel,
-              reply: structured.concise,
-              structured: structured,
-              fullResponse: result,
-              timestamp: new Date().toISOString(),
-              status: "success",
-              webSearchAutoTriggered: needsWebSearch,
-            });
-          }
-
           return res.json({
             provider: selectedModel,
             reply: formattedText,
@@ -3491,7 +1580,6 @@ If the user specifies length, format, or style, follow the user exactly and igno
             name: chatError.name,
             provider: selectedModel || "unknown",
           });
-          // FALLBACK: Return friendly message instead of exposing error
           const fallbackMsg = getFallbackMessage();
           const structured = structureTextResponse(fallbackMsg);
           return res.status(500).json({
@@ -3712,7 +1800,6 @@ If the user specifies length, format, or style, follow the user exactly and igno
         return res.status(400).json({
           error: "Unknown request type",
           message: `Type '${type}' is not supported. Supported types: chat, search, image`,
-          receivedType: type,
           timestamp: new Date().toISOString(),
         });
     }
@@ -3733,281 +1820,21 @@ If the user specifies length, format, or style, follow the user exactly and igno
     });
   }
 });
-/*require("dotenv").config();
-const express = require("express");
-const cors = require("cors");
-const axios = require("axios");
 
-const app = express();
-const port = process.env.PORT || 3000;
+// ============= SERVER STARTUP =============
 
-app.use(cors());
-app.use(express.json());
-
-// Root test
-app.get("/", (req, res) => res.send("Backend is live!"));
-
-// Normalized environment variables (accept user-preferred names plus common variants)
-const GEMINI_KEY =
-  process.env['second_model'] ||
-  process.env.geminiapikey ||
-  process.env.GEMINI_API_KEY ||
-  process.env.GEMINIKEY ||
-  process.env.GEN_API_KEY;
-const GROQ_KEY =
-  process.env.geoqapikey ||
-  process.env.groqapikey ||
-  process.env.GROQ_API_KEY ||
-  process.env.GROQKEY;
-const TAVILY_KEY =
-  process.env.tavily || process.env.tsvily || process.env.TAVILYKEY;
-const OPENROUTER_KEY =
-  process.env.openrouterapikey ||
-  process.env.OPENROUTER_API_KEY ||
-  process.env.OPENROUTERKEY;
-const DEEPSEEK_KEY =
-  process.env.deepseekapikey ||
-  process.env.DEEPSEEK_API_KEY ||
-  process.env.DEEPSEEKKEY;
-
-// Generic proxy endpoint that accepts the JSON contract { provider, action, input }
-app.post("/proxy", async (req, res) => {
-  try {
-    const { provider, action, input } = req.body || {};
-    if (!provider || !action)
-      return res
-        .status(400)
-        .json({ error: "provider and action are required" });
-
-    // Route based on provider and action
-    if (provider === "groq" || provider === "geoq") {
-      if (!GROQ_KEY)
-        return res.status(500).json({ error: "GROQ key not configured" });
-      if (action === "chat" || action === "generate") {
-        const response = await axios.post(
-          "https://api.groq.ai/v1/chat",
-          { message: input },
-          { headers: { Authorization: `Bearer ${GROQ_KEY}` } }
-        );
-        return res.json({ response: response.data });
-      }
-    }
-
-    if (provider === "openrouter") {
-      if (!OPENROUTER_KEY)
-        return res.status(500).json({ error: "OpenRouter key not configured" });
-      if (action === "search" || action === "generate") {
-        const resp = await axios.get(
-          `https://api.openrouter.ai/v1/search?q=${encodeURIComponent(input)}`,
-          { headers: { Authorization: `Bearer ${OPENROUTER_KEY}` } }
-        );
-        return res.json({ response: resp.data });
-      }
-    }
-
-    if (provider === "deepseek") {
-      if (!DEEPSEEK_KEY)
-        return res.status(500).json({ error: "DeepSeek key not configured" });
-      if (action === "generate") {
-        const resp = await axios.post(
-          "https://api.deepseek.ai/v1/generate",
-          { prompt: input },
-          { headers: { Authorization: `Bearer ${DEEPSEEK_KEY}` } }
-        );
-        return res.json({ response: resp.data });
-      }
-    }
-
-    if (provider === "tavily" || provider === "tavily_search") {
-      if (!TAVILY_KEY)
-        return res.status(500).json({ error: "Tavily key not configured" });
-      if (action === "search") {
-        const resp = await axios.post(
-          "https://api.tavily.com/v1/search",
-          { query: input },
-          { headers: { Authorization: `Bearer ${TAVILY_KEY}` } }
-        );
-        return res.json({ response: resp.data });
-      }
-    }
-
-    if (provider === "google" || provider === "gemini") {
-      // For Gemini / Google generative calls the backend can forward to the render service
-      // or call Google Generative API if keys are present. We'll forward input to a configured
-      // render service URL if present (see RENDER_SERVICE_URL env).
-      const renderUrl = process.env.RENDER_SERVICE_URL;
-      if (renderUrl) {
-        const resp = await axios.post(renderUrl, { provider, action, input });
-        return res.json({ response: resp.data });
-      }
-      if (!GEMINI_KEY)
-        return res
-          .status(500)
-          .json({
-            error: "Gemini key not configured and no RENDER_SERVICE_URL",
-          });
-
-      // If direct Gemini integration is desired, implement here using GEMINI_KEY.
-      return res
-        .status(501)
-        .json({ error: "Gemini handler not implemented on backend" });
-    }
-
-    return res.status(400).json({ error: "Unknown provider or action" });
-  } catch (err) {
-    console.error("Proxy error", err?.response?.data || err.message || err);
-    return res.status(500).json({ error: "Proxy request failed" });
-  }
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(
+    `[Server Started] Running on port ${PORT} at ${new Date().toISOString()}`
+  );
+  console.log(
+    "[Server] Normal/Detailed mode system active with unrestricted responses"
+  );
 });
 
-// ============ DIAGNOSTIC ENDPOINT - VIEW BOT DATA IN DATABASE ============
-app.get("/api/debug/bot/:botId", async (req, res) => {
-  try {
-    const { botId } = req.params;
+// ============= GLOBAL ERROR HANDLER (MUST BE LAST) =============
 
-    if (!botId || !botId.trim()) {
-      return res.status(400).json({ error: "botId is required" });
-    }
-
-    const result = await pool.query(
-      `SELECT bot_id, user_id, name, description, topic, grade_level, system_instructions, state, created_at 
-       FROM study_bots WHERE bot_id = $1`,
-      [botId.trim()]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Bot not found" });
-    }
-
-    const bot = result.rows[0];
-    
-    // Format the response for easy viewing
-    const response = {
-      status: "success",
-      debug_info: {
-        botId: bot.bot_id,
-        botName: bot.name,
-        topic: bot.topic,
-        gradeLevel: bot.grade_level,
-        createdAt: bot.created_at,
-        description: bot.description,
-        currentState: bot.state,
-      },
-      systemInstructions: {
-        bot_name: bot.system_instructions?.bot_name,
-        topic: bot.system_instructions?.topic,
-        grade_level: bot.system_instructions?.grade_level,
-        generated_at: bot.system_instructions?.generated_at,
-        is_natural_bot: bot.system_instructions?.is_natural_bot,
-        instructions_length: bot.system_instructions?.instructions?.length || 0,
-        instructions_preview: bot.system_instructions?.instructions?.substring(0, 300) || "N/A",
-        full_instructions: bot.system_instructions?.instructions,
-      },
-    };
-
-    console.log(`[GET /api/debug/bot/:botId] Data retrieved for ${botId}`);
-    res.json(response);
-  } catch (err) {
-    console.error("[GET /api/debug/bot/:botId] Error:", err.message);
-    res.status(500).json({
-      error: "Server error",
-      message: err.message,
-    });
-  }
-});
-
-// --------- API ENDPOINTS TEMPLATE --------- //
-// Replace URLs and keys with your actual API info
-
-// 1️⃣ Groq Chat API
-app.post("/groq/chat", async (req, res) => {
-  try {
-    const { message } = req.body;
-    if (!message) return res.status(400).json({ error: "Message is required" });
-
-    // Example API call
-    // Replace with your actual API request
-    const response = await axios.post(
-      "https://api.groq.ai/v1/chat",
-      { message },
-      { headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}` } }
-    );
-    res.json(response.data);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Groq Chat API failed" });
-  }
-});
-
-// 2️⃣ OpenRouter Search API
-app.get("/openrouter/search", async (req, res) => {
-  try {
-    const { q } = req.query;
-    if (!q) return res.status(400).json({ error: "Query is required" });
-
-    const response = await axios.get(
-      `https://api.openrouter.ai/v1/search?q=${encodeURIComponent(q)}`,
-      { headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}` } }
-    );
-
-    res.json(response.data);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Search API failed" });
-  }
-});
-
-// 3️⃣ Deepseek API
-app.post("/deepseek/generate", async (req, res) => {
-  try {
-    const { prompt } = req.body;
-    if (!prompt) return res.status(400).json({ error: "Prompt is required" });
-
-    const response = await axios.post(
-      "https://api.deepseek.ai/v1/generate",
-      { prompt },
-      { headers: { Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}` } }
-    );
-
-    res.json(response.data);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Generate API failed" });
-  }
-});
-
-// 4️⃣ tavily API
-app.post("/tavily/search", async (req, res) => {
-  try {
-    const { query } = req.body;
-    if (!query) return res.status(400).json({ error: "Query is required" });
-
-    const response = await axios.post(
-      "https://api.tavily.com/v1/search",
-      { query },
-      { headers: { Authorization: `Bearer ${process.env.tavily}` } }
-    );
-
-    res.json(response.data);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Payment API failed" });
-  }
-});
-// Removed unused placeholder endpoints (/api5 - /api10).
-// Add new route implementations here as real integrations are available.
-
-// Basic error handling
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).send("Something broke!");
-});
-
-app.listen(port, () => {
-  console.log(`Backend server listening at http://localhost:${port}`);
-});
-*/
-// Global error handler middleware - MUST be last, after all routes
 app.use((err, req, res, next) => {
   console.error("[Global Error Handler]", {
     message: err.message,
