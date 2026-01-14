@@ -166,7 +166,7 @@ class _AiScreenState extends State<AiScreen> {
                       TypingIndicator(),
                       SizedBox(width: AppTheme.spaceSm),
                       Text(
-                        'Generating response...', // Text for user interaction
+                        'Generating response...',
                         style: AppTheme.bodyMedium.copyWith(
                           color: AppTheme.textSecondary,
                         ),
@@ -264,23 +264,37 @@ class _AiScreenState extends State<AiScreen> {
   Widget _buildMessageBubble(_Message message) {
     final isUser = message.fromUser;
 
+    // For AI messages, use full-width layout like ChatGPT
+    if (!isUser) {
+      return Padding(
+        padding: EdgeInsets.only(bottom: AppTheme.spaceLg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // AI message content - full width, no bubble
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: AppTheme.spaceSm),
+              child: _buildMessageContent(message.text, isUser),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // User messages keep the bubble style
     return Padding(
       padding: EdgeInsets.only(bottom: AppTheme.spaceMd),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: isUser
-            ? MainAxisAlignment.end
-            : MainAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          if (!isUser) SizedBox(width: AppTheme.spaceSm),
           Flexible(
             child: Container(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.85,
+              ),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: isUser
-                      ? AppTheme.accentGradient
-                      : AppTheme.surfaceGradient,
-                ),
+                gradient: LinearGradient(colors: AppTheme.accentGradient),
                 borderRadius: BorderRadius.circular(AppTheme.radiusLg),
                 boxShadow: [
                   BoxShadow(
@@ -291,10 +305,17 @@ class _AiScreenState extends State<AiScreen> {
                 ],
               ),
               padding: EdgeInsets.all(AppTheme.spaceMd),
-              child: _buildMessageContent(message.text, isUser),
+              child: Text(
+                message.text,
+                style: AppTheme.bodyLarge.copyWith(
+                  color: Colors.white,
+                  height: 1.6,
+                ),
+                softWrap: true,
+              ),
             ),
           ),
-          if (isUser) SizedBox(width: AppTheme.spaceSm),
+          SizedBox(width: AppTheme.spaceSm),
         ],
       ),
     );
@@ -304,70 +325,145 @@ class _AiScreenState extends State<AiScreen> {
     if (isUser) {
       return Text(
         text,
-        style: AppTheme.bodyLarge.copyWith(color: Colors.white, height: 1.5),
+        style: AppTheme.bodyLarge.copyWith(color: Colors.white, height: 1.6),
         softWrap: true,
       );
     }
 
+    // AI responses use Markdown rendering with ChatGPT-like styling
     return MarkdownBody(
       data: text,
       selectable: true,
+      softLineBreak: true,
       styleSheet: MarkdownStyleSheet(
-        h1: AppTheme.headlineSmall.copyWith(
+        // Large, bold headings like ChatGPT
+        h1: TextStyle(
+          fontSize: 26,
+          fontWeight: FontWeight.w700,
           color: AppTheme.textPrimary,
-          fontWeight: FontWeight.bold,
-          height: 1.6,
+          height: 1.4,
+          letterSpacing: -0.3,
         ),
-        h2: AppTheme.headlineMedium.copyWith(
-          color: AppTheme.textPrimary,
-          fontWeight: FontWeight.bold,
-          height: 1.5,
+        h1Padding: EdgeInsets.only(
+          top: AppTheme.spaceLg,
+          bottom: AppTheme.spaceMd,
         ),
-        h3: AppTheme.bodyLarge.copyWith(
+        h2: TextStyle(
+          fontSize: 22,
+          fontWeight: FontWeight.w700,
           color: AppTheme.textPrimary,
+          height: 1.4,
+          letterSpacing: -0.2,
+        ),
+        h2Padding: EdgeInsets.only(
+          top: AppTheme.spaceMd,
+          bottom: AppTheme.spaceSm,
+        ),
+        h3: TextStyle(
+          fontSize: 18,
           fontWeight: FontWeight.w600,
+          color: AppTheme.textPrimary,
           height: 1.4,
         ),
-        p: AppTheme.bodyLarge.copyWith(
-          color: AppTheme.textPrimary,
-          height: 1.6,
+        h3Padding: EdgeInsets.only(
+          top: AppTheme.spaceMd,
+          bottom: AppTheme.spaceSm,
         ),
-        em: AppTheme.bodyLarge.copyWith(
+        // Body text - good size and line height
+        p: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w400,
+          color: AppTheme.textPrimary,
+          height: 1.7,
+          letterSpacing: 0.1,
+        ),
+        pPadding: EdgeInsets.only(bottom: AppTheme.spaceMd),
+        // Emphasis styles
+        em: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w400,
           color: AppTheme.textPrimary,
           fontStyle: FontStyle.italic,
-          height: 1.6,
+          height: 1.7,
         ),
-        strong: AppTheme.bodyLarge.copyWith(
+        strong: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
           color: AppTheme.textPrimary,
-          fontWeight: FontWeight.bold,
-          height: 1.6,
+          height: 1.7,
         ),
-        code: AppTheme.bodyMedium.copyWith(
-          color: AppTheme.textSecondary,
-          backgroundColor: AppTheme.surfaceCard.withValues(alpha: 0.5),
+        // Code styling
+        code: TextStyle(
+          fontSize: 14,
+          color: Color(0xFFE06C75),
+          backgroundColor: Color(0xFF2D333B),
           fontFamily: 'monospace',
+          letterSpacing: 0,
         ),
-        blockquote: AppTheme.bodyLarge.copyWith(
+        codeblockDecoration: BoxDecoration(
+          color: Color(0xFF1E2228),
+          borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+          border: Border.all(color: AppTheme.surfaceElevated, width: 1),
+        ),
+        codeblockPadding: EdgeInsets.all(AppTheme.spaceMd),
+        // Blockquote styling
+        blockquote: TextStyle(
+          fontSize: 16,
           color: AppTheme.textSecondary,
-          height: 1.6,
+          height: 1.7,
           fontStyle: FontStyle.italic,
         ),
         blockquoteDecoration: BoxDecoration(
           border: Border(
-            left: BorderSide(color: AppTheme.primaryBlue, width: 3),
+            left: BorderSide(color: AppTheme.primaryBlue, width: 4),
           ),
         ),
-        listBullet: AppTheme.bodyLarge.copyWith(
-          color: AppTheme.textPrimary,
-          height: 1.6,
+        blockquotePadding: EdgeInsets.only(
+          left: AppTheme.spaceMd,
+          top: AppTheme.spaceSm,
+          bottom: AppTheme.spaceSm,
         ),
+        // List styling - good spacing between items
+        listBullet: TextStyle(
+          fontSize: 16,
+          color: AppTheme.textPrimary,
+          height: 1.7,
+        ),
+        listBulletPadding: EdgeInsets.only(right: AppTheme.spaceSm),
+        listIndent: AppTheme.spaceMd,
+        // Unordered list item spacing
+        unorderedListAlign: WrapAlignment.start,
+        // Ordered list item spacing
+        orderedListAlign: WrapAlignment.start,
+        // Horizontal rule
         horizontalRuleDecoration: BoxDecoration(
           border: Border(
             top: BorderSide(
-              color: AppTheme.surfaceElevated.withValues(alpha: 0.3),
+              color: AppTheme.surfaceElevated.withValues(alpha: 0.5),
               width: 1,
             ),
           ),
+        ),
+        // Table styling
+        tableHead: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          color: AppTheme.textPrimary,
+        ),
+        tableBody: TextStyle(
+          fontSize: 15,
+          color: AppTheme.textPrimary,
+          height: 1.5,
+        ),
+        tableBorder: TableBorder.all(color: AppTheme.surfaceElevated, width: 1),
+        tableCellsPadding: EdgeInsets.all(AppTheme.spaceSm),
+        // Link styling
+        a: TextStyle(
+          fontSize: 16,
+          color: AppTheme.primaryBlue,
+          decoration: TextDecoration.underline,
+          decorationColor: AppTheme.primaryBlue,
+          height: 1.7,
         ),
       ),
     );

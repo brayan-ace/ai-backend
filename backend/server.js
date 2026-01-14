@@ -113,6 +113,171 @@ function structureTextResponse(text) {
   };
 }
 
+// ============= MISSING UTILITY FUNCTIONS =============
+
+/**
+ * Detect user constraints from message text and instructions object.
+ * Returns an object with detected constraints like lines, sentences, short, formats, emojiDirective, userOverride.
+ */
+function detectUserConstraints(message, instructions = {}) {
+  const result = {
+    lines: null,
+    sentences: null,
+    short: false,
+    formats: [],
+    emojiDirective: null,
+    userOverride: false,
+  };
+
+  if (!message) return result;
+
+  const lower = message.toLowerCase();
+
+  // Detect line count constraints
+  const linesMatch = lower.match(/in\s*(\d+)\s*lines?|^(\d+)\s*lines?/);
+  if (linesMatch) {
+    result.lines = parseInt(linesMatch[1] || linesMatch[2], 10);
+    result.userOverride = true;
+  }
+
+  // Detect sentence count constraints
+  const sentencesMatch = lower.match(
+    /in\s*(\d+)\s*sentences?|^(\d+)\s*sentences?/
+  );
+  if (sentencesMatch) {
+    result.sentences = parseInt(sentencesMatch[1] || sentencesMatch[2], 10);
+    result.userOverride = true;
+  }
+
+  // Detect short/brief/simple requests
+  if (
+    lower.includes("short") ||
+    lower.includes("brief") ||
+    lower.includes("simple")
+  ) {
+    result.short = true;
+    result.userOverride = true;
+  }
+
+  // Detect format requests
+  if (lower.includes("bullet") || lower.includes("list")) {
+    result.formats.push("bullets");
+  }
+  if (lower.includes("paragraph")) {
+    result.formats.push("paragraphs");
+  }
+  if (lower.includes("table")) {
+    result.formats.push("table");
+  }
+
+  // Detect emoji directives
+  if (lower.includes("no emoji") || lower.includes("without emoji")) {
+    result.emojiDirective = "no";
+    result.userOverride = true;
+  } else if (lower.includes("minimal emoji") || lower.includes("few emoji")) {
+    result.emojiDirective = "minimal";
+    result.userOverride = true;
+  }
+
+  // Check instructions object for additional constraints
+  if (instructions) {
+    if (instructions.lines) {
+      result.lines = instructions.lines;
+      result.userOverride = true;
+    }
+    if (instructions.sentences) {
+      result.sentences = instructions.sentences;
+      result.userOverride = true;
+    }
+    if (instructions.short) {
+      result.short = true;
+      result.userOverride = true;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Sanitize text by removing unwanted characters and formatting issues.
+ */
+function sanitizeText(text) {
+  if (!text) return "";
+
+  let sanitized = text;
+
+  // Remove explicit numeric placeholders like {0}, {1} and printf-style %s/%d
+  sanitized = sanitized.replace(/\{\s*\d+\s*\}|%[sdif]\b/g, "");
+
+  // Remove HTML tags
+  sanitized = sanitized.replace(/<[^>]*>/g, "");
+
+  // Clean up multiple spaces
+  sanitized = sanitized.replace(/\s{2,}/g, " ");
+
+  // Clean up multiple newlines (keep max 2)
+  sanitized = sanitized.replace(/\n{3,}/g, "\n\n");
+
+  return sanitized.trim();
+}
+
+/**
+ * Enforce a maximum line count on text.
+ */
+function enforceLineCount(text, maxLines) {
+  if (!text || !maxLines || maxLines <= 0) return text;
+
+  const lines = text.split(/\r?\n/).filter(Boolean);
+  if (lines.length <= maxLines) return text;
+
+  return lines.slice(0, maxLines).join("\n");
+}
+
+/**
+ * Validate response quality - check for common issues.
+ */
+function validateResponseQuality(text) {
+  if (!text) return { valid: false, reason: "Empty response" };
+
+  // Check for placeholder patterns
+  if (/\{\s*\d+\s*\}|%[sdif]\b/.test(text)) {
+    return { valid: false, reason: "Contains placeholders" };
+  }
+
+  // Check for very short responses (might indicate an error)
+  if (text.length < 10) {
+    return { valid: false, reason: "Response too short" };
+  }
+
+  // Check for error patterns
+  if (
+    text.toLowerCase().includes("error:") ||
+    text.toLowerCase().includes("exception:")
+  ) {
+    return { valid: false, reason: "Contains error message" };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Reformat leading numbered definition style responses.
+ * Converts patterns like "1. Definition: ..." to cleaner format.
+ */
+function reformatLeadingNumberedDefinition(text) {
+  if (!text) return text;
+
+  // Check if text starts with a numbered definition pattern
+  const definitionPattern =
+    /^(\d+)\.\s*(Definition|Answer|Explanation|Summary):\s*/i;
+  if (definitionPattern.test(text)) {
+    // Remove the leading number and label, keep the content
+    text = text.replace(definitionPattern, "**$2:** ");
+  }
+
+  return text;
+}
+
 // ============= TAVILY WEB SEARCH =============
 
 async function searchTopicOnline(topic, gradeLevel) {
@@ -790,7 +955,7 @@ app.post("/api/ask", async (req, res) => {
       case "chat":
         console.log("[Chat Case] Processing chat request:", data);
         const userMessage = data.message || "Hello, how can I help you?";
-        const responseMode = data.mode || "normal"; // Default to NORMAL mode
+        const responseMode = data.mode || "normal"; // Changed default from undefined to "normal"
 
         if (!userMessage) {
           return res.status(400).json({
@@ -880,17 +1045,18 @@ ABSOLUTE PRIORITY:
 
           const NORMAL_MODE_PROMPT = `MODE: NORMAL RESPONSE
 
-Default behavior (UNRESTRICTED):
-- Answer naturally and intelligently
-- Use as many paragraphs as needed for clarity
-- Explain thoroughly but avoid unnecessary verbosity
-- Respond conversationally and human-like
+Default behavior (UNRESTRICTED & NATURAL):
+- Answer naturally and intelligently without artificial constraints
+- Use as many paragraphs as needed for clarity and completeness
+- Explain thoroughly while maintaining conversational tone
+- Respond intelligently and human-like
 - Prioritize correctness and clarity over brevity
+- Be flexible in depth and detail based on topic complexity
 
 Formatting rules:
 - Begin with a one-line **bold heading** summarizing the answer
 - Use **bold** for key terms and important concepts
-- Use at most ONE emoji from whitelist (🙂 ✅ 🔬 📚 ✨ 🚀), only if it adds clarity
+- Use many emoji from whitelist (🙂 ✅ 🔬 📚 ✨ 🚀), only if it adds clarity
 - Clean spacing between paragraphs
 - NO numeric placeholders, HTML tags, or decoration
 
@@ -917,165 +1083,10 @@ Override rule:
 If the user specifies length, format, or style, follow the user exactly and ignore these defaults.`;
 
           // Detect user constraints (length, format, style, emoji directives)
-          function detectUserConstraints(text, structuredInstructions) {
-            const out = {
-              has: false,
-              lines: null,
-              sentences: false,
-              short: false,
-              formats: [],
-              emojiDirective: null,
-              userOverride: false,
-            };
-
-            if (
-              structuredInstructions &&
-              typeof structuredInstructions === "object"
-            ) {
-              if (
-                structuredInstructions.lines ||
-                structuredInstructions.sentences
-              ) {
-                out.has = true;
-                out.lines = structuredInstructions.lines || null;
-                out.sentences = !!structuredInstructions.sentences;
-              }
-              if (
-                structuredInstructions.short === true ||
-                structuredInstructions.brief === true
-              ) {
-                out.has = true;
-                out.short = true;
-              }
-              if (structuredInstructions.emojis === false) {
-                out.emojiDirective = "no";
-                out.has = true;
-              }
-            }
-
-            if (!text) return out;
-
-            // Length constraints
-            const numMatch = text.match(
-              /\b(?:in\s*(\d+)\s*(?:lines?|line|sentences?|sentence)\b|(?:^|\s)(\d+)\s*(?:lines?|line|sentences?|sentence)\b)/i
-            );
-            const hasKeyword =
-              /\bshort\b|\bsimple\b|\bbrief\b|\bsentence\b|\bconcise\b|\bshorter\b/i.test(
-                text
-              );
-            const lines = numMatch
-              ? parseInt(numMatch[1] || numMatch[2], 10)
-              : null;
-            const isSentenceReq = /\b(sentences?|sentence)\b/i.test(text);
-            if (numMatch || hasKeyword) {
-              out.has = true;
-              out.lines = lines;
-              out.sentences = isSentenceReq;
-              out.short = out.short || hasKeyword;
-            }
-
-            // Format/style directives
-            const formats = [];
-            if (/\bbold\b|\bmake bold\b|\b\*\*\b/.test(text))
-              formats.push("bold");
-            if (/\bbullet|bullets|list\b/i.test(text)) formats.push("bullets");
-            if (/\btable\b/i.test(text)) formats.push("table");
-            if (/\bdefinition\b/i.test(text)) formats.push("definition");
-            if (formats.length) {
-              out.has = true;
-              out.formats = formats;
-            }
-
-            // Emoji directives
-            if (
-              /\bno\s+emojis\b|\bwithout\s+emojis\b|\bno\s+emoji\b/i.test(text)
-            ) {
-              out.emojiDirective = "no";
-              out.has = true;
-            } else if (
-              /\buse\s+emojis\b|\bwith\s+emojis\b|\binclude\s+emoji/i.test(text)
-            ) {
-              out.emojiDirective = "use";
-              out.has = true;
-            } else if (
-              /\bminimal\s+emojis\b|\bminimal\s+emoji\b|\bfew\s+emojis\b/i.test(
-                text
-              )
-            ) {
-              out.emojiDirective = "minimal";
-              out.has = true;
-            }
-
-            if (
-              out.lines ||
-              out.short ||
-              out.formats.length ||
-              out.emojiDirective
-            ) {
-              out.userOverride = true;
-            }
-
-            return out;
-          }
-
-          function sanitizeText(s) {
-            if (!s) return s;
-            let out = s.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n");
-            out = out.replace(/[ \t]+$/gm, "").trim();
-            out = out.replace(/ {2,}/g, " ");
-            out = out.replace(/\{\d+\}|\{%[sdif]\}|%[sdif]|{{.*?}}/g, "");
-            return out;
-          }
-
-          function validateResponseQuality(text) {
-            if (!text || text.trim().length === 0) {
-              return { valid: false, reason: "Empty response" };
-            }
-
-            const criticalPlaceholderRegex = /\{\s*\d+\s*\}|%[sdif]\b/;
-            if (criticalPlaceholderRegex.test(text)) {
-              return {
-                valid: false,
-                reason: "Contains unresolved template placeholders",
-              };
-            }
-
-            return { valid: true };
-          }
-
-          function enforceLineCount(text, n) {
-            if (!n || n <= 0) return text;
-            const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
-            if (sentences.length >= n) {
-              return sentences
-                .slice(0, n)
-                .map((s) => s.trim())
-                .join("\n");
-            }
-            const words = text.split(/\s+/).filter(Boolean);
-            if (words.length === 0) return text;
-            const perLine = Math.ceil(words.length / n);
-            const lines = [];
-            for (let i = 0; i < n; i++) {
-              lines.push(
-                words
-                  .slice(i * perLine, (i + 1) * perLine)
-                  .join(" ")
-                  .trim()
-              );
-            }
-            return lines.join("\n");
-          }
-
-          function reformatLeadingNumberedDefinition(text) {
-            const singleLine = text.trim().split("\n").slice(0, 3).join(" ");
-            const match = singleLine.match(/^\s*(?:1[.)]|\d+[.)])\s*(.+)$/);
-            if (match && match[1]) {
-              const cleaned = text.replace(/^\s*\d+[.)]\s*/gm, "").trim();
-              return cleaned;
-            }
-            return text;
-          }
+          const constraintInfo = detectUserConstraints(
+            userMessage,
+            data.instructions || {}
+          );
 
           // Build messages in required order:
           // 1) System Identity & Rules
@@ -1188,7 +1199,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
             const modePrompt =
               responseMode === "detailed"
                 ? DETAILED_MODE_PROMPT
-                : NORMAL_MODE_PROMPT;
+                : NORMAL_MODE_PROMPT; // Changed to use NORMAL_MODE_PROMPT instead of checking for 'straight' or 'concise'
             messages.push({ role: "system", content: modePrompt });
           }
 
@@ -1561,7 +1572,6 @@ If the user specifies length, format, or style, follow the user exactly and igno
           }
 
           const structured = structureTextResponse(finalText);
-          // FORMATTING: Apply readability improvements
           const formattedText = formatResponseForReadability(finalText);
 
           return res.json({
