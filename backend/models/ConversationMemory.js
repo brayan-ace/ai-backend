@@ -39,26 +39,31 @@ class ConversationMemory {
 
   // Get relevant context for a new message
   async getRelevantContext(newMessage) {
-    // Check if this is a follow-up or reference
-    const followUpPatterns = [
-      "what's the answer",
-      "explain it again",
-      "why",
-      "continue",
-      "i don't get",
-      "go on",
-    ];
-
-    const isFollowUp = followUpPatterns.some((pattern) =>
-      newMessage.toLowerCase().includes(pattern)
-    );
-
-    if (isFollowUp && this.shortTermMemory.length > 0) {
-      // Return the most recent interaction
-      return this.shortTermMemory[this.shortTermMemory.length - 1];
+    // Always load the last 10 interactions as reference for context awareness
+    if (this.shortTermMemory.length > 0) {
+      // Return all recent interactions for comprehensive context
+      return this.shortTermMemory;
     }
 
     return null;
+  }
+
+  // Get a summary of recent context for prompt injection
+  getContextSummary() {
+    if (this.shortTermMemory.length === 0) {
+      return null;
+    }
+
+    // Create a summary of the last 10 interactions
+    const summary = this.shortTermMemory
+      .map((interaction, index) => {
+        return `Interaction ${index + 1}: User: "${
+          interaction.user_message
+        }" | AI: "${interaction.ai_response}"`;
+      })
+      .join("\n");
+
+    return summary;
   }
 
   // Load conversation memory from database
