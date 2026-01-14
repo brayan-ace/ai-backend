@@ -188,6 +188,7 @@ class _BotProcessingScreenState extends State<BotProcessingScreen> {
           'Preparing your Study Bot',
           style: AppTheme.headlineSmall.copyWith(color: AppTheme.textPrimary),
         ),
+        centerTitle: true,
       ),
       body: SafeArea(
         child: Center(
@@ -197,26 +198,189 @@ class _BotProcessingScreenState extends State<BotProcessingScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (!_isError) ...[
-                  CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation(AppTheme.primaryBlue),
-                  ),
-                  SizedBox(height: AppTheme.spaceLg),
-                  Text(
-                    _statusMessage,
-                    style: AppTheme.headlineMedium.copyWith(
-                      color: AppTheme.textPrimary,
+                  // Animated progress indicator with gradient
+                  Container(
+                    width: 120,
+                    height: 120,
+                    padding: EdgeInsets.all(AppTheme.spaceMd),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppTheme.primaryBlue.withOpacity(0.1),
+                          AppTheme.primaryBlue.withOpacity(0.05),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+                    ),
+                    child: Stack(
+                      children: [
+                        // Circular progress with animated gradient
+                        CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation(
+                            AppTheme.primaryBlue,
+                          ),
+                          strokeWidth: 4,
+                        ),
+                        // Center icon
+                        Center(
+                          child: Container(
+                            width: 60,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: AppTheme.accentGradient,
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            child: Icon(
+                              Icons.school_outlined,
+                              color: Colors.white,
+                              size: 30,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
+                  SizedBox(height: AppTheme.spaceXl),
+                  // Progress steps indicator
+                  Column(
+                    children: [
+                      for (int i = 0; i < _steps.length; i++)
+                        Padding(
+                          padding: EdgeInsets.only(bottom: AppTheme.spaceSm),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 24,
+                                height: 24,
+                                margin: EdgeInsets.only(
+                                  right: AppTheme.spaceMd,
+                                ),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: i <= _currentStep
+                                      ? AppTheme.primaryBlue
+                                      : AppTheme.surfaceElevated,
+                                  border: Border.all(
+                                    color: i <= _currentStep
+                                        ? AppTheme.primaryBlue
+                                        : AppTheme.surfaceElevated,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: i <= _currentStep
+                                      ? Icon(
+                                          Icons.check,
+                                          size: 14,
+                                          color: Colors.white,
+                                        )
+                                      : Text(
+                                          '${i + 1}',
+                                          style: TextStyle(
+                                            color: AppTheme.textSecondary,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  _steps[i],
+                                  style: AppTheme.bodyMedium.copyWith(
+                                    color: i == _currentStep
+                                        ? AppTheme.textPrimary
+                                        : AppTheme.textSecondary,
+                                    fontWeight: i == _currentStep
+                                        ? FontWeight.w600
+                                        : FontWeight.normal,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                  SizedBox(height: AppTheme.spaceXl),
+                  // Current status with animation
+                  AnimatedSwitcher(
+                    duration: Duration(milliseconds: 300),
+                    child: Text(
+                      _statusMessage,
+                      key: ValueKey<String>(_statusMessage),
+                      textAlign: TextAlign.center,
+                      style: AppTheme.headlineMedium.copyWith(
+                        color: AppTheme.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: AppTheme.spaceLg),
+                  // Loading animation dots
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(3, (index) {
+                      return Container(
+                        width: 8,
+                        height: 8,
+                        margin: EdgeInsets.symmetric(horizontal: 4),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppTheme.primaryBlue,
+                        ),
+                      );
+                    }),
+                  ),
                 ] else ...[
-                  Icon(Icons.error_outline, color: Colors.red, size: 56),
+                  // Error state with better styling
+                  Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.red.withOpacity(0.1),
+                          Colors.red.withOpacity(0.05),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        Icons.error_outline,
+                        color: Colors.redAccent,
+                        size: 56,
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: AppTheme.spaceXl),
+                  Text(
+                    'Oops! Something went wrong',
+                    style: AppTheme.headlineMedium.copyWith(
+                      color: AppTheme.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
                   SizedBox(height: AppTheme.spaceMd),
                   Text(
                     _errorMessage,
                     style: AppTheme.bodyMedium.copyWith(
-                      color: AppTheme.textPrimary,
+                      color: AppTheme.textSecondary,
+                      height: 1.6,
                     ),
+                    textAlign: TextAlign.center,
                   ),
-                  SizedBox(height: AppTheme.spaceMd),
+                  SizedBox(height: AppTheme.spaceXl),
                   ElevatedButton(
                     onPressed: () {
                       setState(() {
@@ -227,7 +391,29 @@ class _BotProcessingScreenState extends State<BotProcessingScreen> {
                       });
                       _startProcessing();
                     },
-                    child: Text('Retry'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryBlue,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: AppTheme.spaceXl,
+                        vertical: AppTheme.spaceMd,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.refresh, color: Colors.white, size: 20),
+                        SizedBox(width: AppTheme.spaceSm),
+                        Text(
+                          'Retry',
+                          style: AppTheme.labelMedium.copyWith(
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ],

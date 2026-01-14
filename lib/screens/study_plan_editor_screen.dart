@@ -119,29 +119,105 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
           style: AppTheme.headlineSmall.copyWith(color: AppTheme.textPrimary),
         ),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.info_outline, color: AppTheme.textSecondary),
+            onPressed: () {
+              // Show info about editing
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Edit your study plan modules and objectives'),
+                  backgroundColor: AppTheme.primaryBlue,
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(AppTheme.spaceMd),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Plan title
-            Text(
-              planTitle,
-              style: AppTheme.headlineMedium.copyWith(
-                color: AppTheme.textPrimary,
-                fontWeight: FontWeight.bold,
+            // Enhanced header with gradient background
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(AppTheme.spaceXl),
+              margin: EdgeInsets.only(bottom: AppTheme.spaceLg),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppTheme.primaryBlue.withOpacity(0.1),
+                    AppTheme.primaryBlue.withOpacity(0.05),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                border: Border.all(
+                  color: AppTheme.primaryBlue.withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '📚 Study Plan Editor',
+                    style: AppTheme.headlineMedium.copyWith(
+                      color: AppTheme.textPrimary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  SizedBox(height: AppTheme.spaceSm),
+                  Text(
+                    planTitle,
+                    style: AppTheme.headlineSmall.copyWith(
+                      color: AppTheme.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  SizedBox(height: AppTheme.spaceMd),
+                  Text(
+                    'Customize your learning journey by editing modules and objectives below.',
+                    style: AppTheme.bodyMedium.copyWith(
+                      color: AppTheme.textSecondary,
+                      height: 1.6,
+                    ),
+                  ),
+                ],
               ),
             ),
-            SizedBox(height: AppTheme.spaceMd),
 
-            // Modules
+            // Modules with enhanced styling
             if (modules.isEmpty)
               Center(
-                child: Text(
-                  'No modules in this plan',
-                  style: AppTheme.bodyMedium.copyWith(
-                    color: AppTheme.textSecondary,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: AppTheme.spaceXl),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.library_books_outlined,
+                        size: 60,
+                        color: AppTheme.textTertiary,
+                      ),
+                      SizedBox(height: AppTheme.spaceMd),
+                      Text(
+                        'No modules in this plan',
+                        style: AppTheme.bodyLarge.copyWith(
+                          color: AppTheme.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      SizedBox(height: AppTheme.spaceSm),
+                      Text(
+                        'Add modules to start building your study plan',
+                        style: AppTheme.bodySmall.copyWith(
+                          color: AppTheme.textTertiary,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ),
                 ),
               )
@@ -160,61 +236,105 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
                     color: AppTheme.surfaceCard,
                     margin: EdgeInsets.only(bottom: AppTheme.spaceMd),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusLg),
                       side: BorderSide.none,
                     ),
+                    elevation: 2,
                     child: Column(
                       children: [
-                        // Module header
-                        ListTile(
-                          title: Text(
-                            '📚 $moduleTitle',
-                            style: AppTheme.bodyMedium.copyWith(
-                              color: AppTheme.textPrimary,
-                              fontWeight: FontWeight.bold,
+                        // Enhanced module header with gradient
+                        Container(
+                          width: double.infinity,
+                          padding: EdgeInsets.all(AppTheme.spaceMd),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                AppTheme.primaryBlue.withOpacity(0.08),
+                                AppTheme.primaryBlue.withOpacity(0.04),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.vertical(
+                              top: Radius.circular(AppTheme.radiusLg),
                             ),
                           ),
-                          trailing: PopupMenuButton(
-                            onSelected: (value) {
-                              if (value == 'edit') {
-                                _showEditModuleDialog(moduleIndex);
-                              } else if (value == 'delete') {
-                                _deleteModule(moduleIndex);
-                              }
-                            },
-                            itemBuilder: (context) => [
-                              const PopupMenuItem(
-                                value: 'edit',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.edit, size: 18),
-                                    SizedBox(width: 8),
-                                    Text('Rename'),
-                                  ],
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                margin: EdgeInsets.only(
+                                  right: AppTheme.spaceMd,
+                                ),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: AppTheme.accentGradient,
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Center(
+                                  child: Icon(
+                                    Icons.menu_book_outlined,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
                                 ),
                               ),
-                              const PopupMenuItem(
-                                value: 'delete',
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.delete,
-                                      size: 18,
-                                      color: Colors.red,
-                                    ),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Delete',
-                                      style: TextStyle(color: Colors.red),
-                                    ),
-                                  ],
+                              Expanded(
+                                child: Text(
+                                  moduleTitle,
+                                  style: AppTheme.bodyLarge.copyWith(
+                                    color: AppTheme.textPrimary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
+                              ),
+                              PopupMenuButton(
+                                onSelected: (value) {
+                                  if (value == 'edit') {
+                                    _showEditModuleDialog(moduleIndex);
+                                  } else if (value == 'delete') {
+                                    _deleteModule(moduleIndex);
+                                  }
+                                },
+                                itemBuilder: (context) => [
+                                  const PopupMenuItem(
+                                    value: 'edit',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.edit, size: 18),
+                                        SizedBox(width: 8),
+                                        Text('Rename'),
+                                      ],
+                                    ),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: 'delete',
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.delete,
+                                          size: 18,
+                                          color: Colors.red,
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Delete',
+                                          style: TextStyle(color: Colors.red),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
                         ),
 
-                        // Subtopics/Objectives
+                        // Enhanced objectives section
                         if (objectives.isNotEmpty)
                           Padding(
                             padding: EdgeInsets.symmetric(
@@ -224,58 +344,109 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  '📝 Learning Objectives:',
-                                  style: AppTheme.bodySmall.copyWith(
-                                    color: AppTheme.textSecondary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.check_circle_outline,
+                                      size: 18,
+                                      color: AppTheme.primaryBlue,
+                                    ),
+                                    SizedBox(width: AppTheme.spaceSm),
+                                    Text(
+                                      'Learning Objectives',
+                                      style: AppTheme.bodyMedium.copyWith(
+                                        color: AppTheme.textPrimary,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                SizedBox(height: AppTheme.spaceSm),
-                                ListView.builder(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  itemCount: objectives.length,
-                                  itemBuilder: (context, objectiveIndex) {
-                                    final objective =
-                                        objectives[objectiveIndex];
-                                    return Padding(
-                                      padding: EdgeInsets.only(
-                                        bottom: AppTheme.spaceSm,
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Expanded(
-                                            child: Text(
-                                              '• $objective',
-                                              style: AppTheme.bodySmall
-                                                  .copyWith(
-                                                    color: AppTheme.textPrimary,
-                                                  ),
+                                SizedBox(height: AppTheme.spaceMd),
+                                Container(
+                                  width: double.infinity,
+                                  padding: EdgeInsets.all(AppTheme.spaceSm),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.surfaceElevated,
+                                    borderRadius: BorderRadius.circular(
+                                      AppTheme.radiusMd,
+                                    ),
+                                    border: Border.all(
+                                      color: AppTheme.surfaceElevated,
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: ListView.builder(
+                                    shrinkWrap: true,
+                                    physics:
+                                        const NeverScrollableScrollPhysics(),
+                                    itemCount: objectives.length,
+                                    itemBuilder: (context, objectiveIndex) {
+                                      final objective =
+                                          objectives[objectiveIndex];
+                                      return Padding(
+                                        padding: EdgeInsets.only(
+                                          bottom: AppTheme.spaceSm,
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              width: 20,
+                                              height: 20,
+                                              margin: EdgeInsets.only(
+                                                right: AppTheme.spaceMd,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                color: AppTheme.primaryBlue
+                                                    .withOpacity(0.1),
+                                                border: Border.all(
+                                                  color: AppTheme.primaryBlue
+                                                      .withOpacity(0.3),
+                                                  width: 1,
+                                                ),
+                                              ),
+                                              child: Center(
+                                                child: Icon(
+                                                  Icons.circle,
+                                                  size: 8,
+                                                  color: AppTheme.primaryBlue,
+                                                ),
+                                              ),
                                             ),
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(
-                                              Icons.close,
-                                              size: 18,
-                                              color: Colors.red,
+                                            Expanded(
+                                              child: Text(
+                                                objective,
+                                                style: AppTheme.bodyMedium
+                                                    .copyWith(
+                                                      color:
+                                                          AppTheme.textPrimary,
+                                                      height: 1.5,
+                                                    ),
+                                              ),
                                             ),
-                                            onPressed: () {
-                                              _deleteSubtopic(
-                                                moduleIndex,
-                                                objectiveIndex,
-                                              );
-                                            },
-                                            constraints: const BoxConstraints(
-                                              minHeight: 30,
-                                              minWidth: 30,
+                                            IconButton(
+                                              icon: Icon(
+                                                Icons.close,
+                                                size: 18,
+                                                color: Colors.redAccent,
+                                              ),
+                                              onPressed: () {
+                                                _deleteSubtopic(
+                                                  moduleIndex,
+                                                  objectiveIndex,
+                                                );
+                                              },
+                                              constraints: const BoxConstraints(
+                                                minHeight: 30,
+                                                minWidth: 30,
+                                              ),
+                                              padding: EdgeInsets.zero,
                                             ),
-                                            padding: EdgeInsets.zero,
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  ),
                                 ),
                               ],
                             ),
@@ -290,98 +461,158 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
 
             SizedBox(height: AppTheme.spaceLg),
 
-            // Info box
+            // Enhanced info box with better styling
             Container(
               padding: EdgeInsets.all(AppTheme.spaceMd),
               decoration: BoxDecoration(
-                color: AppTheme.primaryBlue.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                gradient: LinearGradient(
+                  colors: [
+                    AppTheme.primaryBlue.withOpacity(0.08),
+                    AppTheme.primaryBlue.withOpacity(0.04),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(AppTheme.radiusLg),
                 border: Border.all(
                   color: AppTheme.primaryBlue.withOpacity(0.3),
+                  width: 1,
                 ),
               ),
-              child: Column(
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '💡 What happens when you save?',
-                    style: AppTheme.bodyMedium.copyWith(
-                      color: AppTheme.textPrimary,
-                      fontWeight: FontWeight.bold,
+                  Container(
+                    width: 40,
+                    height: 40,
+                    margin: EdgeInsets.only(right: AppTheme.spaceMd),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: AppTheme.accentGradient,
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        Icons.info_outline,
+                        color: Colors.white,
+                        size: 20,
+                      ),
                     ),
                   ),
-                  SizedBox(height: AppTheme.spaceSm),
-                  Text(
-                    'Your changes will be saved and the bot will adjust its teaching strategy based on your updated plan. Your progress and chat history will be preserved.',
-                    style: AppTheme.bodySmall.copyWith(
-                      color: AppTheme.textSecondary,
-                      height: 1.6,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '💡 What happens when you save?',
+                          style: AppTheme.bodyLarge.copyWith(
+                            color: AppTheme.textPrimary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        SizedBox(height: AppTheme.spaceSm),
+                        Text(
+                          'Your changes will be saved and the bot will adjust its teaching strategy based on your updated plan. Your progress and chat history will be preserved.',
+                          style: AppTheme.bodyMedium.copyWith(
+                            color: AppTheme.textSecondary,
+                            height: 1.6,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
 
-            SizedBox(height: AppTheme.spaceLg),
+            SizedBox(height: AppTheme.spaceXl),
 
-            // Save and Cancel buttons
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.surfaceCard,
-                      padding: EdgeInsets.symmetric(vertical: AppTheme.spaceMd),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                        side: BorderSide(
-                          color: AppTheme.primaryBlue.withOpacity(0.3),
+            // Enhanced Save and Cancel buttons
+            Container(
+              padding: EdgeInsets.all(AppTheme.spaceMd),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceCard,
+                borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                border: Border.all(color: AppTheme.surfaceElevated, width: 1),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        padding: EdgeInsets.symmetric(
+                          vertical: AppTheme.spaceMd,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppTheme.radiusMd,
+                          ),
+                          side: BorderSide(
+                            color: AppTheme.textTertiary,
+                            width: 1,
+                          ),
+                        ),
+                      ),
+                      child: Text(
+                        'Cancel',
+                        style: AppTheme.labelMedium.copyWith(
+                          color: AppTheme.textPrimary,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
-                    child: Text(
-                      'Cancel',
-                      style: AppTheme.labelMedium.copyWith(
-                        color: AppTheme.textPrimary,
-                      ),
-                    ),
                   ),
-                ),
-                SizedBox(width: AppTheme.spaceMd),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _isSaving ? null : _saveChanges,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryBlue,
-                      disabledBackgroundColor: AppTheme.primaryBlue.withOpacity(
-                        0.5,
-                      ),
-                      padding: EdgeInsets.symmetric(vertical: AppTheme.spaceMd),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                      ),
-                    ),
-                    child: _isSaving
-                        ? SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
-                            ),
-                          )
-                        : Text(
-                            'Save Changes',
-                            style: AppTheme.labelMedium.copyWith(
-                              color: Colors.white,
-                            ),
+                  SizedBox(width: AppTheme.spaceMd),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _isSaving ? null : _saveChanges,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryBlue,
+                        disabledBackgroundColor: AppTheme.primaryBlue
+                            .withOpacity(0.5),
+                        padding: EdgeInsets.symmetric(
+                          vertical: AppTheme.spaceMd,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppTheme.radiusMd,
                           ),
+                        ),
+                      ),
+                      child: _isSaving
+                          ? SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            )
+                          : Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.save, color: Colors.white, size: 18),
+                                SizedBox(width: AppTheme.spaceSm),
+                                Text(
+                                  'Save Changes',
+                                  style: AppTheme.labelMedium.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
 
             SizedBox(height: AppTheme.spaceMd),

@@ -570,6 +570,36 @@ async function ensureTables() {
 
 ensureTables();
 
+// ============= USER STUDY STATE TABLE =============
+
+async function ensureUserStudyStateTable() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_study_state (
+        id SERIAL PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        bot_id TEXT NOT NULL,
+        current_phase VARCHAR(50) NOT NULL DEFAULT 'greeting',
+        active_study_plan JSONB NOT NULL DEFAULT '{"modules": []}'::jsonb,
+        current_module_index INTEGER NOT NULL DEFAULT 0,
+        completed_modules JSONB NOT NULL DEFAULT '[]'::jsonb,
+        last_user_confirmation TEXT,
+        learning_preferences JSONB NOT NULL DEFAULT '{}'::jsonb,
+        response_mode VARCHAR(50) NOT NULL DEFAULT 'normal',
+        comprehension_flags JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, bot_id)
+      );
+    `);
+    console.log("[DB] user_study_state table ensured");
+  } catch (err) {
+    console.error("[DB] Failed to ensure user_study_state table:", err.message);
+  }
+}
+
+ensureUserStudyStateTable();
+
 // ============= ROUTES =============
 
 app.get("/", (req, res) => {
@@ -891,16 +921,17 @@ app.post("/api/generate-quiz", async (req, res) => {
     });
 
     // Save quiz to database for future reference
+    let quizId = 0;
     try {
       const quizResult = await pool.query(
-        `INSERT INTO quiz_data (bot_id, user_id, module_name, quiz_data, created_at) 
+        `INSERT INTO quiz_data (bot_id, user_id, module_name, quiz_data, created_at)
          VALUES ($1, $2, $3, $4, $5)
-         ON CONFLICT (bot_id, user_id, module_name) DO UPDATE 
+         ON CONFLICT (bot_id, user_id, module_name) DO UPDATE
          SET quiz_data = $4, created_at = $5
          RETURNING id`,
         [botId, userId, moduleName, JSON.stringify(quizJson), timestamp]
       );
-      const quizId = quizResult.rows[0]?.id || 0;
+      quizId = quizResult.rows[0]?.id || 0;
       console.log("[generate-quiz] Quiz saved to database with ID:", quizId);
     } catch (dbErr) {
       console.warn("[generate-quiz] Failed to save quiz to DB:", dbErr.message);
@@ -932,6 +963,79 @@ app.post("/api/generate-quiz", async (req, res) => {
     console.error("[POST /api/generate-quiz] Error:", err.message);
     return res.status(500).json({
       error: "Failed to generate quiz",
+      message: err.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+app.post("/api/create-study-bot", async (req, res) => {
+  try {
+    console.log("[POST /api/create-study-bot] Request received");
+    const { user_id, name, description, topic, grade_level } = req.body;
+
+    if (!user_id || !name || !topic || !grade_level) {
+      return res.status(400).json({
+        error: "Invalid request format",
+        message: "user_id, name, topic, and grade_level are required",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Generate a unique bot_id
+    const botId = `bot_${Date.now()}_${Math.random()
+      .toString(36)
+      .substring(2, 8)}`;
+
+    // Generate system instructions
+    const systemInstructions = generateNaturalStudyBotInstructions(
+      name,
+      topic,
+      description || "",
+      grade_level
+    );
+
+    // Save to database
+    await pool.query(
+      `INSERT INTO study_bots (bot_id, user_id, name, description, topic, grade_level, system_instructions)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        botId,
+        user_id,
+        name,
+        description,
+        topic,
+        grade_level,
+        JSON.stringify({ instructions: systemInstructions }),
+      ]
+    );
+
+    // Initialize bot progress
+    await pool.query(
+      `INSERT INTO bot_progress (bot_id, user_id, study_plan, bot_state)
+       VALUES ($1, $2, $3, $4)`,
+      [botId, user_id, JSON.stringify({ modules: [] }), "intro"]
+    );
+
+    console.log("[create-study-bot] Bot created successfully:", botId);
+
+    return res.json({
+      status: "success",
+      bot: {
+        bot_id: botId,
+        user_id: user_id,
+        name: name,
+        description: description,
+        topic: topic,
+        grade_level: grade_level,
+        system_instructions: { instructions: systemInstructions },
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("[POST /api/create-study-bot] Error:", err.message);
+    return res.status(500).json({
+      error: "Failed to create study bot",
       message: err.message,
       timestamp: new Date().toISOString(),
     });
@@ -1103,11 +1207,11 @@ If the user specifies length, format, or style, follow the user exactly and igno
 
           // Formatting & Emoji defaults (second)
           const allowedEmojis = "🙂 ✅ 🔬 📚 ✨ 🚀";
-          let emojiSystem = `Default emoji policy: include at least one emoji from the following set in every response unless the user explicitly requests no emojis. Allowed emojis: ${allowedEmojis}.`;
+          let emojiSystem = `Default emoji policy: include at least one emoji from the following set in every response unless the user explicitly requests no emojis. Allowed emojis: ${allowedEmojis}`;
           if (constraintInfo.emojiDirective === "no") {
             emojiSystem = `User requested no emojis: do NOT include any emoji in your response.`;
           } else if (constraintInfo.emojiDirective === "minimal") {
-            emojiSystem = `User requested minimal emojis: include at most one emoji from the allowed set (${allowedEmojis}).`;
+            emojiSystem = `User requested minimal emojis: include at most one emoji from the allowed set (${allowedEmojis})`;
           }
           messages.push({ role: "system", content: emojiSystem });
 

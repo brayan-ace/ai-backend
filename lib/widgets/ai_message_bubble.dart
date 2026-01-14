@@ -456,9 +456,9 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
   List<InlineSpan> _parseMarkdownContent(String text) {
     final List<InlineSpan> spans = [];
 
-    // Pattern for bullet points, numbered lists, **bold**, *italic*, `code`, headings, URLs
+    // Enhanced pattern for bullet points, numbered lists, **bold**, *italic*, `code`, headings, URLs, and emojis
     final markdownPattern = RegExp(
-      r'\*\*([\s\S]+?)\*\*|\*([\s\S]+?)\*|`([\s\S]+?)`|^#{1,6}\s+(.+?)$|https?://[^\s]+|^[\s]*[-•*]\s+(.+?)$|^\s*\d+[\.)]\s+(.+?)$|---|\n',
+      r'\*\*([\s\S]+?)\*\*|\*([\s\S]+?)\*|`([\s\S]+?)`|^#{1,6}\s+(.+?)$|https?://[^\s]+|^[\s]*[-•*]\s+(.+?)$|^\s*\d+[\.)]\s+(.+?)$|---|\n|(?::[a-zA-Z0-9_]+:)|(?::[a-zA-Z0-9_]+:)',
       multiLine: true,
     );
 
@@ -474,8 +474,9 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
               text: plainText,
               style: TextStyle(
                 color: AppTheme.textPrimary,
-                fontSize: 15,
-                height: 1.5,
+                fontSize: 16,
+                height: 1.7,
+                letterSpacing: 0.1,
               ),
             ),
           );
@@ -489,17 +490,19 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
         final item = match.group(5)!.trim();
         spans.add(
           WidgetSpan(
-            child: Padding(
-              padding: EdgeInsets.only(left: 0, top: 4, bottom: 4),
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.only(left: 8, top: 12, bottom: 12),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '• ',
-                    style: TextStyle(
+                  Container(
+                    margin: EdgeInsets.only(top: 10, right: 12),
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
                       color: AppTheme.primaryBlue,
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
+                      shape: BoxShape.circle,
                     ),
                   ),
                   Expanded(
@@ -507,8 +510,9 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
                       item,
                       style: TextStyle(
                         color: AppTheme.textPrimary,
-                        fontSize: 15,
-                        height: 1.4,
+                        fontSize: 16,
+                        height: 1.7,
+                        letterSpacing: 0.1,
                       ),
                     ),
                   ),
@@ -522,22 +526,27 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
         final fullMatch = match.group(0) ?? '';
         final item = match.group(6)!.trim();
         final numberMatch = RegExp(r'^\s*(\d+)[\.)]').firstMatch(fullMatch);
-        final number = numberMatch?.group(1) ?? '•';
+        final number = numberMatch?.group(1) ?? '1';
 
         spans.add(
           WidgetSpan(
-            child: Padding(
-              padding: EdgeInsets.only(left: 0, top: 4, bottom: 4),
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.only(left: 8, top: 12, bottom: 12),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '$number. ',
-                    style: TextStyle(
-                      color: AppTheme.primaryBlue,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      height: 1.4,
+                  Container(
+                    width: 28,
+                    margin: EdgeInsets.only(right: 8),
+                    child: Text(
+                      '$number.',
+                      style: TextStyle(
+                        color: AppTheme.primaryBlue,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        height: 1.7,
+                      ),
                     ),
                   ),
                   Expanded(
@@ -545,8 +554,9 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
                       item,
                       style: TextStyle(
                         color: AppTheme.textPrimary,
-                        fontSize: 15,
-                        height: 1.4,
+                        fontSize: 16,
+                        height: 1.7,
+                        letterSpacing: 0.1,
                       ),
                     ),
                   ),
@@ -562,8 +572,9 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
             text: matched,
             style: TextStyle(
               color: AppTheme.primaryBlue,
-              fontSize: 15,
+              fontSize: 16,
               decoration: TextDecoration.underline,
+              height: 1.7,
             ),
             recognizer: TapGestureRecognizer()
               ..onTap = () async {
@@ -581,8 +592,9 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
             text: match.group(1),
             style: TextStyle(
               color: AppTheme.textPrimary,
-              fontSize: 15,
+              fontSize: 16,
               fontWeight: FontWeight.w700,
+              height: 1.7,
             ),
           ),
         );
@@ -593,21 +605,32 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
             text: match.group(2),
             style: TextStyle(
               color: AppTheme.textPrimary,
-              fontSize: 15,
+              fontSize: 16,
               fontStyle: FontStyle.italic,
+              height: 1.7,
             ),
           ),
         );
       } else if (match.group(3) != null) {
         // `code` with newlines (group 3)
         spans.add(
-          TextSpan(
-            text: match.group(3),
-            style: TextStyle(
-              color: AppTheme.primaryBlue,
-              fontSize: 14,
-              fontFamily: 'monospace',
-              backgroundColor: AppTheme.surfaceElevated.withOpacity(0.25),
+          WidgetSpan(
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              margin: EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+              decoration: BoxDecoration(
+                color: Color(0xFF2D333B),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                match.group(3)!,
+                style: TextStyle(
+                  color: Color(0xFFE06C75),
+                  fontSize: 15,
+                  fontFamily: 'monospace',
+                  height: 1.5,
+                ),
+              ),
             ),
           ),
         );
@@ -615,29 +638,71 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
         // # Headers (group 4)
         final headerText = match.group(4)!;
         final headerMatch = match.group(0)!;
-        int level = 1;
+        int level = 0;
         for (int i = 0; i < headerMatch.length; i++) {
           if (headerMatch[i] == '#')
             level++;
           else
             break;
         }
-        final fontSize = level == 1
-            ? 20.0
-            : level == 2
-            ? 18.0
-            : 16.0;
+
+        // Enhanced ChatGPT-like heading sizes with better spacing
+        double fontSize;
+        FontWeight fontWeight;
+        double topPadding;
+        double bottomPadding;
+
+        switch (level) {
+          case 1:
+            fontSize = 28;
+            fontWeight = FontWeight.w800;
+            topPadding = 32;
+            bottomPadding = 20;
+            break;
+          case 2:
+            fontSize = 24;
+            fontWeight = FontWeight.w700;
+            topPadding = 28;
+            bottomPadding = 16;
+            break;
+          case 3:
+            fontSize = 20;
+            fontWeight = FontWeight.w700;
+            topPadding = 24;
+            bottomPadding = 12;
+            break;
+          case 4:
+            fontSize = 18;
+            fontWeight = FontWeight.w600;
+            topPadding = 20;
+            bottomPadding = 10;
+            break;
+          case 5:
+            fontSize = 17;
+            fontWeight = FontWeight.w600;
+            topPadding = 18;
+            bottomPadding = 8;
+            break;
+          default:
+            fontSize = 16;
+            fontWeight = FontWeight.w600;
+            topPadding = 16;
+            bottomPadding = 6;
+        }
 
         spans.add(
           WidgetSpan(
-            child: Padding(
-              padding: EdgeInsets.only(top: 12, bottom: 8),
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.only(top: topPadding, bottom: bottomPadding),
               child: Text(
                 headerText,
                 style: TextStyle(
-                  color: AppTheme.primaryBlue,
+                  color: AppTheme.textPrimary,
                   fontSize: fontSize,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: fontWeight,
+                  height: 1.3,
+                  letterSpacing: -0.4,
                 ),
               ),
             ),
@@ -648,23 +713,29 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
         spans.add(
           WidgetSpan(
             child: Container(
-              margin: EdgeInsets.symmetric(vertical: 10),
+              width: double.infinity,
+              margin: EdgeInsets.symmetric(vertical: 20),
               height: 1,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppTheme.primaryBlue.withOpacity(0),
-                    AppTheme.primaryBlue.withOpacity(0.3),
-                    AppTheme.primaryBlue.withOpacity(0),
-                  ],
-                ),
-              ),
+              color: AppTheme.surfaceElevated.withOpacity(0.5),
             ),
           ),
         );
       } else if (matched == '\n') {
-        // Preserve newlines
-        spans.add(TextSpan(text: '\n'));
+        // Preserve newlines with proper spacing
+        spans.add(
+          WidgetSpan(child: SizedBox(height: 12, width: double.infinity)),
+        );
+      } else if (matched.startsWith(':') && matched.endsWith(':')) {
+        // Emoji pattern
+        final emojiCode = matched.substring(1, matched.length - 1);
+        spans.add(
+          WidgetSpan(
+            child: Container(
+              margin: EdgeInsets.symmetric(horizontal: 2),
+              child: Text(matched, style: TextStyle(fontSize: 20, height: 1.5)),
+            ),
+          ),
+        );
       }
 
       lastIndex = match.end;
@@ -679,8 +750,9 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
             text: remaining,
             style: TextStyle(
               color: AppTheme.textPrimary,
-              fontSize: 15,
-              height: 1.5,
+              fontSize: 16,
+              height: 1.7,
+              letterSpacing: 0.1,
             ),
           ),
         );
@@ -693,8 +765,9 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
               text: text,
               style: TextStyle(
                 color: AppTheme.textPrimary,
-                fontSize: 15,
-                height: 1.5,
+                fontSize: 16,
+                height: 1.7,
+                letterSpacing: 0.1,
               ),
             ),
           ]
@@ -894,53 +967,44 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
                   onLongPress: () => _copyToClipboard(context),
                   child: Container(
                     width: double.infinity,
-                    margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    margin: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                     padding: EdgeInsets.symmetric(horizontal: 0, vertical: 6),
-                    // No background, border, or shadow for AI messages
+                    // No background, border, or shadow for AI messages - full width like ChatGPT
                     color: Colors.transparent,
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          minWidth: MediaQuery.of(context).size.width - 32,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (widget.imagePath != null &&
-                                widget.imagePath!.isNotEmpty) ...[
-                              GestureDetector(
-                                onTap: () => _showFullScreenImage(context),
-                                child: Container(
-                                  margin: EdgeInsets.only(
-                                    bottom: AppTheme.spaceSm,
-                                  ),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(
-                                      AppTheme.radiusSm,
-                                    ),
-                                    child: Image.file(
-                                      File(widget.imagePath!),
-                                      fit: BoxFit.cover,
-                                      width: double.infinity,
-                                      height: 200,
-                                    ),
-                                  ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (widget.imagePath != null &&
+                            widget.imagePath!.isNotEmpty) ...[
+                          GestureDetector(
+                            onTap: () => _showFullScreenImage(context),
+                            child: Container(
+                              margin: EdgeInsets.only(bottom: AppTheme.spaceSm),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(
+                                  AppTheme.radiusSm,
+                                ),
+                                child: Image.file(
+                                  File(widget.imagePath!),
+                                  fit: BoxFit.cover,
+                                  width: double.infinity,
+                                  height: 200,
                                 ),
                               ),
-                            ],
-                            SelectableText.rich(
-                              TextSpan(children: _parseText(formattedText)),
-                              style: TextStyle(
-                                color: AppTheme.textPrimary,
-                                fontSize: 15,
-                                height: 1.6,
-                                letterSpacing: 0.2,
-                              ),
                             ),
-                          ],
+                          ),
+                        ],
+                        // Use RichText with proper text wrapping - no horizontal scroll
+                        SelectableText.rich(
+                          TextSpan(children: _parseText(formattedText)),
+                          style: TextStyle(
+                            color: AppTheme.textPrimary,
+                            fontSize: 16,
+                            height: 1.7,
+                            letterSpacing: 0.1,
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ),
