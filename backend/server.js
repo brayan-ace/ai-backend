@@ -629,17 +629,51 @@ app.post("/api/chat-enhanced", async (req, res) => {
       });
     }
 
-    // Here you would typically process the message with your AI model
-    // For now, we'll return a simple response
-    const response = {
-      response: "Hello from the backend! I received your message: " + message,
-      state: "intro",
-      progress: { percentage: 0 },
-    };
+    // Extract system instructions
+    const instructions = systemInstructions?.instructions || "";
+
+    // Build the prompt for the AI model
+    const prompt = `${instructions}\n\nUser Message: ${message}`;
+
+    // Call the AI model to generate a meaningful response
+    const groqApiKey = process.env.GROQ_API_KEY;
+    if (!groqApiKey) {
+      console.error("[POST /api/chat-enhanced] GROQ_API_KEY not configured");
+      return res.status(500).json({
+        error: "API configuration error",
+        message: "GROQ_API_KEY not configured",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    const response = await axios.post(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        model: "mixtral-8x7b-32768",
+        messages: [
+          { role: "system", content: instructions },
+          { role: "user", content: message },
+        ],
+        max_tokens: 1500,
+        temperature: 0.7,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${groqApiKey}`,
+        },
+        timeout: 30000,
+      }
+    );
+
+    const aiResponse =
+      response.data.choices?.[0]?.message?.content || "No response from AI";
 
     return res.json({
       status: "success",
-      ...response,
+      response: aiResponse,
+      state: "intro",
+      progress: { percentage: 0 },
       timestamp: new Date().toISOString(),
     });
   } catch (err) {
