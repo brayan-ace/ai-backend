@@ -615,6 +615,43 @@ app.get("/", (req, res) => {
   }
 });
 
+// Add the missing /api/chat-enhanced endpoint
+app.post("/api/chat-enhanced", async (req, res) => {
+  try {
+    console.log("[POST /api/chat-enhanced] Request received");
+    const { message, botId, userId, systemInstructions } = req.body;
+
+    if (!message || !botId || !userId) {
+      return res.status(400).json({
+        error: "Invalid request format",
+        message: "message, botId, and userId are required",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Here you would typically process the message with your AI model
+    // For now, we'll return a simple response
+    const response = {
+      response: "Hello from the backend! I received your message: " + message,
+      state: "intro",
+      progress: { percentage: 0 },
+    };
+
+    return res.json({
+      status: "success",
+      ...response,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("[POST /api/chat-enhanced] Error:", err.message);
+    return res.status(500).json({
+      error: "Failed to process chat message",
+      message: err.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
 app.get("/test-env", (req, res) => {
   try {
     const testVar = process.env.TEST_VAR || "TEST_VAR not set";

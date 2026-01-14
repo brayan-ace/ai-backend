@@ -1083,32 +1083,35 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
               child: Row(
                 children: [
                   Expanded(
-                    child: TextField(
-                      controller: _inputController,
-                      enabled: !_isLoading,
-                      decoration: InputDecoration(
-                        hintText: 'Type your message...',
-                        hintStyle: AppTheme.bodyMedium.copyWith(
-                          color: AppTheme.textSecondary,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(
-                            AppTheme.radiusMd,
-                          ),
-                          borderSide: BorderSide(
-                            color: AppTheme.surfaceElevated,
-                          ),
-                        ),
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: AppTheme.spaceMd,
-                          vertical: AppTheme.spaceSm,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: AppTheme.backgroundDeep,
+                        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                        border: Border.all(
+                          color: AppTheme.surfaceElevated,
+                          width: 1,
                         ),
                       ),
-                      onSubmitted: (text) {
-                        if (text.isNotEmpty && !_isLoading) {
-                          _addUserMessage(text);
-                        }
-                      },
+                      child: TextField(
+                        controller: _inputController,
+                        enabled: !_isLoading,
+                        decoration: InputDecoration(
+                          hintText: 'Type your message...',
+                          hintStyle: AppTheme.bodyMedium.copyWith(
+                            color: AppTheme.textSecondary,
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: AppTheme.spaceMd,
+                            vertical: AppTheme.spaceSm,
+                          ),
+                        ),
+                        onSubmitted: (text) {
+                          if (text.isNotEmpty && !_isLoading) {
+                            _addUserMessage(text);
+                          }
+                        },
+                      ),
                     ),
                   ),
                   SizedBox(width: AppTheme.spaceSm),
