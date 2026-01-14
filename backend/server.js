@@ -10,7 +10,7 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // Ensure DB pool is available BEFORE using it
 const { pool } = require("./db");
-
+const ConversationMemory = require("./models/ConversationMemory");
 // ============= UTILITY FUNCTIONS =============
 
 function shouldAutoTriggerWebSearch(message) {
@@ -600,6 +600,30 @@ async function ensureUserStudyStateTable() {
 
 ensureUserStudyStateTable();
 
+// Ensure conversation memory table
+async function ensureConversationMemoryTable() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS conversation_memory (
+        id SERIAL PRIMARY KEY,
+        conversation_id TEXT NOT NULL,
+        interaction_data JSONB NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(conversation_id)
+      );
+    `);
+    console.log("[DB] conversation_memory table ensured");
+  } catch (err) {
+    console.error(
+      "[DB] Failed to ensure conversation_memory table:",
+      err.message
+    );
+  }
+}
+
+ensureConversationMemoryTable();
+
 // ============= ROUTES =============
 
 app.get("/", (req, res) => {
@@ -1118,6 +1142,13 @@ app.post("/api/ask", async (req, res) => {
     console.log("[POST /api/ask] Request received");
     const { type, data } = req.body;
 
+    // Initialize conversation memory for chat requests
+    let conversationMemory;
+    if (type === "chat" && data.conversationId) {
+      conversationMemory = new ConversationMemory(data.conversationId);
+      await conversationMemory.loadFromDatabase();
+    }
+
     if (!type || !data) {
       return res.status(400).json({
         error: "Invalid request format",
@@ -1131,6 +1162,36 @@ app.post("/api/ask", async (req, res) => {
         console.log("[Chat Case] Processing chat request:", data);
         const userMessage = data.message || "Hello, how can I help you?";
         const responseMode = data.mode || "normal"; // Changed default from undefined to "normal"
+
+        // Check for context and intent detection
+        let context = null;
+        let detectedIntent = "new_question";
+
+        if (conversationMemory) {
+          context = await conversationMemory.getRelevantContext(userMessage);
+
+          if (context) {
+            detectedIntent = "follow_up";
+            console.log("[Chat] Detected follow-up question, using context");
+          } else {
+            // Check for riddle/puzzle patterns
+            const riddlePatterns = [
+              "riddle",
+              "puzzle",
+              "brain teaser",
+              "what's the answer",
+              "explain it again",
+            ];
+
+            if (
+              riddlePatterns.some((pattern) =>
+                userMessage.toLowerCase().includes(pattern)
+              )
+            ) {
+              detectedIntent = "riddle_followup";
+            }
+          }
+        }
 
         if (!userMessage) {
           return res.status(400).json({
@@ -1268,13 +1329,22 @@ If the user specifies length, format, or style, follow the user exactly and igno
           // 2) Formatting & Emoji defaults
           // 3) USER CONSTRAINTS (as system message) if present
           // 4) Conversation history (client-provided)
-          // 5) Mode prompt (only if no strict user override)
-          // 6) Latest user message
+          // 5) Context from memory (if available)
+          // 6) Mode prompt (only if no strict user override)
+          // 7) Latest user message
 
           let messages = [
             { role: "system", content: IDENTITY_LOCK_INSTRUCTION },
             { role: "system", content: GLOBAL_SYSTEM_INSTRUCTION },
           ];
+
+          // Add context from memory if available
+          if (context) {
+            messages.push({
+              role: "system",
+              content: `Previous context: User asked "${context.user_message}" and AI responded "${context.ai_response}"`,
+            });
+          }
 
           // Formatting & Emoji defaults (second)
           const allowedEmojis = "🙂 ✅ 🔬 📚 ✨ 🚀";
@@ -1749,6 +1819,18 @@ If the user specifies length, format, or style, follow the user exactly and igno
           const structured = structureTextResponse(finalText);
           const formattedText = formatResponseForReadability(finalText);
 
+          // Save conversation memory if we have a conversation ID
+          if (conversationMemory && data.conversationId) {
+            const topicSignature =
+              detectedIntent === "riddle_followup" ? "riddle" : "general";
+            await conversationMemory.addInteraction(
+              userMessage,
+              finalText,
+              detectedIntent,
+              topicSignature
+            );
+          }
+
           return res.json({
             provider: selectedModel,
             reply: formattedText,
@@ -1757,6 +1839,8 @@ If the user specifies length, format, or style, follow the user exactly and igno
             timestamp: new Date().toISOString(),
             status: "success",
             webSearchAutoTriggered: needsWebSearch,
+            memoryStatus: conversationMemory ? "active" : "inactive",
+            detectedIntent: detectedIntent,
           });
         } catch (chatError) {
           console.error("[Chat] Exception caught:", {
