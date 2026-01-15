@@ -11,6 +11,47 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 // Ensure DB pool is available BEFORE using it
 const { pool } = require("./db");
 const ConversationMemory = require("./models/ConversationMemory");
+
+// Ensure database tables are created
+async function ensureDatabaseTables() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_study_state (
+        id SERIAL PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        bot_id TEXT NOT NULL,
+        current_phase VARCHAR(50) NOT NULL DEFAULT 'greeting',
+        active_study_plan JSONB NOT NULL DEFAULT '{"modules": []}'::jsonb,
+        current_module_index INTEGER NOT NULL DEFAULT 0,
+        completed_modules JSONB NOT NULL DEFAULT '[]'::jsonb,
+        last_user_confirmation TEXT,
+        learning_preferences JSONB NOT NULL DEFAULT '{}'::jsonb,
+        response_mode VARCHAR(50) NOT NULL DEFAULT 'normal',
+        comprehension_flags JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, bot_id)
+      );
+    `);
+    console.log("[DB] user_study_state table ensured");
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS conversation_memory (
+        id SERIAL PRIMARY KEY,
+        conversation_id TEXT NOT NULL,
+        interaction_data JSONB NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(conversation_id)
+      );
+    `);
+    console.log("[DB] conversation_memory table ensured");
+  } catch (err) {
+    console.error("[DB] Failed to ensure tables:", err.message);
+  }
+}
+
+ensureDatabaseTables();
 // ============= UTILITY FUNCTIONS =============
 
 function shouldAutoTriggerWebSearch(message) {
@@ -652,6 +693,9 @@ app.post("/api/chat-enhanced", async (req, res) => {
         timestamp: new Date().toISOString(),
       });
     }
+
+    // Log the received payload for debugging
+    console.log("[POST /api/chat-enhanced] Received payload:", req.body);
 
     // Extract system instructions
     const instructions = systemInstructions?.instructions || "";
