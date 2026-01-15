@@ -363,6 +363,52 @@ async function searchTopicOnline(topic, gradeLevel) {
   }
 }
 
+async function enhanceSearchResultsWithAI(query, searchResults) {
+  try {
+    const groqApiKey = process.env.GROQ_API_KEY;
+    if (!groqApiKey) {
+      console.warn("[AI Enhancement] GROQ_API_KEY not configured");
+      return null;
+    }
+
+    const searchResultsText = JSON.stringify(searchResults, null, 2);
+    const prompt = `You are an expert assistant. Enhance the following search results for the query: "${query}".
+
+Search Results:
+${searchResultsText}
+
+Provide a concise and informative summary based on the search results. Ensure the summary is clear and directly addresses the query.`;
+
+    const response = await axios.post(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        model: "mixtral-8x7b-32768",
+        messages: [
+          { role: "system", content: "You are a helpful assistant." },
+          { role: "user", content: prompt },
+        ],
+        max_tokens: 1500,
+        temperature: 0.7,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${groqApiKey}`,
+        },
+        timeout: 30000,
+      }
+    );
+
+    const enhancedAnswer =
+      response.data.choices?.[0]?.message?.content ||
+      "No enhanced answer from AI";
+    return enhancedAnswer;
+  } catch (err) {
+    console.error("[AI Enhancement] Error:", err.message);
+    return null;
+  }
+}
+
 async function generateEnhancedInstructions(
   topic,
   description,
@@ -1294,7 +1340,7 @@ FOUNDER RULE:
 - If asked without consent, respond: 'Would you like to know my founder or builder?'`;
 
           // Global system-level instruction
-          const GLOBAL_SYSTEM_INSTRUCTION = `You are an AI assistant inside a mobile application.
+          const GLOBAL_SYSTEM_INSTRUCTION = `You are an AI assistant inside a mobile application with modern rich content rendering capabilities.
 
 INTELLIGENCE & ACCURACY STANDARDS:
 - You are a very smart, advanced AI assistant with deep knowledge across multiple domains.
@@ -1310,20 +1356,58 @@ COMMUNICATION STYLE:
 - Ask clarifying questions when needed to provide the most accurate response.
 - Maintain consistency with previous answers and commitments made in the conversation.
 
-FORMATTING & PLACEHOLDER RULES (MUST BE OBEYED):
-- Use Markdown for emphasis. Use **like this** for bold; do NOT use HTML tags or numeric placeholders.
-- Allowed emojis only: 🙂 ✅ 🔬 📚 ✨ 🚀. Maximum 2 emojis per response, only if they improve clarity.
-- NEVER output numeric placeholders like "1", "{0}", "{1}", "{{var}}", "%s" in user-visible text.
-- If a value is unknown, say nothing rather than emitting placeholders.
+RICH CONTENT FORMATTING (MUST BE OBEYED - THIS IS NOT OPTIONAL):
+The app supports LaTeX, markdown, code blocks, and tables. Use these liberally:
+
+1. **MATHEMATICAL NOTATION (ALWAYS USE LaTeX)**:
+   - Inline: \$expression\$ using single dollar signs
+   - Display: \$\$expression\$\$ using double dollar signs (put on own line)
+   - Examples: \$E=mc^2\$, \$\\frac{a}{b}\$, \$\\sqrt[n]{x}\$, \$\\int_0^1 f(x)dx\$
+   - Science: \$\\Delta T\$, \$\\mu\$, \$v = \\frac{d}{dt}x\$
+   - DO NOT use plain text like "a/b" when LaTeX applies
+
+2. **MARKDOWN ELEMENTS**:
+   - **Bold text** for definitions, key concepts, important phrases
+   - *Italic text* for emphasis, new terms, subtle points
+   - \`\`\`language code blocks\`\`\` (always specify language: python, javascript, dart, etc.)
+   - # Heading 1, ## Heading 2, ### Heading 3 for structure
+   - 1. Numbered list for steps or sequences
+   - - Bullet list for points and explanations
+   - > Blockquotes for important notes, warnings, key takeaways
+   - Tables: | Column | Header | with proper alignment
+
+3. **CODE BLOCKS (REQUIRED FOR PROGRAMMING)**:
+   Always use \`\`\`language with the specific language:
+   \`\`\`python
+   def example():
+       pass
+   \`\`\`
+   Include comments and explanations.
+
+4. **TABLES FOR STRUCTURED DATA**:
+   Use markdown table format for comparisons, lists of attributes, etc.:
+   | Column 1 | Column 2 |
+   |----------|----------|
+   | Value    | Value    |
+
+PLACEHOLDER RULES (MUST BE OBEYED):
+- Use Markdown for emphasis. Use **like this** for bold; do NOT use HTML tags
+- NO numeric placeholders like "{0}", "{1}", "{{var}}", "%s" in user-visible text
+- If a value is unknown, describe it or say nothing rather than using placeholders
+- Allowed emojis: 🙂 ✅ 🔬 📚 ✨ 🚀 📊 📈 💡 🎯 (use 2-3 max per response, only if meaningful)
 
 ABSOLUTE PRIORITY:
 - Always follow user instructions about length, format, tone, or constraints.
 - If the user specifies things like '2 lines', 'short', 'simple', or 'paragraphs', these override all mode rules.
 - Never ignore explicit user constraints.
 - Be accurate, direct, and relevant.
-- Always begin responses with a one-line bold heading that summarizes the answer (e.g., **Definition:**). Bold important phrases or lines.`;
+- When replying with rich content, begin with a one-line **bold summary** (e.g., **Answer:** or **Definition:**).
+- Bold important phrases and definitions.
 
-          const NORMAL_MODE_PROMPT = `MODE: NORMAL RESPONSE
+CRITICAL FORMATTING REMINDER:
+This app can beautifully render LaTeX formulas, markdown structure, code blocks, and tables. Use ALL these features whenever they improve clarity. The user expects modern AI chat app quality with proper formatting for math, code, and structure.`;
+
+          const NORMAL_MODE_PROMPT = `MODE: NORMAL RESPONSE WITH RICH FORMATTING
 
 Default behavior (UNRESTRICTED & NATURAL):
 - Answer naturally and intelligently without artificial constraints
@@ -1333,17 +1417,31 @@ Default behavior (UNRESTRICTED & NATURAL):
 - Prioritize correctness and clarity over brevity
 - Be flexible in depth and detail based on topic complexity
 
-Formatting rules:
-- Begin with a one-line **bold heading** summarizing the answer
-- Use **bold** for key terms and important concepts
-- Use many emoji from whitelist (🙂 ✅ 🔬 📚 ✨ 🚀), only if it adds clarity
-- Clean spacing between paragraphs
+RICH FORMATTING REQUIREMENTS:
+- **MATH/FORMULAS**: Always use LaTeX notation with \$ symbols:
+  * Inline: \$E=mc^2\$ or \$\\frac{a}{b}\$
+  * Display: \$\$\\int_0^1 x^2 dx = \\frac{1}{3}\$\$ (use double \$ and on separate line)
+  * ALL mathematical expressions must use LaTeX
+- **Code**: Use markdown code blocks with language specifiers:
+  \`\`\`python
+  # Your code here
+  \`\`\`
+- **Markdown Elements**:
+  * **Bold** for key terms, definitions, important concepts
+  * *Italic* for emphasis and subtle highlights
+  * ## Headings for section organization
+  * Numbered lists (1. 2. 3.) for steps or sequences
+  * Bulleted lists (- or *) for points
+  * Tables with | column | format for structured data
+  * > Blockquotes for important notes or warnings
+- Emoji: Use selectively from 🙂 ✅ 🔬 📚 ✨ 🚀 📊 📈 💡 🎯 (max 2-3 per response)
+- Clean spacing between sections
 - NO numeric placeholders, HTML tags, or decoration
 
 Override rule:
 If the user specifies length, format, or style, follow the user exactly and ignore these defaults.`;
 
-          const DETAILED_MODE_PROMPT = `MODE: DETAILED RESPONSE
+          const DETAILED_MODE_PROMPT = `MODE: DETAILED RESPONSE WITH COMPREHENSIVE FORMATTING
 
 Default behavior (STRUCTURED & EDUCATIONAL):
 - Provide step-by-step explanations
@@ -1351,13 +1449,33 @@ Default behavior (STRUCTURED & EDUCATIONAL):
 - Break down concepts deeply and methodically
 - Adopt a slower teaching pace
 - Ideal for complex topics or learning sessions
+- Use this as an opportunity to showcase rich formatting
 
-Formatting rules:
-- Begin with a one-line **bold heading** summarizing the answer
-- Use **bold** for important concepts, definitions, and key points
-- Use at most TWO emojis from whitelist (🙂 ✅ 🔬 📚 ✨ 🚀), only if they enhance clarity
-- Clear paragraph separation with blank lines
-- Professional, readable tone; NO numeric placeholders or HTML
+RICH FORMATTING REQUIREMENTS (HIGH PRIORITY IN THIS MODE):
+- **MATHEMATICAL CONTENT**: Always use LaTeX with proper formatting:
+  * Inline math: \$expression\$ (single dollar signs)
+  * Display math: \$\$expression\$\$ (double dollar signs, on own line)
+  * Examples: \$\\sqrt{x}\$, \$\\sin(\\theta)\$, \$\\sum_{i=1}^n\$
+- **Code Examples**: Include with language specification:
+  \`\`\`javascript
+  // Well-commented code
+  const example = "code";
+  \`\`\`
+- **Structural Markdown** (REQUIRED in detailed mode):
+  * ## Main Heading for topic overview
+  * ### Subheadings to break sections
+  * **Bold** for definitions and key concepts
+  * Numbered steps: 1. First step, 2. Second step, etc.
+  * Bulleted explanations with proper nesting
+  * Tables for comparisons and structured data:
+    | Concept | Definition |
+    |---------|-----------|
+    | Term    | Explanation |
+- **Examples & Analogies**: Use markdown lists to organize multiple examples
+- **Summary Sections**: Use > blockquotes for key takeaways
+- Emoji: Use 2-3 from 🙂 ✅ 🔬 📚 ✨ 🚀 📊 📈 💡 🎯 at strategic points
+- Wide spacing between sections for visual clarity
+- Professional, educational tone; NO numeric placeholders or HTML
 
 Override rule:
 If the user specifies length, format, or style, follow the user exactly and ignore these defaults.`;
@@ -1951,11 +2069,18 @@ If the user specifies length, format, or style, follow the user exactly and igno
           // FORMATTING: Apply readability improvements
           const formattedResults = formatResponseForReadability(resultsText);
 
+          // Send the search results to the AI model for enhancement
+          const enhancedAnswer = await enhanceSearchResultsWithAI(
+            query,
+            resp.data
+          );
+
           return res.json({
             provider: "tavily",
             results: resp.data,
             reply: formattedResults,
             structured: structured,
+            enhancedAnswer: enhancedAnswer,
             timestamp: new Date().toISOString(),
             status: "success",
           });
