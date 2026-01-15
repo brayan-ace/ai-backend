@@ -19,10 +19,15 @@ class _AiScreenState extends State<AiScreen> {
   final TextEditingController _controller = TextEditingController();
   bool _isWaiting = false;
   bool _detailedMode = false;
+  late String _conversationId; // Unique ID for this conversation session
 
   @override
   void initState() {
     super.initState();
+    // Generate a unique conversation ID for this session
+    _conversationId =
+        'conv_${DateTime.now().millisecondsSinceEpoch}_${(DateTime.now().microsecond % 10000)}';
+
     _messages.add(
       _Message(
         text: 'Welcome to Online AI — type a message below to get started.',
@@ -57,9 +62,25 @@ class _AiScreenState extends State<AiScreen> {
 
   Future<String?> _callWithFallback(String prompt) async {
     try {
-      // Pass the mode to the backend for detailed/concise responses
+      // Convert message history to the format expected by the backend
+      final messages = _messages
+          .where((m) => m.text.isNotEmpty) // Filter out empty messages
+          .map(
+            (m) => {
+              'role': m.fromUser ? 'user' : 'assistant',
+              'content': m.text,
+            },
+          )
+          .toList();
+
+      // Pass the mode and full conversation history to the backend
       final mode = _detailedMode ? 'detailed' : 'quick';
-      final resp = await _gemini.generateContent(prompt, responseMode: mode);
+      final resp = await _gemini.generateContent(
+        prompt,
+        responseMode: mode,
+        messages: messages,
+        conversationId: _conversationId,
+      );
       return resp;
     } catch (e) {
       return '⚠️ All AI services are currently unavailable. ($e)';
