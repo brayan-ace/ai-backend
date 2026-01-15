@@ -19,14 +19,10 @@ class _AiScreenState extends State<AiScreen> {
   final TextEditingController _controller = TextEditingController();
   bool _isWaiting = false;
   bool _detailedMode = false;
-  late String _conversationId; // Unique ID for this conversation session
 
   @override
   void initState() {
     super.initState();
-    // Generate a unique conversation ID for this session
-    _conversationId =
-        'conv_${DateTime.now().millisecondsSinceEpoch}_${(DateTime.now().microsecond % 10000)}';
 
     _messages.add(
       _Message(
@@ -79,7 +75,6 @@ class _AiScreenState extends State<AiScreen> {
         prompt,
         responseMode: mode,
         messages: messages,
-        conversationId: _conversationId,
       );
       return resp;
     } catch (e) {
