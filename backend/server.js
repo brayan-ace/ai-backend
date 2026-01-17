@@ -57,37 +57,17 @@ ensureDatabaseTables();
 function shouldAutoTriggerWebSearch(message) {
   if (!message) return false;
   const msg = message.toLowerCase();
-  const timeKeywords = [
-    "today",
-    "now",
-    "current",
-    "latest",
-    "recent",
-    "this week",
-    "this month",
-    "this year",
-    "2024",
-    "2025",
-    "2026",
-    "tomorrow",
-    "yesterday",
-  ];
+  const timeKeywords = ["today", "now", "current"];
   const eventKeywords = [
-    "news",
-    "stock",
-    "weather",
-    "score",
-    "game",
-    "match",
-    "event",
-    "happening",
-    "trending",
-    "breaking",
-    "live",
-    "real-time",
+    "who is",
+    "where is",
+    "how much",
+    "how many",
+    "can you find",
+    "search for",
+    "look up",
   ];
   const queryKeywords = [
-    "what is",
     "who is",
     "where is",
     "how much",
@@ -253,6 +233,32 @@ function sanitizeText(text) {
   // Leave the rest of the text intact so the frontend receives raw
   // markdown as produced by the model.
   return (text || "").replace(/\{\s*\d+\s*\}|%[sdif]\b/g, "");
+}
+
+/**
+ * Normalize model responses to avoid escaped markdown artifacts and
+ * ensure emojis and emphasis markers are preserved for the frontend.
+ * - Convert literal escaped newlines ("\\n"/"\\r\\n") into real newlines
+ * - Unescape backslash-escaped markdown characters (\* \` \$)
+ * - Collapse runs of 3+ asterisks into a valid bold marker
+ */
+function normalizeModelResponse(text) {
+  if (!text) return text;
+  let t = text;
+
+  // Convert escaped CRLF / LF sequences into real newlines
+  t = t.replace(/\\r\\n/g, "\n");
+  t = t.replace(/\\n/g, "\n");
+
+  // Unescape common markdown escapes so **bold** markers are left intact
+  t = t.replace(/\\\*/g, "*");
+  t = t.replace(/\\`/g, "`");
+  t = t.replace(/\\\$/g, "$");
+
+  // Collapse accidental long asterisk runs into valid bold markers
+  t = t.replace(/\*{3,}/g, "**");
+
+  return t;
 }
 
 /**
@@ -952,12 +958,20 @@ Always prioritize clarity and professional formatting.`,
       throw groqErr;
     }
 
-    const aiResponse =
+    const aiResponseRaw =
       response.data.choices?.[0]?.message?.content || "No response from AI";
 
     console.log(
-      "[Chat-Enhanced] ✅ AI response received, length:",
-      aiResponse.length,
+      "[Chat-Enhanced] ✅ AI response received, raw length:",
+      aiResponseRaw.length,
+    );
+
+    // Normalize the model response to unescape markdown/newline artifacts
+    const aiResponse = normalizeModelResponse(aiResponseRaw);
+
+    console.log(
+      "[Chat-Enhanced] 🔧 Normalized AI response preview:",
+      aiResponse.substring(0, 200).replace(/\n/g, "␤"),
     );
 
     return res.json({
@@ -2165,6 +2179,9 @@ If the user specifies length, format, or style, follow the user exactly and igno
             );
             // Still return the response even if validation warns (model outputs are usually correct)
           }
+
+          // Ensure model-produced escapes are normalized before sending to client
+          finalText = normalizeModelResponse(finalText);
 
           const structured = structureTextResponse(finalText);
           const formattedText = formatResponseForReadability(finalText);

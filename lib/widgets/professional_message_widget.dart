@@ -91,11 +91,30 @@ class ProfessionalMessageWidget extends StatelessWidget {
     // Convert escaped newline sequences (literal backslash-n) into real newlines
     t = t.replaceAll('\\n', '\n');
 
-    // Convert HTML <br> tags (case-insensitive) to newline
-    t = t.replaceAll(RegExp(r'(?i)<br\s*\/?>'), '\n');
+    // Normalize bold markers that have stray spaces/newlines inside them
+    // e.g. "** Hello **" -> "**Hello**" so our inline parser catches them
+    t = t.replaceAllMapped(
+      RegExp(r'\*{2}\s*(.+?)\s*\*{2}', dotAll: true),
+      (m) => '**${m.group(1)!.trim()}**',
+    );
+
+    // Collapse accidental long runs of asterisks into a valid bold marker
+    // e.g., "*****" or "****" -> "**" to avoid literal **** showing.
+    t = t.replaceAllMapped(RegExp(r'\*{3,}'), (_) => '**');
+
+    // Convert HTML <br> tags to newline (case-insensitive)
+    t = t.replaceAll(RegExp(r'<br\s*\/?>', caseSensitive: false), '\n');
 
     // Normalize CRLF to LF
     t = t.replaceAll('\r\n', '\n');
+
+    // Convert LaTeX display and inline bracket forms to dollar forms
+    // so the existing parser can handle them. Convert \[ ... \] -> $$...$$
+    // and \( ... \) -> $...$ (handles backslash-escaped bracket forms).
+    t = t.replaceAll(RegExp(r'\\\[', caseSensitive: false), '\$\$');
+    t = t.replaceAll(RegExp(r'\\\]', caseSensitive: false), '\$\$');
+    t = t.replaceAll(RegExp(r'\\\(', caseSensitive: false), '\$');
+    t = t.replaceAll(RegExp(r'\\\)', caseSensitive: false), '\$');
 
     // Treat two or more trailing spaces before a newline as an explicit
     // markdown line break — convert to an extra blank line (paragraph break)
@@ -110,6 +129,38 @@ class ProfessionalMessageWidget extends StatelessWidget {
   /// Detect block type from content
   BlockType _detectBlockType(String line) {
     final trimmed = line.trim();
+
+    // Treat a single-line bold-only paragraph as a top-level heading only
+    // when it's likely meaningful (not generic words like 'answer' or 'response').
+    final boldOnlyMatch = RegExp(r'^\*\*(.+)\*\*$').firstMatch(trimmed);
+    if (boldOnlyMatch != null) {
+      final content = boldOnlyMatch.group(1)?.trim() ?? '';
+      final lower = content.toLowerCase();
+      // Reject generic labels that are not useful as headings
+      final generic = {
+        'answer',
+        'answers',
+        'response',
+        'reply',
+        'greeting',
+        'greetings',
+        'hello',
+        'hi',
+        'note',
+        'summary',
+        'definition',
+      };
+      // Heuristics: must contain letters, be reasonably short (<=6 words),
+      // and not be a generic label.
+      final wordCount = content
+          .split(RegExp(r'\s+'))
+          .where((s) => s.isNotEmpty)
+          .length;
+      final hasLetter = RegExp(r'[A-Za-z]').hasMatch(content);
+      if (hasLetter && wordCount <= 6 && !generic.contains(lower)) {
+        return BlockType.heading1;
+      }
+    }
 
     // Headings
     if (trimmed.startsWith('###')) return BlockType.heading3;
@@ -129,6 +180,13 @@ class ProfessionalMessageWidget extends StatelessWidget {
 
     // Math (LaTeX)
     if (trimmed.startsWith('\$\$') || trimmed.startsWith(r'$$')) {
+      return BlockType.mathBlock;
+    }
+
+    // Also accept LaTeX bracket forms and begin/end environments
+    if (trimmed.startsWith('\\[') ||
+        trimmed.startsWith('\\(') ||
+        trimmed.contains('\\begin{')) {
       return BlockType.mathBlock;
     }
 
@@ -186,24 +244,17 @@ class ProfessionalMessageWidget extends StatelessWidget {
     // Pattern for **bold**, *italic*, `code`, and $math$
     final pattern = RegExp(
       r'\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`|\$([^\$]+)\$',
-      multiLine: false,
+      multiLine: true,
+      dotAll: true,
     );
 
     for (final match in pattern.allMatches(text)) {
-      // Add plain text before match
+      // Add plain text before match; pass it through the bold-fallback
+      // splitter so any literal **bold** is rendered even if the main
+      // pattern misses an edge case.
       if (match.start > lastIndex) {
-        spans.add(
-          TextSpan(
-            text: text.substring(lastIndex, match.start),
-            style: TextStyle(
-              fontSize: 15,
-              height: 1.75,
-              color: AppTheme.textPrimary,
-              fontWeight: FontWeight.w400,
-              letterSpacing: 0.2,
-            ),
-          ),
-        );
+        final plainSegment = text.substring(lastIndex, match.start);
+        spans.addAll(_splitBoldFallback(plainSegment));
       }
 
       if (match.group(1) != null) {
@@ -279,11 +330,58 @@ class ProfessionalMessageWidget extends StatelessWidget {
       lastIndex = match.end;
     }
 
-    // Add remaining text
+    // Add remaining text and ensure leftover bold markers are handled
     if (lastIndex < text.length) {
-      spans.add(
+      final remaining = text.substring(lastIndex);
+      spans.addAll(_splitBoldFallback(remaining));
+    }
+
+    return TextSpan(children: spans.isEmpty ? [TextSpan(text: text)] : spans);
+  }
+
+  /// Fallback splitter: converts any literal `**bold**` occurrences in `s`
+  /// into TextSpans, leaving other text as normal TextSpans. This is a
+  /// safety net when the primary regex misses some edge cases.
+  List<InlineSpan> _splitBoldFallback(String s) {
+    final out = <InlineSpan>[];
+    var last = 0;
+    // Accept two-or-more asterisks as delimiters and allow inner whitespace.
+    // This catches ****bold****, ******bold******, and ** bold ** variants.
+    final pat = RegExp(r'\*{2,}\s*(.+?)\s*\*{2,}', dotAll: true);
+    for (final m in pat.allMatches(s)) {
+      if (m.start > last) {
+        out.add(
+          TextSpan(
+            text: s.substring(last, m.start),
+            style: TextStyle(
+              fontSize: 15,
+              height: 1.75,
+              color: AppTheme.textPrimary,
+              fontWeight: FontWeight.w400,
+              letterSpacing: 0.2,
+            ),
+          ),
+        );
+      }
+      final boldText = m.group(1) ?? '';
+      out.add(
         TextSpan(
-          text: text.substring(lastIndex),
+          text: boldText,
+          style: TextStyle(
+            fontSize: 15,
+            height: 1.75,
+            color: AppTheme.textPrimary,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.2,
+          ),
+        ),
+      );
+      last = m.end;
+    }
+    if (last < s.length) {
+      out.add(
+        TextSpan(
+          text: s.substring(last),
           style: TextStyle(
             fontSize: 15,
             height: 1.75,
@@ -294,34 +392,42 @@ class ProfessionalMessageWidget extends StatelessWidget {
         ),
       );
     }
-
-    return TextSpan(children: spans.isEmpty ? [TextSpan(text: text)] : spans);
+    return out;
   }
 
   /// Build heading with enhanced visual hierarchy
   Widget _buildHeading(String content, int level) {
-    final text = content.replaceFirst(RegExp(r'^#+\s*'), '').trim();
+    // Remove leading hashes if present, and also remove surrounding bold markers
+    var text = content.replaceFirst(RegExp(r'^#+\s*'), '').trim();
+    text = text.replaceAll(RegExp(r'^\*{2}\s*|\s*\*{2}$'), '').trim();
     if (text.isEmpty) return SizedBox.shrink();
+    final topPadding = {1: 20.0, 2: 16.0, 3: 12.0};
+    final bottomPadding = {1: 12.0, 2: 10.0, 3: 8.0};
 
-    final fontSizes = {1: 30.0, 2: 24.0, 3: 20.0};
-    final topPadding = {1: 22.0, 2: 18.0, 3: 14.0};
-    final bottomPadding = {1: 14.0, 2: 12.0, 3: 10.0};
+    TextStyle style;
+    if (level == 1) {
+      style = AppTheme.displayLarge.copyWith(
+        fontSize: 28,
+        color: AppTheme.textPrimary,
+      );
+    } else if (level == 2) {
+      style = AppTheme.displayMedium.copyWith(
+        fontSize: 24,
+        color: AppTheme.textPrimary,
+      );
+    } else {
+      style = AppTheme.displaySmall.copyWith(
+        fontSize: 20,
+        color: AppTheme.textPrimary,
+      );
+    }
 
     return Padding(
       padding: EdgeInsets.only(
         top: topPadding[level] ?? 14,
         bottom: bottomPadding[level] ?? 10,
       ),
-      child: SelectableText(
-        text,
-        style: TextStyle(
-          fontSize: fontSizes[level] ?? 18,
-          fontWeight: FontWeight.w900,
-          color: level == 1 ? AppTheme.primaryBlue : AppTheme.textPrimary,
-          height: 1.25,
-          letterSpacing: level == 1 ? 0.25 : 0.12,
-        ),
-      ),
+      child: SelectableText(text, style: style, textAlign: TextAlign.left),
     );
   }
 
@@ -436,21 +542,21 @@ class ProfessionalMessageWidget extends StatelessWidget {
     if (item.startsWith('•')) {
       text = item.replaceFirst('•', '').trim();
       bullet = '•';
-      bulletColor = AppTheme.primaryBlue;
+      bulletColor = AppTheme.textPrimary;
     } else if (item.startsWith('-')) {
       text = item.replaceFirst('-', '').trim();
       bullet = '•';
-      bulletColor = AppTheme.primaryBlue;
+      bulletColor = AppTheme.textPrimary;
     } else if (item.startsWith('*')) {
       text = item.replaceFirst('*', '').trim();
       bullet = '◦';
-      bulletColor = AppTheme.primaryBlue.withOpacity(0.7);
+      bulletColor = AppTheme.textPrimary.withOpacity(0.9);
     } else {
       final match = RegExp(r'^(\d+)\.').firstMatch(item);
       if (match != null) {
         bullet = '${match.group(1)}.';
         text = item.substring(match.end).trim();
-        bulletColor = AppTheme.primaryBlue;
+        bulletColor = AppTheme.textPrimary;
       }
     }
 
@@ -462,10 +568,10 @@ class ProfessionalMessageWidget extends StatelessWidget {
           child: Text(
             bullet,
             style: TextStyle(
-              fontSize: 16,
+              fontSize: 18,
               height: 1.4,
               color: bulletColor,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ),
@@ -473,7 +579,7 @@ class ProfessionalMessageWidget extends StatelessWidget {
           child: SelectableText(
             text,
             style: TextStyle(
-              fontSize: 15,
+              fontSize: 16,
               height: 1.75,
               color: AppTheme.textPrimary,
               fontWeight: FontWeight.w400,
