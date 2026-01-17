@@ -55,7 +55,16 @@ class ApiService {
       // Decode raw bytes to a Dart string to avoid malformed UTF-16 from
       // intermediate encodings. Allow malformed so we don't crash on odd bytes.
       final bodyString = utf8.decode(response.bodyBytes, allowMalformed: true);
+      // Rune-safe preview and newline/escaped-newline diagnostics
+      final runeCount = bodyString.runes.length;
+      final hasRealNewlines = bodyString.contains('\n');
+      final hasEscapedNewlines = bodyString.contains('\\n');
+      final preview = String.fromCharCodes(bodyString.runes.take(200));
       print('📄 [Response Body] $bodyString');
+      print(
+        '🔍 [RAW AI RESPONSE] length=$runeCount hasNewlines=$hasRealNewlines hasEscapedNewlines=$hasEscapedNewlines',
+      );
+      print('🔍 [RAW AI RESPONSE PREVIEW] $preview');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         try {
@@ -150,7 +159,15 @@ class ApiService {
 
     print('✅ [sendRaw] Response Status: ${response.statusCode}');
     final bodyString = utf8.decode(response.bodyBytes, allowMalformed: true);
+    final runeCount = bodyString.runes.length;
+    final hasRealNewlines = bodyString.contains('\n');
+    final hasEscapedNewlines = bodyString.contains('\\n');
+    final preview = String.fromCharCodes(bodyString.runes.take(400));
     print('📄 [sendRaw] Response Body: $bodyString');
+    print(
+      '🔍 [RAW AI RESPONSE] length=$runeCount hasNewlines=$hasRealNewlines hasEscapedNewlines=$hasEscapedNewlines',
+    );
+    print('🔍 [RAW AI RESPONSE PREVIEW] $preview');
 
     if (response.statusCode == 200 || response.statusCode == 201) {
       try {

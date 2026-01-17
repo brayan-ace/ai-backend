@@ -45,7 +45,8 @@ class ProfessionalMessageWidget extends StatelessWidget {
   /// Parse message into structured blocks
   List<MessageBlock> _parseMessageBlocks(String text) {
     final blocks = <MessageBlock>[];
-    final lines = text.split('\n');
+    final normalized = _normalizeText(text);
+    final lines = normalized.split('\n');
     var currentBlock = <String>[];
     var blockType = BlockType.paragraph;
 
@@ -76,6 +77,34 @@ class ProfessionalMessageWidget extends StatelessWidget {
     }
 
     return blocks;
+  }
+
+  /// Normalize common newline/linebreak encodings so markdown-like
+  /// formatting is preserved when the backend returns escaped sequences
+  /// or HTML `<br>` tags. This converts literal `\\n` into real
+  /// newlines, normalizes `<br>` to newline, and treats trailing two
+  /// spaces + newline as a paragraph break.
+  String _normalizeText(String text) {
+    if (text.isEmpty) return text;
+    var t = text;
+
+    // Convert escaped newline sequences (literal backslash-n) into real newlines
+    t = t.replaceAll('\\n', '\n');
+
+    // Convert HTML <br> tags (case-insensitive) to newline
+    t = t.replaceAll(RegExp(r'(?i)<br\s*\/?>'), '\n');
+
+    // Normalize CRLF to LF
+    t = t.replaceAll('\r\n', '\n');
+
+    // Treat two or more trailing spaces before a newline as an explicit
+    // markdown line break — convert to an extra blank line (paragraph break)
+    t = t.replaceAllMapped(RegExp(r' {2,}\n'), (m) => '\n\n');
+
+    // Trim trailing spaces at end of lines while preserving line breaks
+    t = t.replaceAll(RegExp(r'[ \t]+\n'), '\n');
+
+    return t;
   }
 
   /// Detect block type from content
@@ -131,10 +160,21 @@ class ProfessionalMessageWidget extends StatelessWidget {
     final text = content.trim();
     if (text.isEmpty) return SizedBox.shrink();
 
-    // Parse inline markdown and math
+    // Use RichText with a merged DefaultTextStyle so WidgetSpan (math/code)
+    // can be rendered inline. SelectableText.rich does not reliably support
+    // WidgetSpan in all Flutter versions, so RichText is safer here.
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 6.0),
-      child: RichText(text: _parseInlineMarkdown(text)),
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: DefaultTextStyle.merge(
+        style: TextStyle(
+          fontSize: 15,
+          height: 1.75,
+          fontWeight: FontWeight.w400,
+          color: AppTheme.textPrimary,
+          letterSpacing: 0.2,
+        ),
+        child: RichText(text: _parseInlineMarkdown(text)),
+      ),
     );
   }
 
@@ -263,28 +303,23 @@ class ProfessionalMessageWidget extends StatelessWidget {
     final text = content.replaceFirst(RegExp(r'^#+\s*'), '').trim();
     if (text.isEmpty) return SizedBox.shrink();
 
-    final fontSizes = {1: 28.0, 2: 22.0, 3: 18.0};
-    final topPadding = {1: 20.0, 2: 16.0, 3: 12.0};
-    final bottomPadding = {1: 12.0, 2: 10.0, 3: 8.0};
-    final fontWeights = {
-      1: FontWeight.w800,
-      2: FontWeight.w700,
-      3: FontWeight.w700,
-    };
+    final fontSizes = {1: 30.0, 2: 24.0, 3: 20.0};
+    final topPadding = {1: 22.0, 2: 18.0, 3: 14.0};
+    final bottomPadding = {1: 14.0, 2: 12.0, 3: 10.0};
 
     return Padding(
       padding: EdgeInsets.only(
-        top: topPadding[level] ?? 12,
-        bottom: bottomPadding[level] ?? 8,
+        top: topPadding[level] ?? 14,
+        bottom: bottomPadding[level] ?? 10,
       ),
       child: SelectableText(
         text,
         style: TextStyle(
-          fontSize: fontSizes[level] ?? 16,
-          fontWeight: fontWeights[level] ?? FontWeight.w700,
+          fontSize: fontSizes[level] ?? 18,
+          fontWeight: FontWeight.w900,
           color: level == 1 ? AppTheme.primaryBlue : AppTheme.textPrimary,
-          height: 1.3,
-          letterSpacing: level == 1 ? 0.2 : 0.1,
+          height: 1.25,
+          letterSpacing: level == 1 ? 0.25 : 0.12,
         ),
       ),
     );

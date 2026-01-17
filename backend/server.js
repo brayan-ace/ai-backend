@@ -114,11 +114,13 @@ function getFallbackMessage() {
 }
 
 function formatResponseForReadability(text) {
+  // Preserve original formatting. Do not collapse newlines or trim.
+  // This function was previously collapsing multiple newlines and trimming
+  // which removed paragraph breaks and collapsed lists. Return the text
+  // unchanged to ensure the frontend receives raw markdown as produced
+  // by the model. Any lightweight normalization (CRLF -> LF) is safe.
   if (!text) return text;
-  let formatted = text.replace(/\n\n+/g, "\n\n");
-  formatted = formatted.replace(/^(\s*[-*])/gm, "\n$1");
-  formatted = formatted.replace(/(\n)(#+\s)/g, "\n\n$2");
-  return formatted.trim();
+  return text.replace(/\r\n/g, "\n");
 }
 
 function structureTextResponse(text) {
@@ -245,21 +247,12 @@ function detectUserConstraints(message, instructions = {}) {
 function sanitizeText(text) {
   if (!text) return "";
 
-  let sanitized = text;
-
-  // Remove explicit numeric placeholders like {0}, {1} and printf-style %s/%d
-  sanitized = sanitized.replace(/\{\s*\d+\s*\}|%[sdif]\b/g, "");
-
-  // Remove HTML tags
-  sanitized = sanitized.replace(/<[^>]*>/g, "");
-
-  // Clean up multiple spaces
-  sanitized = sanitized.replace(/\s{2,}/g, " ");
-
-  // Clean up multiple newlines (keep max 2)
-  sanitized = sanitized.replace(/\n{3,}/g, "\n\n");
-
-  return sanitized.trim();
+  // Only remove explicit numeric/printf placeholders. Do NOT strip HTML,
+  // collapse whitespace, or trim — these operations destroy markdown and
+  // LaTeX formatting (code blocks, lists, and paragraph spacing).
+  // Leave the rest of the text intact so the frontend receives raw
+  // markdown as produced by the model.
+  return (text || "").replace(/\{\s*\d+\s*\}|%[sdif]\b/g, "");
 }
 
 /**
@@ -1977,8 +1970,10 @@ If the user specifies length, format, or style, follow the user exactly and igno
           // Reformat numbered definition style if needed
           rawText = reformatLeadingNumberedDefinition(rawText);
 
-          // Sanitize and respect explicit user line/sentence constraints if present
-          let finalText = sanitizeText(rawText);
+          // Preserve model-produced formatting (markdown, newlines, code blocks).
+          // We only removed explicit numeric placeholders in `sanitizeText`
+          // earlier; do NOT collapse whitespace or strip tags here.
+          let finalText = rawText;
           if (constraintInfo.lines) {
             finalText = enforceLineCount(finalText, constraintInfo.lines);
           }
@@ -2137,9 +2132,13 @@ If the user specifies length, format, or style, follow the user exactly and igno
                   "";
               }
 
-              regenText = sanitizeText(regenText || "");
+              // Keep regenerated text formatting intact; only apply line limits
+              // if the user explicitly requested them.
               if (constraintInfo.lines)
-                regenText = enforceLineCount(regenText, constraintInfo.lines);
+                regenText = enforceLineCount(
+                  regenText || "",
+                  constraintInfo.lines,
+                );
 
               const regenValidation = validateResponseConstraints(
                 regenText,

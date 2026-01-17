@@ -91,8 +91,8 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
           padding: EdgeInsets.all(6),
           decoration: BoxDecoration(
             color: isSelected
-                ? AppTheme.primaryBlue.withOpacity(0.15)
-                : AppTheme.backgroundGradientEnd.withOpacity(0.5),
+                ? AppTheme.primaryBlue.withOpacity(0.12)
+                : AppTheme.primaryBlue.withOpacity(0.04),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Icon(
@@ -100,7 +100,7 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
             size: 14,
             color: isSelected
                 ? AppTheme.primaryBlue
-                : AppTheme.textTertiary.withOpacity(0.6),
+                : AppTheme.primaryBlue.withOpacity(0.65),
           ),
         ),
       ),
