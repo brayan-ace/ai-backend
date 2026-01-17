@@ -52,11 +52,14 @@ class ApiService {
           );
 
       print('✅ [Response Received] Status: ${response.statusCode}');
-      print('📄 [Response Body] ${response.body}');
+      // Decode raw bytes to a Dart string to avoid malformed UTF-16 from
+      // intermediate encodings. Allow malformed so we don't crash on odd bytes.
+      final bodyString = utf8.decode(response.bodyBytes, allowMalformed: true);
+      print('📄 [Response Body] $bodyString');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         try {
-          final decodedData = jsonDecode(response.body);
+          final decodedData = jsonDecode(bodyString);
           if (decodedData is Map) {
             // Preserve backward compatibility by returning the textual reply when present
             if (decodedData.containsKey('reply')) {
@@ -76,7 +79,7 @@ class ApiService {
               return decodedData['response'].toString(); // Generic response
             } else {
               print('⚠️ [Warning] Unexpected response format: $decodedData');
-              return response.body;
+              return bodyString;
             }
           }
           return response.body;
@@ -146,13 +149,14 @@ class ApiService {
         .timeout(const Duration(seconds: 60));
 
     print('✅ [sendRaw] Response Status: ${response.statusCode}');
-    print('📄 [sendRaw] Response Body: ${response.body}');
+    final bodyString = utf8.decode(response.bodyBytes, allowMalformed: true);
+    print('📄 [sendRaw] Response Body: $bodyString');
 
     if (response.statusCode == 200 || response.statusCode == 201) {
       try {
-        final decoded = jsonDecode(response.body);
+        final decoded = jsonDecode(bodyString);
         if (decoded is Map<String, dynamic>) return decoded;
-        return {'reply': response.body};
+        return {'reply': bodyString};
       } catch (e) {
         throw Exception('Failed to parse backend response: $e');
       }

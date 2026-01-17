@@ -112,7 +112,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
   void _logAndAddAiMessage(String text) {
     final hasNewlines = text.contains('\n');
     print('📥 [Frontend Received] len=${text.length} hasNewlines=$hasNewlines');
-    final preview = text.length > 800 ? text.substring(0, 800) + '...' : text;
+    final preview = text.runes.length > 800
+        ? String.fromCharCodes(text.runes.take(800)) + '...'
+        : text;
     print('📥 [Frontend Preview] $preview');
     setState(() {
       _messages.add(_Message(text: text, fromUser: false));
@@ -1062,18 +1064,20 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
       _messages.add(streamingMessage);
     });
 
-    // Stream character-by-character to preserve all whitespace (newlines, multiple spaces)
+    // Stream by Unicode code points (runes) to avoid splitting surrogate pairs
+    // This prevents temporary invalid UTF-16 halves (which crash rendering)
     final buffer = StringBuffer();
-    for (int i = 0; i < fullResponse.length; i++) {
+    final runes = fullResponse.runes.toList();
+    for (int i = 0; i < runes.length; i++) {
       if (!mounted) return;
-      buffer.write(fullResponse[i]);
+      buffer.write(String.fromCharCode(runes[i]));
       // Update the streaming message in small chunks to provide smooth typing effect
-      if (i % 2 == 0 || i == fullResponse.length - 1) {
+      if (i % 2 == 0 || i == runes.length - 1) {
         setState(() {
           streamingMessage.text = buffer.toString();
         });
       }
-      await Future.delayed(Duration(milliseconds: 6));
+      await Future.delayed(const Duration(milliseconds: 6));
     }
 
     if (!mounted) return;
@@ -1236,9 +1240,11 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
       print(
         '🔍 [RAW AI RESPONSE] length=${reply.toString().length} hasNewlines=${reply.toString().contains('\n')}',
       );
-      print(
-        '🔍 [RAW AI RESPONSE PREVIEW] ${reply.toString().length > 400 ? reply.toString().substring(0, 400) + "..." : reply.toString()}',
-      );
+      final replyStr = reply.toString();
+      final previewStr = replyStr.runes.length > 400
+          ? String.fromCharCodes(replyStr.runes.take(400)) + '...'
+          : replyStr;
+      print('🔍 [RAW AI RESPONSE PREVIEW] $previewStr');
       return reply.isEmpty ? null : reply.toString();
     } catch (e) {
       return '⚠️ All AI services are currently unavailable. ($e)';
