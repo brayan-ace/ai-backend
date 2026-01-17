@@ -5,6 +5,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../utils/theme.dart';
+import 'professional_message_widget.dart';
 
 class AiMessageBubble extends StatefulWidget {
   final String text;
@@ -993,16 +994,8 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
                             ),
                           ),
                         ],
-                        // Use RichText with proper text wrapping - no horizontal scroll
-                        SelectableText.rich(
-                          TextSpan(children: _parseText(formattedText)),
-                          style: TextStyle(
-                            color: AppTheme.textPrimary,
-                            fontSize: 16,
-                            height: 1.7,
-                            letterSpacing: 0.1,
-                          ),
-                        ),
+                        // Use ProfessionalMessageWidget for enhanced formatting
+                        ProfessionalMessageWidget(formattedText, isBot: true),
                       ],
                     ),
                   ),

@@ -20,6 +20,7 @@ import '../services/web_search_service.dart';
 import '../services/chat_storage_service.dart';
 import 'notes_screen.dart';
 import 'chat_history_screen.dart';
+import 'bot_creation_screen.dart';
 
 class OnlineAiScreen extends StatefulWidget {
   const OnlineAiScreen({Key? key}) : super(key: key);
@@ -2045,7 +2046,12 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                 child: InkWell(
                   onTap: () {
                     Navigator.pop(context);
-                    Navigator.pushNamed(context, '/study');
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const BotCreationScreen(),
+                      ),
+                    );
                   },
                   borderRadius: BorderRadius.circular(AppTheme.radiusMd),
                   child: Container(

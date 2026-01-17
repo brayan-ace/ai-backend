@@ -727,10 +727,76 @@ app.get("/", (req, res) => {
 });
 
 // Add the missing /api/chat-enhanced endpoint
+// ============= BOT INSTRUCTIONS RETRIEVAL ENDPOINT =============
+// Frontend calls this to get fresh bot instructions from database
+app.get("/api/bot/:botId/instructions", async (req, res) => {
+  try {
+    const { botId } = req.params;
+    console.log(
+      "[GET /api/bot/:botId/instructions] Fetching for botId:",
+      botId
+    );
+
+    if (!botId) {
+      return res.status(400).json({
+        error: "Invalid request",
+        message: "botId is required",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Query database for bot and its instructions
+    const result = await pool.query(
+      `SELECT bot_id, name, topic, grade_level, system_instructions 
+       FROM study_bots 
+       WHERE bot_id = $1 
+       LIMIT 1`,
+      [botId]
+    );
+
+    if (result.rows.length === 0) {
+      console.log("[Bot Instructions] Bot not found:", botId);
+      return res.status(404).json({
+        error: "Bot not found",
+        message: `Bot with ID ${botId} not found in database`,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    const bot = result.rows[0];
+    console.log("[Bot Instructions] Found bot:", bot.name);
+
+    return res.json({
+      status: "success",
+      botId: bot.bot_id,
+      botName: bot.name,
+      topic: bot.topic,
+      gradeLevel: bot.grade_level,
+      systemInstructions: bot.system_instructions,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("[GET /api/bot/:botId/instructions] Error:", err.message);
+    return res.status(500).json({
+      error: "Failed to fetch bot instructions",
+      message: err.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// ============= ENHANCED CHAT ENDPOINT WITH INSTRUCTION REVIEW =============
 app.post("/api/chat-enhanced", async (req, res) => {
   try {
     console.log("[POST /api/chat-enhanced] Request received");
-    const { message, botId, userId, systemInstructions } = req.body;
+    const {
+      message,
+      botId,
+      userId,
+      systemInstructions,
+      learnerProfile,
+      currentMood,
+    } = req.body;
 
     if (!message || !botId || !userId) {
       return res.status(400).json({
@@ -740,16 +806,87 @@ app.post("/api/chat-enhanced", async (req, res) => {
       });
     }
 
-    // Log the received payload for debugging
-    console.log("[POST /api/chat-enhanced] Received payload:", req.body);
+    console.log("[POST /api/chat-enhanced] Received payload:", {
+      message: message.substring(0, 50),
+      botId,
+      userId,
+      hasLearnerProfile: !!learnerProfile,
+      hasMood: !!currentMood,
+    });
 
-    // Extract system instructions
-    const instructions = systemInstructions?.instructions || "";
+    // STEP 1: Fetch fresh instructions from database (always review)
+    let dbInstructions = null;
+    try {
+      const result = await pool.query(
+        `SELECT system_instructions FROM study_bots WHERE bot_id = $1 LIMIT 1`,
+        [botId]
+      );
+      if (result.rows.length > 0) {
+        dbInstructions = result.rows[0].system_instructions;
+        console.log("[Chat-Enhanced] ✅ Instructions fetched from database");
+      }
+    } catch (dbErr) {
+      console.warn("[Chat-Enhanced] Could not fetch from DB:", dbErr.message);
+    }
 
-    // Build the prompt for the AI model
-    const prompt = `${instructions}\n\nUser Message: ${message}`;
+    // STEP 2: Use database instructions first, fallback to frontend instructions
+    let instructions = "",
+      instructionSource = "";
 
-    // Call the AI model to generate a meaningful response
+    if (dbInstructions?.instructions) {
+      instructions = dbInstructions.instructions;
+      instructionSource = "database";
+      console.log("[Chat-Enhanced] Using instructions from DATABASE");
+    } else if (systemInstructions?.instructions) {
+      instructions = systemInstructions.instructions;
+      instructionSource = "frontend";
+      console.log("[Chat-Enhanced] Using instructions from FRONTEND");
+    } else {
+      console.warn("[Chat-Enhanced] ⚠️ NO INSTRUCTIONS FOUND - using generic");
+      instructions = `You are a helpful study bot. Help the user learn about this topic.`;
+      instructionSource = "fallback";
+    }
+
+    console.log(
+      "[Chat-Enhanced] Instructions ready:",
+      `${instructions.substring(0, 100)}... (source: ${instructionSource})`
+    );
+
+    // STEP 3: Enhance instructions with learner profile if available
+    let enhancedInstructions = instructions;
+    if (learnerProfile) {
+      const profileContext = `
+[LEARNER PROFILE]
+- Learning Style: ${learnerProfile.learningStyle}
+- Pace: ${learnerProfile.pacePreference}
+- Tone: ${learnerProfile.communicationTone}
+- Confidence: ${(learnerProfile.confidenceLevel * 100).toFixed(0)}%`;
+      enhancedInstructions = `${instructions}${profileContext}`;
+      console.log("[Chat-Enhanced] Instructions enhanced with learner profile");
+    }
+
+    // STEP 4: Add mood-based context if available
+    if (currentMood?.sentiment) {
+      const moodContext = `\n[LEARNER MOOD] Sentiment: ${currentMood.sentiment}, Action: ${currentMood.suggestedAction}`;
+      enhancedInstructions = `${enhancedInstructions}${moodContext}`;
+      console.log("[Chat-Enhanced] Instructions enhanced with mood context");
+    }
+
+    // STEP 5: Prepare messages for AI model
+    const messages = [
+      {
+        role: "system",
+        content: enhancedInstructions,
+      },
+      {
+        role: "user",
+        content: message,
+      },
+    ];
+
+    console.log("[Chat-Enhanced] Messages prepared, calling AI model...");
+
+    // STEP 6: Call AI model with proper instructions
     const groqApiKey = process.env.GROQ_API_KEY;
     if (!groqApiKey) {
       console.error("[POST /api/chat-enhanced] GROQ_API_KEY not configured");
@@ -764,10 +901,7 @@ app.post("/api/chat-enhanced", async (req, res) => {
       "https://api.groq.com/openai/v1/chat/completions",
       {
         model: "mixtral-8x7b-32768",
-        messages: [
-          { role: "system", content: instructions },
-          { role: "user", content: message },
-        ],
+        messages: messages,
         max_tokens: 1500,
         temperature: 0.7,
       },
@@ -783,15 +917,24 @@ app.post("/api/chat-enhanced", async (req, res) => {
     const aiResponse =
       response.data.choices?.[0]?.message?.content || "No response from AI";
 
+    console.log(
+      "[Chat-Enhanced] ✅ AI response received, length:",
+      aiResponse.length
+    );
+
     return res.json({
       status: "success",
       response: aiResponse,
       state: "intro",
       progress: { percentage: 0 },
+      instructionSource: instructionSource,
+      learnerProfileApplied: !!learnerProfile,
+      moodApplied: !!currentMood,
       timestamp: new Date().toISOString(),
     });
   } catch (err) {
     console.error("[POST /api/chat-enhanced] Error:", err.message);
+    console.error("[POST /api/chat-enhanced] Stack:", err.stack);
     return res.status(500).json({
       error: "Failed to process chat message",
       message: err.message,

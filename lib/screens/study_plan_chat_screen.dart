@@ -5,10 +5,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/study_bot_state.dart';
 import '../services/study_plan_service.dart';
 import '../services/study_bot_flow_controller.dart';
+import '../services/tutor_engagement_service.dart';
+import '../services/progress_tracking_service.dart';
 import '../utils/theme.dart';
 import 'study_plan_editor_screen.dart';
 import 'quiz_config_screen.dart';
 import '../widgets/quiz_artifact_widget.dart';
+import '../widgets/study_plan_hamburger_menu.dart';
 
 // Widget to render formatted text with emojis and markdown-like styling
 // Includes professional spacing, line separators, and full-width containers
@@ -176,6 +179,8 @@ class StudyPlanChatScreen extends StatefulWidget {
 class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   late StudyPlanService _planService;
   late StudyBotFlowController _flowController;
+  late TutorEngagementService _tutorService;
+  late ProgressTrackingService _progressService;
 
   bool _isPhase1 = false;
   bool _isPhase2 = false;
@@ -196,6 +201,8 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   // Progress tracking
   double _progressPercentage = 0;
   String _botCurrentState = 'intro';
+  LearnerProfile? _learnerProfile;
+  UserMoodState? _currentMood;
 
   // Quiz tracking
   int? _currentQuizId;
@@ -206,11 +213,12 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     defaultValue: 'https://ai-backend-vf75.onrender.com',
   );
 
-  @override
   void initState() {
     super.initState();
     _planService = StudyPlanService();
     _flowController = StudyBotFlowController();
+    _tutorService = TutorEngagementService();
+    _progressService = ProgressTrackingService();
 
     // Initialize bot instructions from parameters
     _botInstructions = widget.systemInstructions;
@@ -234,6 +242,16 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       // Initialize botState first so screen can render
       if (_botState == null && widget.botId != null) {
         _botState = _flowController.createNewSession(botId: widget.botId!);
+      }
+
+      // Initialize progress tracking for this session
+      if (_botState != null) {
+        final toc = _botState!.tableOfContents;
+        final totalModules = toc?.length ?? 8;
+        await _progressService.initializeProgress(
+          _botState!.sessionId,
+          totalModules,
+        );
       }
 
       // If resuming a bot, load chat history and progress from backend
@@ -315,6 +333,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         await _fetchFreshSystemInstructions(widget.botId!);
       }
 
+      // Generate warm greeting and initial learner profile building
+      _initializeWarmGreeting();
+
       // Always fetch initial greeting from backend - ALL responses come from AI
       // The backend will use system instructions to generate personalized greeting
       _fetchInitialGreeting();
@@ -323,6 +344,32 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     } catch (e) {
       print('[ChatScreen] Error in _initPhase2: $e');
     }
+  }
+
+  /// Initialize warm greeting and begin learner profile building
+  void _initializeWarmGreeting() {
+    if (_botState == null) return;
+
+    // Generate warm, casual greeting (NOT the system's standard greeting)
+    final warmGreeting = _tutorService.generateWarmGreeting(
+      widget.botName ?? 'Your Tutor',
+      widget.planName ?? 'Study Plan',
+    );
+
+    // Create initial greeting message
+    final greetingMessage = StudyBotMessage(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      senderType: 'bot',
+      text: warmGreeting,
+      timestamp: DateTime.now(),
+    );
+
+    // Add to messages
+    setState(() {
+      _messages = [greetingMessage];
+    });
+
+    print('[ChatScreen] Warm greeting initialized: $warmGreeting');
   }
 
   /// Fetch the latest system instructions from the backend database
@@ -422,10 +469,15 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   }
 
   Future<void> _addBotMessage(String text) async {
+    // Apply mood-aware response adaptation
+    String adaptedText = _applyMoodAdaptation(text);
+
     // Check if this is a quiz popup trigger
-    if (text.contains('[SHOW_QUIZ_POPUP]')) {
+    if (adaptedText.contains('[SHOW_QUIZ_POPUP]')) {
       // Extract the actual message (without the marker)
-      final displayText = text.replaceAll('[SHOW_QUIZ_POPUP]', '').trim();
+      final displayText = adaptedText
+          .replaceAll('[SHOW_QUIZ_POPUP]', '')
+          .trim();
 
       // Add the message without the marker
       final message = StudyBotMessage(
@@ -455,7 +507,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       final message = StudyBotMessage(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         senderType: 'bot',
-        text: text,
+        text: adaptedText,
         timestamp: DateTime.now(),
       );
 
@@ -480,6 +532,35 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       timestamp: DateTime.now(),
     );
 
+    // Detect user mood from this message
+    _currentMood = _tutorService.detectMood(text);
+    print('[ChatScreen] Detected mood: ${_currentMood?.sentiment}');
+
+    // Check if user is indicating understanding or confusion
+    if (_indicatesUnderstanding(text)) {
+      print('[ChatScreen] User indicated understanding');
+      // Will trigger milestone recording after backend response
+    } else if (_indicatesConfusion(text)) {
+      print('[ChatScreen] User indicated confusion');
+      // Backend will know to provide clarification
+    }
+
+    // Build learner profile from initial exchanges if not yet built
+    if (_learnerProfile == null && _messages.length < 6) {
+      // Build profile from first few exchanges
+      final exchange = _messages
+          .map((m) => {'text': m.text, 'sender': m.senderType})
+          .toList();
+      exchange.add({'text': text, 'sender': 'user'});
+      _learnerProfile = _tutorService.buildLearnerProfile(
+        _botState?.sessionId ?? 'unknown',
+        exchange.cast<Map<String, String>>(),
+      );
+      print(
+        '[ChatScreen] Learner profile built: ${_learnerProfile?.learningStyle}',
+      );
+    }
+
     setState(() {
       _messages.add(message);
       _inputController.clear();
@@ -501,16 +582,25 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       print('[ChatScreen] User ID: $userId');
 
       final uri = Uri.parse('$_backendUrl/api/chat-enhanced');
+
+      // Build enhanced payload with learner profile and mood
       final payload = {
         'message': userMessage,
         'botId': widget.botId,
         'userId': userId,
         'systemInstructions': _botInstructions,
+        'learnerProfile': _learnerProfile?.toJson(),
+        'currentMood': _currentMood?.toJson(),
       };
 
       final payloadStr = jsonEncode(payload);
       final maxLen = payloadStr.length > 200 ? 200 : payloadStr.length;
-      print('[ChatScreen] Payload: ${payloadStr.substring(0, maxLen)}');
+      print('[ChatScreen] 📤 Payload: ${payloadStr.substring(0, maxLen)}');
+      print(
+        '[ChatScreen] 📋 Instructions present: ${_botInstructions != null}',
+      );
+      print('[ChatScreen] 👤 Learner profile: ${_learnerProfile != null}');
+      print('[ChatScreen] 🎭 Current mood: ${_currentMood?.sentiment}');
 
       final resp = await http
           .post(
@@ -520,31 +610,68 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
           )
           .timeout(Duration(seconds: 30));
 
-      print(
-        '[ChatScreen] Response: ${resp.statusCode} ${resp.body.substring(0, resp.body.length > 200 ? 200 : resp.body.length)}',
+      final respPreview = resp.body.substring(
+        0,
+        resp.body.length > 200 ? 200 : resp.body.length,
       );
+      print('[ChatScreen] 📬 Response status: ${resp.statusCode}');
+      print('[ChatScreen] 📬 Response: $respPreview');
 
       if (resp.statusCode >= 200 && resp.statusCode < 300) {
-        final body = jsonDecode(resp.body) as Map<String, dynamic>;
-        final botResponse = body['response'] ?? 'No response';
-        final newState = body['state'] ?? _botCurrentState;
-        final progress = body['progress'] as Map<String, dynamic>?;
+        try {
+          final body = jsonDecode(resp.body) as Map<String, dynamic>;
+          final botResponse = body['response'] ?? 'No response';
+          final newState = body['state'] ?? _botCurrentState;
+          final progress = body['progress'] as Map<String, dynamic>?;
+          final instructionSource = body['instructionSource'] ?? 'unknown';
+          final profileApplied = body['learnerProfileApplied'] ?? false;
+          final moodApplied = body['moodApplied'] ?? false;
 
-        setState(() {
-          _botCurrentState = newState;
-          if (progress != null) {
-            _progressPercentage = (progress['percentage'] ?? 0).toDouble();
-          }
-          print('[ChatScreen] 📊 State updated: $_botCurrentState');
-        });
+          print('[ChatScreen] ✅ Backend processing info:');
+          print('[ChatScreen]    - Instructions from: $instructionSource');
+          print('[ChatScreen]    - Learner profile applied: $profileApplied');
+          print('[ChatScreen]    - Mood applied: $moodApplied');
 
-        await _addBotMessage(botResponse);
+          setState(() {
+            _botCurrentState = newState;
+            if (progress != null) {
+              _progressPercentage = (progress['percentage'] ?? 0).toDouble();
+            }
+            print('[ChatScreen] 📊 State updated: $_botCurrentState');
+          });
+
+          await _addBotMessage(botResponse);
+        } catch (parseErr) {
+          print('[ChatScreen] ❌ Error parsing response JSON: $parseErr');
+          await _addBotMessage(
+            'Error: Could not parse backend response. Please try again.',
+          );
+        }
+      } else if (resp.statusCode == 500) {
+        print('[ChatScreen] ❌ ERROR 500 - Server error from backend');
+        print('[ChatScreen] ❌ Response body: ${resp.body}');
+        await _addBotMessage(
+          'Backend error (500): The server encountered an error. Please check:\n1. Bot instructions are stored correctly\n2. API key is configured\n3. Bot ID is valid',
+        );
+      } else if (resp.statusCode == 404) {
+        print('[ChatScreen] ❌ ERROR 404 - Bot or endpoint not found');
+        await _addBotMessage(
+          'Error 404: Bot not found. Please ensure the bot was created successfully.',
+        );
+      } else if (resp.statusCode == 400) {
+        print('[ChatScreen] ❌ ERROR 400 - Bad request');
+        await _addBotMessage(
+          'Error 400: Invalid request format. Check all required fields are present.',
+        );
       } else {
+        print('[ChatScreen] ⚠️ Unexpected status code: ${resp.statusCode}');
         await _addBotMessage('Error: ${resp.statusCode}. ${resp.body}');
       }
     } catch (e) {
-      print('[ChatScreen] Error: $e');
-      await _addBotMessage('Network error: $e');
+      print('[ChatScreen] ❌ Network/Connection Error: $e');
+      await _addBotMessage(
+        'Network error: $e\n\nPlease check your internet connection and try again.',
+      );
     } finally {
       setState(() => _isLoading = false);
     }
@@ -1257,75 +1384,23 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
 
   /// Build drawer menu with navigation options
   Widget _buildDrawer() {
-    return Drawer(
-      backgroundColor: AppTheme.backgroundDeep,
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          DrawerHeader(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppTheme.primaryBlue,
-                  AppTheme.primaryBlue.withOpacity(0.8),
-                ],
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Text(
-                  widget.botName ?? 'Study Bot',
-                  style: AppTheme.headlineMedium.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                SizedBox(height: AppTheme.spaceSm),
-                Text(
-                  'Menu',
-                  style: AppTheme.bodySmall.copyWith(
-                    color: Colors.white.withOpacity(0.8),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          ListTile(
-            leading: Icon(Icons.home, color: AppTheme.primaryBlue),
-            title: Text(
-              'Back to Main AI',
-              style: AppTheme.bodyMedium.copyWith(color: AppTheme.textPrimary),
-            ),
-            onTap: () {
-              Navigator.of(context).pop(); // Close drawer
-              Navigator.of(context).pop(); // Return to main page
-            },
-          ),
-          Divider(
-            color: AppTheme.surfaceElevated,
-            height: AppTheme.spaceLg,
-            indent: AppTheme.spaceMd,
-            endIndent: AppTheme.spaceMd,
-          ),
-          ListTile(
-            leading: Icon(Icons.info_outline, color: AppTheme.primaryBlue),
-            title: Text(
-              'About This Bot',
-              style: AppTheme.bodyMedium.copyWith(color: AppTheme.textPrimary),
-            ),
-            onTap: () {
-              Navigator.of(context).pop(); // Close drawer
-              _showAboutDialog();
-            },
-          ),
-        ],
-      ),
+    return StudyPlanHamburgerMenu(
+      tableOfContents: _botState?.tableOfContents,
+      currentModule: _botState?.currentModule ?? 0,
+      completedModules: _botState?.completedModules,
+      progressPercentage: _progressPercentage,
+      onModuleEdit: (moduleIndex, moduleName) {
+        // Handle module edit - can navigate to editor
+        print('[ChatScreen] Edit module $moduleIndex: $moduleName');
+      },
+      onClose: () {
+        print('[ChatScreen] Hamburger menu closed');
+      },
     );
   }
 
   /// Show about dialog with bot information
+  @pragma('vm:entry-point')
   void _showAboutDialog() {
     showDialog(
       context: context,
@@ -2144,6 +2219,120 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       }
     }
     return null;
+  }
+
+  /// Apply mood-aware adaptation to bot responses
+  String _applyMoodAdaptation(String response) {
+    if (_currentMood == null) return response;
+
+    switch (_currentMood!.sentiment) {
+      case 'frustrated':
+        // Add supportive message and simplification
+        return '${_tutorService.getSupportMessage()}\n\n$response';
+
+      case 'confused':
+        // Add check-in with encouragement
+        return '$response\n\n${_tutorService.getCheckInMessage()}';
+
+      case 'positive':
+        // Add affirmation and advance
+        return '${_tutorService.getAffirmationMessage()} $response\n\n${_tutorService.getTransitionMessage()}';
+
+      default:
+        return response;
+    }
+  }
+
+  /// Record milestone and update progress
+  Future<void> _recordMilestone(
+    String description,
+    String type, {
+    double? progressIncrement,
+  }) async {
+    if (_botState == null) return;
+
+    try {
+      final updatedProgress = await _progressService.addMilestone(
+        _botState!.sessionId,
+        description,
+        type,
+        progressIncrement: progressIncrement,
+      );
+
+      setState(() {
+        _progressPercentage = (updatedProgress.overallProgress * 100).clamp(
+          0,
+          100,
+        );
+      });
+
+      print(
+        '[ChatScreen] Milestone recorded: $description, Progress: ${_progressPercentage.toStringAsFixed(1)}%',
+      );
+    } catch (e) {
+      print('[ChatScreen] Error recording milestone: $e');
+    }
+  }
+
+  /// Handle user validation of understanding
+  @pragma('vm:entry-point')
+  Future<void> _handleUnderstandingValidation() async {
+    if (_botState == null) return;
+
+    // Record concept mastery
+    await _recordMilestone(
+      'User confirmed understanding',
+      'concept_mastery',
+      progressIncrement: 0.05,
+    );
+
+    // Trigger active recall question
+    _triggerActiveRecall();
+  }
+
+  /// Trigger active recall quiz question
+  void _triggerActiveRecall() {
+    if (_messages.isEmpty) return;
+
+    // Get the last bot message as context
+    final lastBotMessage = _messages.lastWhere(
+      (m) => m.senderType == 'bot',
+      orElse: () => _messages.first,
+    );
+
+    // Generate recall question based on previous content
+    final recallQuestion = _tutorService.generateActiveRecallQuestion(
+      lastBotMessage.text,
+      _botState?.currentModule ?? 1,
+    );
+
+    print('[ChatScreen] Active recall triggered: $recallQuestion');
+
+    // Add as a bot message with special formatting
+    _addBotMessage(recallQuestion);
+  }
+
+  /// Check if user's message indicates understanding
+  bool _indicatesUnderstanding(String message) {
+    final lowerMessage = message.toLowerCase();
+    return lowerMessage.contains('got it') ||
+        lowerMessage.contains('understand') ||
+        lowerMessage.contains('makes sense') ||
+        lowerMessage.contains('clear') ||
+        lowerMessage.contains('i get it') ||
+        lowerMessage.contains('yes') ||
+        lowerMessage.contains('👍');
+  }
+
+  /// Check if user's message indicates confusion
+  bool _indicatesConfusion(String message) {
+    final lowerMessage = message.toLowerCase();
+    return lowerMessage.contains('confused') ||
+        lowerMessage.contains('not sure') ||
+        lowerMessage.contains('explain') ||
+        lowerMessage.contains('again') ||
+        lowerMessage.contains('huh') ||
+        lowerMessage.contains('what');
   }
 
   @override
