@@ -727,7 +727,6 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
         );
       } else if (matched.startsWith(':') && matched.endsWith(':')) {
         // Emoji pattern
-        final emojiCode = matched.substring(1, matched.length - 1);
         spans.add(
           WidgetSpan(
             child: Container(
