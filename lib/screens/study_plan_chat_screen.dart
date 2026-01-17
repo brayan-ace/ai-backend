@@ -12,6 +12,19 @@ import 'study_plan_editor_screen.dart';
 import 'quiz_config_screen.dart';
 import '../widgets/quiz_artifact_widget.dart';
 import '../widgets/study_plan_hamburger_menu.dart';
+import '../widgets/professional_message_widget.dart';
+
+// Premium color palette matching bot creation and processing screens
+class PremiumColors {
+  static const Color darkBg = Color(0xFF0a0a0a); // Pure black
+  static const Color darkBg2 = Color(0xFF1a1a2e); // Deep blue-black
+  static const Color accentGradient1 = Color(0xFF6366f1); // Indigo
+  static const Color accentGradient2 = Color(0xFF8b5cf6); // Purple
+  static const Color accentGradient3 = Color(0xFF3b82f6); // Blue
+  static const Color cardBg = Color(0xFF111827); // Very dark gray
+  static const Color focusBorder = Color(0xFF4f46e5); // Focus blue
+  static const Color successGreen = Color(0xFF10b981); // Success green
+}
 
 // Widget to render formatted text with emojis and markdown-like styling
 // Includes professional spacing, line separators, and full-width containers
@@ -994,33 +1007,45 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
 
   Widget _buildPhase2ChatScreen() {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundDeep,
+      backgroundColor: PremiumColors.darkBg,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: null,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              widget.botName ?? 'Study Bot',
-              style: AppTheme.headlineSmall.copyWith(
-                color: AppTheme.textPrimary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            if (_botCurrentState.isNotEmpty)
+        title: ShaderMask(
+          shaderCallback: (bounds) => LinearGradient(
+            colors: [
+              PremiumColors.accentGradient2,
+              PremiumColors.accentGradient1,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ).createShader(bounds),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Text(
-                _botCurrentState == 'intro'
-                    ? 'Ready to learn? Say "ready"'
-                    : _botCurrentState == 'plan_review'
-                    ? 'Plan created - Ready to start?'
-                    : 'Learning mode - Step by step',
-                style: AppTheme.bodySmall.copyWith(
-                  color: AppTheme.textSecondary,
+                widget.botName ?? 'Study Bot',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
                 ),
               ),
-          ],
+              if (_botCurrentState.isNotEmpty)
+                Text(
+                  _botCurrentState == 'intro'
+                      ? '✨ Ready to learn'
+                      : _botCurrentState == 'plan_review'
+                      ? '📋 Plan ready'
+                      : '🎓 Learning mode',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.white.withOpacity(0.8),
+                  ),
+                ),
+            ],
+          ),
         ),
         actions: [
           // Bookmark Icon - Study Plan Access
@@ -1030,13 +1055,22 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
               padding: EdgeInsets.only(right: AppTheme.spaceMd),
               child: Container(
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryBlue.withOpacity(0.2),
+                  gradient: LinearGradient(
+                    colors: [
+                      PremiumColors.accentGradient2.withOpacity(0.2),
+                      PremiumColors.accentGradient1.withOpacity(0.15),
+                    ],
+                  ),
                   borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: PremiumColors.accentGradient1.withOpacity(0.3),
+                    width: 1.5,
+                  ),
                 ),
                 child: IconButton(
                   icon: Icon(
                     Icons.bookmark,
-                    color: AppTheme.primaryBlue,
+                    color: PremiumColors.accentGradient1,
                     size: 24,
                   ),
                   tooltip: 'View Study Plan',
@@ -1052,228 +1086,330 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         ],
       ),
       drawer: _buildDrawer(),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Enhanced Progress Bar with Concept Tracking
-            if (_botCurrentState == 'learning')
-              Container(
-                padding: EdgeInsets.all(AppTheme.spaceMd),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppTheme.primaryBlue.withOpacity(0.05),
-                      AppTheme.primaryBlue.withOpacity(0.02),
-                    ],
-                  ),
-                  border: Border(
-                    bottom: BorderSide(
-                      color: AppTheme.primaryBlue.withOpacity(0.1),
-                      width: 1,
-                    ),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '🎯 Concepts Mastered',
-                          style: AppTheme.bodySmall.copyWith(
-                            color: AppTheme.textSecondary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Text(
-                          '${_progressPercentage.toStringAsFixed(0)}%',
-                          style: AppTheme.bodySmall.copyWith(
-                            color: AppTheme.primaryBlue,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              PremiumColors.darkBg,
+              PremiumColors.darkBg2.withOpacity(0.5),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Enhanced Progress Bar with Concept Tracking
+              if (_botCurrentState == 'learning')
+                Container(
+                  padding: EdgeInsets.all(AppTheme.spaceMd),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        PremiumColors.accentGradient1.withOpacity(0.08),
+                        PremiumColors.accentGradient2.withOpacity(0.05),
                       ],
                     ),
-                    SizedBox(height: 12),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: LinearProgressIndicator(
-                        value: _progressPercentage / 100,
-                        minHeight: 8,
-                        backgroundColor: AppTheme.primaryBlue.withOpacity(0.15),
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          AppTheme.primaryBlue,
+                    border: Border(
+                      bottom: BorderSide(
+                        color: PremiumColors.accentGradient1.withOpacity(0.2),
+                        width: 1.5,
+                      ),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '🎯 Concepts Mastered',
+                            style: AppTheme.bodySmall.copyWith(
+                              color: Colors.white.withOpacity(0.8),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  PremiumColors.accentGradient2,
+                                  PremiumColors.accentGradient1,
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '${_progressPercentage.toStringAsFixed(0)}%',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 12),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: LinearProgressIndicator(
+                          value: _progressPercentage / 100,
+                          minHeight: 6,
+                          backgroundColor: PremiumColors.accentGradient1
+                              .withOpacity(0.15),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            PremiumColors.accentGradient1,
+                          ),
                         ),
                       ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      '✨ Say "I understand" when you master a concept to track progress',
-                      style: AppTheme.bodySmall.copyWith(
-                        color: AppTheme.textSecondary,
-                        fontStyle: FontStyle.italic,
-                        fontSize: 12,
+                      SizedBox(height: 8),
+                      Text(
+                        '✨ Say "I understand" when you master a concept',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.6),
+                          fontStyle: FontStyle.italic,
+                          fontSize: 12,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                ),
+
+              // Table of Contents (if visible)
+              if (_showToc && _botState?.tableOfContents != null)
+                _buildTableOfContentsWidget(),
+
+              // Chat Messages
+              Expanded(
+                child: ListView.builder(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppTheme.spaceMd,
+                    vertical: AppTheme.spaceMd,
+                  ),
+                  itemCount: _messages.length,
+                  itemBuilder: (context, index) {
+                    final msg = _messages[index];
+                    final isBot = msg.senderType == 'bot';
+                    return Padding(
+                      padding: EdgeInsets.only(bottom: AppTheme.spaceMd),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: isBot
+                            ? MainAxisAlignment.start
+                            : MainAxisAlignment.end,
+                        children: [
+                          if (isBot)
+                            Container(
+                              width: 32,
+                              height: 32,
+                              margin: EdgeInsets.only(right: AppTheme.spaceSm),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(
+                                  colors: [
+                                    PremiumColors.accentGradient2,
+                                    PremiumColors.accentGradient1,
+                                  ],
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: PremiumColors.accentGradient2
+                                        .withOpacity(0.3),
+                                    blurRadius: 12,
+                                    spreadRadius: 1,
+                                  ),
+                                ],
+                              ),
+                              child: Center(
+                                child: Icon(
+                                  Icons.psychology,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                              ),
+                            ),
+                          Flexible(
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                              decoration: BoxDecoration(
+                                gradient: isBot
+                                    ? LinearGradient(
+                                        colors: [
+                                          PremiumColors.cardBg.withOpacity(0.8),
+                                          PremiumColors.darkBg2.withOpacity(
+                                            0.6,
+                                          ),
+                                        ],
+                                      )
+                                    : LinearGradient(
+                                        colors: [
+                                          PremiumColors.accentGradient2,
+                                          PremiumColors.accentGradient1,
+                                        ],
+                                      ),
+                                borderRadius: BorderRadius.only(
+                                  topLeft: Radius.circular(isBot ? 4 : 16),
+                                  topRight: Radius.circular(isBot ? 16 : 4),
+                                  bottomLeft: Radius.circular(16),
+                                  bottomRight: Radius.circular(16),
+                                ),
+                                border: isBot
+                                    ? Border.all(
+                                        color: PremiumColors.accentGradient1
+                                            .withOpacity(0.2),
+                                        width: 1,
+                                      )
+                                    : null,
+                                boxShadow: isBot
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.2),
+                                          blurRadius: 12,
+                                          spreadRadius: 1,
+                                        ),
+                                      ]
+                                    : [],
+                              ),
+                              child: isBot
+                                  ? ProfessionalMessageWidget(
+                                      msg.text,
+                                      isBot: true,
+                                    )
+                                  : Text(
+                                      msg.text,
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        height: 1.5,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                          if (!isBot) SizedBox(width: AppTheme.spaceXs),
+                        ],
+                      ),
+                    );
+                  },
                 ),
               ),
 
-            // Table of Contents (if visible)
-            if (_showToc && _botState?.tableOfContents != null)
-              _buildTableOfContentsWidget(),
+              // Input Area
+              _buildInputArea(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
-            // Chat Messages
-            Expanded(
-              child: ListView.builder(
-                padding: EdgeInsets.symmetric(
-                  horizontal: AppTheme.spaceMd,
-                  vertical: AppTheme.spaceMd,
+  // Input Area
+  Widget _buildInputArea() {
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            PremiumColors.darkBg2.withOpacity(0.8),
+            PremiumColors.cardBg,
+          ],
+        ),
+        border: Border(
+          top: BorderSide(
+            color: PremiumColors.accentGradient1.withOpacity(0.2),
+            width: 1.5,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    PremiumColors.cardBg.withOpacity(0.6),
+                    PremiumColors.darkBg2.withOpacity(0.4),
+                  ],
                 ),
-                itemCount: _messages.length,
-                itemBuilder: (context, index) {
-                  final msg = _messages[index];
-                  final isBot = msg.senderType == 'bot';
-                  return Padding(
-                    padding: EdgeInsets.only(bottom: AppTheme.spaceMd),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: isBot
-                          ? MainAxisAlignment.start
-                          : MainAxisAlignment.end,
-                      children: [
-                        if (isBot)
-                          Container(
-                            width: 32,
-                            height: 32,
-                            margin: EdgeInsets.only(right: AppTheme.spaceSm),
-                            decoration: BoxDecoration(
-                              color: AppTheme.primaryBlue,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.smart_toy,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                          ),
-                        Flexible(
-                          child: Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: AppTheme.spaceMd,
-                              vertical: AppTheme.spaceMd,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isBot
-                                  ? AppTheme.surfaceCard
-                                  : AppTheme.primaryBlue,
-                              borderRadius: BorderRadius.only(
-                                topLeft: Radius.circular(
-                                  isBot ? 4 : AppTheme.radiusMd,
-                                ),
-                                topRight: Radius.circular(
-                                  isBot ? AppTheme.radiusMd : 4,
-                                ),
-                                bottomLeft: Radius.circular(AppTheme.radiusMd),
-                                bottomRight: Radius.circular(AppTheme.radiusMd),
-                              ),
-                            ),
-                            child: isBot
-                                ? FormattedTextWidget(msg.text)
-                                : Text(
-                                    msg.text,
-                                    style: AppTheme.bodyMedium.copyWith(
-                                      color: Colors.white,
-                                      height: 1.5,
-                                    ),
-                                  ),
-                          ),
-                        ),
-                        if (!isBot) SizedBox(width: AppTheme.spaceXs),
-                      ],
-                    ),
-                  );
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: PremiumColors.accentGradient1.withOpacity(0.2),
+                  width: 1.5,
+                ),
+              ),
+              child: TextField(
+                controller: _inputController,
+                enabled: !_isLoading,
+                style: TextStyle(color: Colors.white, fontSize: 15),
+                decoration: InputDecoration(
+                  hintText: 'Ask me anything...',
+                  hintStyle: TextStyle(
+                    color: Colors.white.withOpacity(0.5),
+                    fontSize: 15,
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                ),
+                onSubmitted: (text) {
+                  if (text.isNotEmpty && !_isLoading) {
+                    _addUserMessage(text);
+                  }
                 },
               ),
             ),
-
-            // Input Area
-            Container(
-              padding: EdgeInsets.all(AppTheme.spaceMd),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceCard,
-                border: Border(
-                  top: BorderSide(color: AppTheme.surfaceElevated),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppTheme.backgroundDeep,
-                        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                        border: Border.all(
-                          color: AppTheme.surfaceElevated,
-                          width: 1,
-                        ),
-                      ),
-                      child: TextField(
-                        controller: _inputController,
-                        enabled: !_isLoading,
-                        decoration: InputDecoration(
-                          hintText: 'Type your message...',
-                          hintStyle: AppTheme.bodyMedium.copyWith(
-                            color: AppTheme.textSecondary,
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: AppTheme.spaceMd,
-                            vertical: AppTheme.spaceSm,
-                          ),
-                        ),
-                        onSubmitted: (text) {
-                          if (text.isNotEmpty && !_isLoading) {
-                            _addUserMessage(text);
-                          }
-                        },
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: AppTheme.spaceSm),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryBlue,
-                      shape: BoxShape.circle,
-                    ),
-                    child: IconButton(
-                      icon: _isLoading
-                          ? SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                valueColor: AlwaysStoppedAnimation(
-                                  Colors.white,
-                                ),
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : Icon(Icons.send, color: Colors.white),
-                      onPressed: _isLoading
-                          ? null
-                          : () {
-                              if (_inputController.text.isNotEmpty) {
-                                _addUserMessage(_inputController.text);
-                              }
-                            },
-                    ),
-                  ),
+          ),
+          SizedBox(width: 12),
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  PremiumColors.accentGradient2,
+                  PremiumColors.accentGradient1,
                 ],
               ),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: PremiumColors.accentGradient2.withOpacity(0.4),
+                  blurRadius: 15,
+                  spreadRadius: 2,
+                ),
+              ],
             ),
-          ],
-        ),
+            child: IconButton(
+              icon: _isLoading
+                  ? SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation(Colors.white),
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : Icon(Icons.send, color: Colors.white),
+              onPressed: _isLoading
+                  ? null
+                  : () {
+                      if (_inputController.text.isNotEmpty) {
+                        _addUserMessage(_inputController.text);
+                      }
+                    },
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -122,46 +122,35 @@ class ProfessionalMessageWidget extends StatelessWidget {
       case BlockType.mathBlock:
         return _buildMathBlock(block.content);
       case BlockType.paragraph:
-      default:
         return _buildParagraph(block.content);
     }
   }
 
-  /// Build paragraph with inline LaTeX support
+  /// Build paragraph with inline LaTeX support and markdown
   Widget _buildParagraph(String content) {
     final text = content.trim();
     if (text.isEmpty) return SizedBox.shrink();
 
-    // Check if paragraph contains inline math
-    if (text.contains(r'$') && !text.startsWith(r'$$')) {
-      return _buildMixedContentParagraph(text);
-    }
-
+    // Parse inline markdown and math
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 6.0),
-      child: SelectableText(
-        text,
-        style: TextStyle(
-          fontSize: 15,
-          height: 1.75,
-          color: AppTheme.textPrimary,
-          fontWeight: FontWeight.w400,
-          letterSpacing: 0.2,
-        ),
-      ),
+      child: RichText(text: _parseInlineMarkdown(text)),
     );
   }
 
-  /// Build paragraph with mixed text and LaTeX
-  Widget _buildMixedContentParagraph(String text) {
+  /// Parse inline markdown formatting (**bold**, *italic*, `code`, $math$)
+  InlineSpan _parseInlineMarkdown(String text) {
     final spans = <InlineSpan>[];
     var lastIndex = 0;
 
-    // Regex to find $...$ patterns (inline math)
-    final mathRegex = RegExp(r'\$([^\$]+)\$');
+    // Pattern for **bold**, *italic*, `code`, and $math$
+    final pattern = RegExp(
+      r'\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`|\$([^\$]+)\$',
+      multiLine: false,
+    );
 
-    for (final match in mathRegex.allMatches(text)) {
-      // Add text before math
+    for (final match in pattern.allMatches(text)) {
+      // Add plain text before match
       if (match.start > lastIndex) {
         spans.add(
           TextSpan(
@@ -177,29 +166,75 @@ class ProfessionalMessageWidget extends StatelessWidget {
         );
       }
 
-      // Add math with proper styling
-      final mathContent = match.group(1) ?? '';
-      spans.add(
-        WidgetSpan(
-          alignment: PlaceholderAlignment.middle,
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
-            child: Math.tex(
-              mathContent,
-              textStyle: TextStyle(color: AppTheme.primaryBlue, fontSize: 15),
-              onErrorFallback: (error) {
-                return Text(
-                  '\$${mathContent}\$',
-                  style: TextStyle(
-                    color: AppTheme.primaryBlue,
-                    fontFamily: 'monospace',
-                  ),
-                );
-              },
+      if (match.group(1) != null) {
+        // **Bold**
+        spans.add(
+          TextSpan(
+            text: match.group(1),
+            style: TextStyle(
+              fontSize: 15,
+              height: 1.75,
+              color: AppTheme.textPrimary,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
             ),
           ),
-        ),
-      );
+        );
+      } else if (match.group(2) != null) {
+        // *Italic*
+        spans.add(
+          TextSpan(
+            text: match.group(2),
+            style: TextStyle(
+              fontSize: 15,
+              height: 1.75,
+              color: AppTheme.textPrimary,
+              fontStyle: FontStyle.italic,
+              letterSpacing: 0.2,
+            ),
+          ),
+        );
+      } else if (match.group(3) != null) {
+        // `code`
+        spans.add(
+          WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Color(0xFF2D333B),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                match.group(3) ?? '',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFFE06C75),
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ),
+          ),
+        );
+      } else if (match.group(4) != null) {
+        // $math$
+        spans.add(
+          WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            child: Math.tex(
+              match.group(4) ?? '',
+              textStyle: TextStyle(color: AppTheme.primaryBlue, fontSize: 15),
+              onErrorFallback: (_) => Text(
+                '\$${match.group(4)}\$',
+                style: TextStyle(
+                  color: AppTheme.primaryBlue,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ),
+          ),
+        );
+      }
 
       lastIndex = match.end;
     }
@@ -220,10 +255,7 @@ class ProfessionalMessageWidget extends StatelessWidget {
       );
     }
 
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 6.0),
-      child: RichText(text: TextSpan(children: spans)),
-    );
+    return TextSpan(children: spans.isEmpty ? [TextSpan(text: text)] : spans);
   }
 
   /// Build heading with enhanced visual hierarchy

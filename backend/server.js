@@ -183,7 +183,7 @@ function detectUserConstraints(message, instructions = {}) {
 
   // Detect sentence count constraints
   const sentencesMatch = lower.match(
-    /in\s*(\d+)\s*sentences?|^(\d+)\s*sentences?/
+    /in\s*(\d+)\s*sentences?|^(\d+)\s*sentences?/,
   );
   if (sentencesMatch) {
     result.sentences = parseInt(sentencesMatch[1] || sentencesMatch[2], 10);
@@ -341,7 +341,7 @@ async function searchTopicOnline(topic, gradeLevel) {
         include_answer: true,
         max_results: 5,
       },
-      { timeout: 10000 }
+      { timeout: 10000 },
     );
 
     if (response.data?.results?.length > 0) {
@@ -382,7 +382,7 @@ Provide a concise and informative summary based on the search results. Ensure th
     const response = await axios.post(
       "https://api.groq.com/openai/v1/chat/completions",
       {
-        model: "mixtral-8x7b-32768",
+        model: "openai/gpt-oss-20b",
         messages: [
           { role: "system", content: "You are a helpful assistant." },
           { role: "user", content: prompt },
@@ -396,7 +396,7 @@ Provide a concise and informative summary based on the search results. Ensure th
           Authorization: `Bearer ${groqApiKey}`,
         },
         timeout: 30000,
-      }
+      },
     );
 
     const enhancedAnswer =
@@ -413,7 +413,7 @@ async function generateEnhancedInstructions(
   topic,
   description,
   gradeLevel,
-  groqApiKey
+  groqApiKey,
 ) {
   try {
     const searchResults = await searchTopicOnline(topic, gradeLevel);
@@ -462,7 +462,7 @@ Return ONLY valid JSON with this exact structure:
           Authorization: `Bearer ${groqApiKey}`,
         },
         timeout: 30000,
-      }
+      },
     );
 
     const responseText = groqRes?.data?.choices?.[0]?.message?.content;
@@ -485,7 +485,7 @@ function generateNaturalStudyBotInstructions(
   botName,
   botTopic,
   description,
-  gradeLevel
+  gradeLevel,
 ) {
   const instructions = `## YOU ARE A WARM, HUMAN STUDY COMPANION
 
@@ -704,7 +704,7 @@ async function ensureConversationMemoryTable() {
   } catch (err) {
     console.error(
       "[DB] Failed to ensure conversation_memory table:",
-      err.message
+      err.message,
     );
   }
 }
@@ -734,7 +734,7 @@ app.get("/api/bot/:botId/instructions", async (req, res) => {
     const { botId } = req.params;
     console.log(
       "[GET /api/bot/:botId/instructions] Fetching for botId:",
-      botId
+      botId,
     );
 
     if (!botId) {
@@ -751,7 +751,7 @@ app.get("/api/bot/:botId/instructions", async (req, res) => {
        FROM study_bots 
        WHERE bot_id = $1 
        LIMIT 1`,
-      [botId]
+      [botId],
     );
 
     if (result.rows.length === 0) {
@@ -819,7 +819,7 @@ app.post("/api/chat-enhanced", async (req, res) => {
     try {
       const result = await pool.query(
         `SELECT system_instructions FROM study_bots WHERE bot_id = $1 LIMIT 1`,
-        [botId]
+        [botId],
       );
       if (result.rows.length > 0) {
         dbInstructions = result.rows[0].system_instructions;
@@ -849,7 +849,7 @@ app.post("/api/chat-enhanced", async (req, res) => {
 
     console.log(
       "[Chat-Enhanced] Instructions ready:",
-      `${instructions.substring(0, 100)}... (source: ${instructionSource})`
+      `${instructions.substring(0, 100)}... (source: ${instructionSource})`,
     );
 
     // STEP 3: Enhance instructions with learner profile if available
@@ -872,11 +872,34 @@ app.post("/api/chat-enhanced", async (req, res) => {
       console.log("[Chat-Enhanced] Instructions enhanced with mood context");
     }
 
-    // STEP 5: Prepare messages for AI model
+    // STEP 5: Prepare messages for AI model with MARKDOWN formatting requirement
     const messages = [
       {
         role: "system",
-        content: enhancedInstructions,
+        content: `${enhancedInstructions}
+
+## RESPONSE FORMAT REQUIREMENT
+Format your response using Markdown to ensure professional presentation:
+
+- Use **bold text** for emphasis and important concepts
+- Use ## Heading 2 for section titles
+- Use ### Heading 3 for subsections
+- Use \`\`\`code code\`\`\` for code blocks and technical examples
+- Use • bullet points for lists (no numbered lists unless necessary)
+- Use proper spacing between paragraphs
+- Use **key terms** in bold when first introduced
+- Keep responses well-structured with clear hierarchy
+
+Example format:
+**Key Concept**: Brief explanation
+
+## Main Idea
+Details about the concept...
+
+### Sub-topic
+More information...
+
+Always prioritize clarity and professional formatting.`,
       },
       {
         role: "user",
@@ -897,29 +920,51 @@ app.post("/api/chat-enhanced", async (req, res) => {
       });
     }
 
-    const response = await axios.post(
-      "https://api.groq.com/openai/v1/chat/completions",
-      {
-        model: "mixtral-8x7b-32768",
-        messages: messages,
-        max_tokens: 1500,
-        temperature: 0.7,
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${groqApiKey}`,
+    let response;
+    try {
+      response = await axios.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        {
+          model: "openai/gpt-oss-20b",
+          messages: messages,
+          max_tokens: 1500,
+          temperature: 0.7,
         },
-        timeout: 30000,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${groqApiKey}`,
+          },
+          timeout: 30000,
+        },
+      );
+    } catch (groqErr) {
+      console.error("[Chat-Enhanced] Groq API Error:", groqErr.message);
+      if (groqErr.response) {
+        console.error(
+          "[Chat-Enhanced] Groq response status:",
+          groqErr.response.status,
+        );
+        console.error(
+          "[Chat-Enhanced] Groq response data:",
+          groqErr.response.data,
+        );
+        return res.status(503).json({
+          error: "AI service temporarily unavailable",
+          message: groqErr.response.data?.error?.message || groqErr.message,
+          provider: "groq",
+          timestamp: new Date().toISOString(),
+        });
       }
-    );
+      throw groqErr;
+    }
 
     const aiResponse =
       response.data.choices?.[0]?.message?.content || "No response from AI";
 
     console.log(
       "[Chat-Enhanced] ✅ AI response received, length:",
-      aiResponse.length
+      aiResponse.length,
     );
 
     return res.json({
@@ -938,6 +983,7 @@ app.post("/api/chat-enhanced", async (req, res) => {
     return res.status(500).json({
       error: "Failed to process chat message",
       message: err.message,
+      provider: "unknown",
       timestamp: new Date().toISOString(),
     });
   }
@@ -972,7 +1018,7 @@ app.get("/api/user-bots/:userId", async (req, res) => {
        WHERE user_id = $1 
        ORDER BY bot_id DESC 
        LIMIT 20`,
-      [userId]
+      [userId],
     );
 
     console.log("[user-bots] Found", result.rows.length, "bots");
@@ -1002,7 +1048,7 @@ app.get("/api/chat-history/:botId/:userId", async (req, res) => {
       "[chat-history] Fetching messages for bot:",
       botId,
       "user:",
-      userId
+      userId,
     );
 
     const result = await pool.query(
@@ -1010,7 +1056,7 @@ app.get("/api/chat-history/:botId/:userId", async (req, res) => {
        FROM chat_messages 
        WHERE bot_id = $1 AND user_id = $2 
        ORDER BY created_at ASC`,
-      [botId, userId]
+      [botId, userId],
     );
 
     console.log("[chat-history] Found", result.rows.length, "messages");
@@ -1058,7 +1104,7 @@ app.post("/api/update-study-plan", async (req, res) => {
 
     await pool.query(
       `UPDATE bot_progress SET study_plan = $1, last_updated = NOW() WHERE bot_id = $2 AND user_id = $3`,
-      [JSON.stringify(updatedPlan), botId, userId]
+      [JSON.stringify(updatedPlan), botId, userId],
     );
     console.log("[update-study-plan] Plan updated in database");
 
@@ -1111,7 +1157,7 @@ app.post("/api/generate-quiz", async (req, res) => {
       console.log("[generate-quiz] Performing web search for context");
       const searchResults = await searchTopicOnline(
         `${moduleName} ${topic || ""}`.trim(),
-        gradeLevel || "General"
+        gradeLevel || "General",
       );
       if (searchResults && searchResults.answer) {
         searchContext = `Web search context: ${searchResults.answer}`;
@@ -1185,7 +1231,7 @@ app.post("/api/generate-quiz", async (req, res) => {
     const groqRes = await axios.post(
       "https://api.groq.com/openai/v1/chat/completions",
       {
-        model: "mixtral-8x7b-32768",
+        model: "openai/gpt-oss-20b",
         messages: [
           {
             role: "system",
@@ -1206,7 +1252,7 @@ app.post("/api/generate-quiz", async (req, res) => {
           Authorization: `Bearer ${groqApiKey}`,
         },
         timeout: 30000,
-      }
+      },
     );
 
     let quizJson;
@@ -1217,7 +1263,7 @@ app.post("/api/generate-quiz", async (req, res) => {
       quizJson = JSON.parse(responseText);
     } catch (parseErr) {
       console.warn(
-        "[generate-quiz] Failed to parse JSON directly, attempting cleanup"
+        "[generate-quiz] Failed to parse JSON directly, attempting cleanup",
       );
       // Try to extract JSON from markdown code blocks or extra text
       let cleanedText = responseText
@@ -1257,7 +1303,7 @@ app.post("/api/generate-quiz", async (req, res) => {
          ON CONFLICT (bot_id, user_id, module_name) DO UPDATE
          SET quiz_data = $4, created_at = $5
          RETURNING id`,
-        [botId, userId, moduleName, JSON.stringify(quizJson), timestamp]
+        [botId, userId, moduleName, JSON.stringify(quizJson), timestamp],
       );
       quizId = quizResult.rows[0]?.id || 0;
       console.log("[generate-quiz] Quiz saved to database with ID:", quizId);
@@ -1271,12 +1317,12 @@ app.post("/api/generate-quiz", async (req, res) => {
       const quizMessage = `I've prepared a comprehensive quiz with ${quizJson.questions.length} questions for you. You can review the questions, answer them, and then check the answers with detailed explanations. Good luck! 🎯`;
       await pool.query(
         `INSERT INTO chat_messages (bot_id, user_id, message_type, content) VALUES ($1, $2, $3, $4)`,
-        [botId, userId, "bot", quizMessage]
+        [botId, userId, "bot", quizMessage],
       );
     } catch (msgErr) {
       console.warn(
         "[generate-quiz] Failed to save quiz message:",
-        msgErr.message
+        msgErr.message,
       );
     }
 
@@ -1320,7 +1366,7 @@ app.post("/api/create-study-bot", async (req, res) => {
       name,
       topic,
       description || "",
-      grade_level
+      grade_level,
     );
 
     // Save to database
@@ -1335,14 +1381,14 @@ app.post("/api/create-study-bot", async (req, res) => {
         topic,
         grade_level,
         JSON.stringify({ instructions: systemInstructions }),
-      ]
+      ],
     );
 
     // Initialize bot progress
     await pool.query(
       `INSERT INTO bot_progress (bot_id, user_id, study_plan, bot_state)
        VALUES ($1, $2, $3, $4)`,
-      [botId, user_id, JSON.stringify({ modules: [] }), "intro"]
+      [botId, user_id, JSON.stringify({ modules: [] }), "intro"],
     );
 
     console.log("[create-study-bot] Bot created successfully:", botId);
@@ -1418,7 +1464,7 @@ app.post("/api/ask", async (req, res) => {
 
             if (
               riddlePatterns.some((pattern) =>
-                userMessage.toLowerCase().includes(pattern)
+                userMessage.toLowerCase().includes(pattern),
               )
             ) {
               detectedIntent = "riddle_followup";
@@ -1442,7 +1488,7 @@ app.post("/api/ask", async (req, res) => {
               "[Chat] Auto-detected need for web search; enabling...",
               {
                 message: userMessage,
-              }
+              },
             );
             data.webSearchEnabled = true;
           }
@@ -1453,7 +1499,7 @@ app.post("/api/ask", async (req, res) => {
           const consentGiven = data?.founderConsent === true;
           if (founderQuestionRegex.test(userMessage) && !consentGiven) {
             console.log(
-              "[Chat] Founder question detected without consent; bypassing model"
+              "[Chat] Founder question detected without consent; bypassing model",
             );
             return res.json({
               provider: "local",
@@ -1626,7 +1672,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
           // Detect user constraints (length, format, style, emoji directives)
           const constraintInfo = detectUserConstraints(
             userMessage,
-            data.instructions || {}
+            data.instructions || {},
           );
 
           // Build messages in required order:
@@ -1674,7 +1720,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
               parts.push(`emoji=${constraintInfo.emojiDirective}`);
 
             const userConstraintText = `User constraints (ENFORCE STRICTLY): ${parts.join(
-              "; "
+              "; ",
             )}`;
             messages.push({ role: "system", content: userConstraintText });
           }
@@ -1691,7 +1737,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
           if (clientMessages.length > MAX_MESSAGES) {
             const older = clientMessages.slice(
               0,
-              clientMessages.length - KEEP_RECENT
+              clientMessages.length - KEEP_RECENT,
             );
             const recent = clientMessages.slice(-KEEP_RECENT);
             const summarizeText = older
@@ -1722,7 +1768,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
                     model: "openai/gpt-oss-20b",
                   }),
                   timeout: 30000,
-                }
+                },
               );
 
               const sumResult = await sumResp.json();
@@ -1774,12 +1820,12 @@ If the user specifies length, format, or style, follow the user exactly and igno
                 {
                   role: m.role,
                   preview: (m.content || "").slice(0, 120),
-                }
+                },
               );
               // Remove explicit numeric placeholders like {0} and printf-style %s/%d
               messages[i].content = (m.content || "").replace(
                 /\{\s*\d+\s*\}|%[sdif]\b/g,
-                ""
+                "",
               );
             }
           }
@@ -1798,8 +1844,8 @@ If the user specifies length, format, or style, follow the user exactly and igno
 
           console.log(
             `[Chat] Selected model: ${selectedModel} (mode: ${responseMode}, constraints: ${JSON.stringify(
-              constraintInfo
-            )})...`
+              constraintInfo,
+            )})...`,
           );
 
           let result = null;
@@ -1831,7 +1877,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
                   model: "openai/gpt-oss-20b",
                 }),
                 timeout: 30000,
-              }
+              },
             );
 
             // Check response status
@@ -1860,7 +1906,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
             const gemKey = computedGemKey;
             if (!gemKey) {
               console.error(
-                "[Chat] GEMINI key not configured (env 'second_model' or GEMINI_*)"
+                "[Chat] GEMINI key not configured (env 'second_model' or GEMINI_*)",
               );
               return res.status(500).json({
                 error: "API configuration error",
@@ -1894,7 +1940,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
                 {
                   headers: { "Content-Type": "application/json" },
                   timeout: 30000,
-                }
+                },
               );
 
               result = geminiResp.data;
@@ -1974,12 +2020,12 @@ If the user specifies length, format, or style, follow the user exactly and igno
 
           let postValidation = validateResponseConstraints(
             finalText,
-            constraintInfo
+            constraintInfo,
           );
           if (!postValidation.ok) {
             console.warn(
               "[Chat] Post-response validation failed:",
-              postValidation.reason
+              postValidation.reason,
             );
             // Try once to regenerate with enforced constraints
             try {
@@ -1990,7 +2036,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
               if (constraintInfo.short) enforceParts.push(`short=true`);
               if (constraintInfo.formats && constraintInfo.formats.length)
                 enforceParts.push(
-                  `formats=${constraintInfo.formats.join(",")}`
+                  `formats=${constraintInfo.formats.join(",")}`,
                 );
               if (constraintInfo.emojiDirective)
                 enforceParts.push(`emoji=${constraintInfo.emojiDirective}`);
@@ -1998,7 +2044,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
               const enforceMsg = {
                 role: "system",
                 content: `ENFORCE STRICTLY: ${enforceParts.join(
-                  "; "
+                  "; ",
                 )}. If impossible, state so briefly without extra text.`,
               };
 
@@ -2011,7 +2057,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
                       {
                         role: "system",
                         content: `User constraints (ENFORCE): ${enforceParts.join(
-                          "; "
+                          "; ",
                         )}`,
                       },
                     ]
@@ -2049,7 +2095,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
                       model: "openai/gpt-oss-20b",
                     }),
                     timeout: 30000,
-                  }
+                  },
                 );
                 regenResult = await regenResp.json();
                 regenText = regenResult.choices?.[0]?.message?.content || "";
@@ -2061,7 +2107,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
                 const gemKey = computedGemKey;
                 if (!gemKey) {
                   throw new Error(
-                    "Gemini API key not configured for regeneration"
+                    "Gemini API key not configured for regeneration",
                   );
                 }
                 const gemResp = await axios.post(
@@ -2081,7 +2127,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
                   {
                     headers: { "Content-Type": "application/json" },
                     timeout: 30000,
-                  }
+                  },
                 );
                 regenResult = gemResp.data;
                 regenText =
@@ -2097,7 +2143,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
 
               const regenValidation = validateResponseConstraints(
                 regenText,
-                constraintInfo
+                constraintInfo,
               );
               if (regenValidation.ok) {
                 finalText = regenText;
@@ -2116,13 +2162,38 @@ If the user specifies length, format, or style, follow the user exactly and igno
           const validation = validateResponseQuality(finalText);
           if (!validation.valid) {
             console.warn(
-              `[Chat] Response validation warning: ${validation.reason}`
+              `[Chat] Response validation warning: ${validation.reason}`,
             );
             // Still return the response even if validation warns (model outputs are usually correct)
           }
 
           const structured = structureTextResponse(finalText);
           const formattedText = formatResponseForReadability(finalText);
+
+          // Detailed logging for formatting audit
+          try {
+            const hasNewlines = /\n/.test(finalText);
+            const hasMarkdown = /(^|\s)(#{1,3}\s|\*\*|\*|`{3}|\$\$|\$)/m.test(
+              finalText,
+            );
+            console.log(
+              "[Chat][OUTGOING] formattedText length=",
+              formattedText.length,
+              "hasNewlines=",
+              hasNewlines,
+              "hasMarkdown=",
+              hasMarkdown,
+            );
+            console.log(
+              "[Chat][OUTGOING][PREVIEW]",
+              formattedText.substring(0, Math.min(800, formattedText.length)),
+            );
+          } catch (logErr) {
+            console.warn(
+              "[Chat] Failed to log formattedText preview:",
+              logErr.message,
+            );
+          }
 
           // Save conversation memory if we have a conversation ID
           if (conversationMemory && data.conversationId) {
@@ -2132,7 +2203,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
               userMessage,
               finalText,
               detectedIntent,
-              topicSignature
+              topicSignature,
             );
           }
 
@@ -2200,7 +2271,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
             {
               headers: { Authorization: `Bearer ${TAVILY_KEY}` },
               timeout: 30000,
-            }
+            },
           );
 
           // Build a text representation of results for structuring
@@ -2215,7 +2286,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
           // Send the search results to the AI model for enhancement
           const enhancedAnswer = await enhanceSearchResultsWithAI(
             query,
-            resp.data
+            resp.data,
           );
 
           return res.json({
@@ -2230,7 +2301,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
         } catch (searchError) {
           console.error(
             "[Search] Error:",
-            searchError?.response?.data || searchError.message || searchError
+            searchError?.response?.data || searchError.message || searchError,
           );
           // FALLBACK: Return friendly message instead of exposing error
           const fallbackMsg = getFallbackMessage();
@@ -2256,7 +2327,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
             process.env.GEN_API_KEY;
           if (!gemKey) {
             console.error(
-              "[Image] GEMINI API key not configured (env 'second_model' or GEMINI_*)"
+              "[Image] GEMINI API key not configured (env 'second_model' or GEMINI_*)",
             );
             return res.status(500).json({
               error: "API configuration error",
@@ -2296,13 +2367,13 @@ If the user specifies length, format, or style, follow the user exactly and igno
                 timeout: 15000,
               });
               imageData = Buffer.from(imageResponse.data, "binary").toString(
-                "base64"
+                "base64",
               );
               console.log("[Image] Image fetched and converted to base64");
             } catch (fetchErr) {
               console.error(
                 "[Image] Failed to fetch image from URL:",
-                fetchErr.message
+                fetchErr.message,
               );
               return res.status(400).json({
                 error: "Failed to fetch image",
@@ -2338,7 +2409,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
             {
               headers: { "Content-Type": "application/json" },
               timeout: 30000,
-            }
+            },
           );
 
           console.log("[Image] Gemini API success:", geminiResponse.data);
@@ -2407,10 +2478,10 @@ If the user specifies length, format, or style, follow the user exactly and igno
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(
-    `[Server Started] Running on port ${PORT} at ${new Date().toISOString()}`
+    `[Server Started] Running on port ${PORT} at ${new Date().toISOString()}`,
   );
   console.log(
-    "[Server] Normal/Detailed mode system active with unrestricted responses"
+    "[Server] Normal/Detailed mode system active with unrestricted responses",
   );
 });
 

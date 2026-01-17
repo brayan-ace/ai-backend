@@ -3,7 +3,6 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import '../utils/theme.dart';
 import 'study_plan_chat_screen.dart';
 
 // Premium color palette matching bot_creation_screen
@@ -537,13 +536,9 @@ class _BotProcessingScreenState extends State<BotProcessingScreen> {
             height: 10,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: [
-                  PremiumColors.accentGradient2,
-                  PremiumColors.accentGradient1,
-                ],
+              color: PremiumColors.accentGradient2.withOpacity(
+                (_currentStep / _steps.length) * (0.3 + (index * 0.2)),
               ),
-              opacity: (_currentStep / _steps.length) * (0.3 + (index * 0.2)),
               boxShadow: [
                 BoxShadow(
                   color: PremiumColors.accentGradient2.withOpacity(0.3),

@@ -17,6 +17,7 @@ import '../widgets/voice_input_dialog.dart';
 import '../services/gemini_services.dart';
 import '../services/api_service.dart';
 import '../services/web_search_service.dart';
+import '../utils/ai_constants.dart';
 import '../services/chat_storage_service.dart';
 import 'notes_screen.dart';
 import 'chat_history_screen.dart';
@@ -105,6 +106,17 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
     _messageScrollController.removeListener(_onScrollListener);
     _messageScrollController.dispose();
     super.dispose();
+  }
+
+  /// Helper: log AI message details and add to UI state
+  void _logAndAddAiMessage(String text) {
+    final hasNewlines = text.contains('\n');
+    print('📥 [Frontend Received] len=${text.length} hasNewlines=$hasNewlines');
+    final preview = text.length > 800 ? text.substring(0, 800) + '...' : text;
+    print('📥 [Frontend Preview] $preview');
+    setState(() {
+      _messages.add(_Message(text: text, fromUser: false));
+    });
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -841,9 +853,8 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
           'action': 'identity',
         });
         final reply = raw['reply'] ?? raw['response'] ?? raw.toString();
-        setState(() {
-          _messages.add(_Message(text: reply.toString(), fromUser: false));
-        });
+        print('🔍 [RAW IDENTITY RESPONSE] ${reply.toString()}');
+        _logAndAddAiMessage(reply.toString());
 
         if (raw['identityOffered'] == true) {
           final consent = await showDialog<bool>(
@@ -871,9 +882,8 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
               'confirm': true,
             });
             final reply2 = raw2['reply'] ?? raw2['response'] ?? raw2.toString();
-            setState(() {
-              _messages.add(_Message(text: reply2.toString(), fromUser: false));
-            });
+            print('🔍 [RAW IDENTITY REVEAL RESPONSE] ${reply2.toString()}');
+            _logAndAddAiMessage(reply2.toString());
           }
         }
 
@@ -959,20 +969,16 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
         response = await _callWithFallback(text, instructions: instructions);
 
         if (response != null && _shouldSuggestWebSearch(response, text)) {
-          setState(() {
-            if (_messages.isNotEmpty && _messages.last.isTyping) {
+          if (_messages.isNotEmpty && _messages.last.isTyping) {
+            setState(() {
               _messages.removeLast();
-            }
-            _messages.add(_Message(text: response!, fromUser: false));
-          });
+            });
+          }
+          _logAndAddAiMessage(response!);
 
           final wantWebSearch = await _showWebSearchDialog();
           if (wantWebSearch == true) {
-            setState(() {
-              _messages.add(
-                _Message(text: '🔍 Searching the web...', fromUser: false),
-              );
-            });
+            _logAndAddAiMessage('🔍 Searching the web...');
 
             try {
               final searchResults = await _webSearchService.search(query: text);
@@ -1041,9 +1047,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
         }
       }
     } else {
-      setState(() {
-        _messages.add(_Message(text: 'No response', fromUser: false));
-      });
+      _logAndAddAiMessage('No response');
     }
   }
 
@@ -1058,20 +1062,18 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
       _messages.add(streamingMessage);
     });
 
-    final words = fullResponse.split(' ');
+    // Stream character-by-character to preserve all whitespace (newlines, multiple spaces)
     final buffer = StringBuffer();
-
-    for (int i = 0; i < words.length; i++) {
+    for (int i = 0; i < fullResponse.length; i++) {
       if (!mounted) return;
-
-      buffer.write(words[i]);
-      if (i < words.length - 1) buffer.write(' ');
-
-      setState(() {
-        streamingMessage.text = buffer.toString();
-      });
-
-      await Future.delayed(Duration(milliseconds: 30));
+      buffer.write(fullResponse[i]);
+      // Update the streaming message in small chunks to provide smooth typing effect
+      if (i % 2 == 0 || i == fullResponse.length - 1) {
+        setState(() {
+          streamingMessage.text = buffer.toString();
+        });
+      }
+      await Future.delayed(Duration(milliseconds: 6));
     }
 
     if (!mounted) return;
@@ -1199,6 +1201,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
         'message': prompt,
         'mode': _responseMode,
         'model': _selectedModel.toLowerCase(),
+        'systemPrompt': AiConstants.systemPrompt,
         if (instructions != null) 'instructions': instructions,
       };
 
@@ -1230,6 +1233,12 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
       }
 
       final reply = fullResp['reply'] ?? fullResp['response'] ?? '';
+      print(
+        '🔍 [RAW AI RESPONSE] length=${reply.toString().length} hasNewlines=${reply.toString().contains('\n')}',
+      );
+      print(
+        '🔍 [RAW AI RESPONSE PREVIEW] ${reply.toString().length > 400 ? reply.toString().substring(0, 400) + "..." : reply.toString()}',
+      );
       return reply.isEmpty ? null : reply.toString();
     } catch (e) {
       return '⚠️ All AI services are currently unavailable. ($e)';
@@ -1281,7 +1290,12 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
 
       setState(() {
         for (final msg in messages) {
-          _messages.add(_Message(text: msg['text'], fromUser: msg['fromUser']));
+          if (msg['fromUser'] == true) {
+            _messages.add(_Message(text: msg['text'], fromUser: true));
+          } else {
+            // Log and add AI messages for audit
+            _logAndAddAiMessage(msg['text']);
+          }
         }
       });
 

@@ -30,6 +30,7 @@ class GeminiService {
         if (instructions != null) 'instructions': instructions,
         if (model != null) 'model': model.toLowerCase(),
         if (conversationId != null) 'conversationId': conversationId,
+        'systemPrompt': AiConstants.systemPrompt,
       };
       final resp = await ApiService.send('chat', input);
       return _cleanResponse(resp);
@@ -52,8 +53,8 @@ class GeminiService {
     }
   }
 
-  /// Clean up AI response by removing only unwanted formatting (math, prefixes)
-  /// PRESERVE Markdown bold (**), italic (*), and other formatting for UI rendering
+  /// Clean up AI response by removing only unwanted formatting (prefixes)
+  /// PRESERVE all Markdown formatting including math ($...$ and $$...$$) for UI rendering
   String _cleanResponse(String text) {
     // Remove "Final Answer:" prefix
     text = text.replaceFirst(RegExp(r'Final Answer:\s*'), '');
@@ -64,27 +65,15 @@ class GeminiService {
     // Remove extra "The final answer is" phrases
     text = text.replaceAll(RegExp(r'The final answer is\s*'), '');
 
-    // DO NOT remove markdown bold (**text**) - UI needs it for rendering!
-    // DO NOT remove markdown italic (*text*) - UI needs it for rendering!
-    // These are now handled by ai_message_bubble.dart markdown parser
+    // PRESERVE ALL Markdown formatting:
+    // - Bold (**text**) - UI renders as bold
+    // - Italic (*text*) - UI renders as italic
+    // - Math inline ($...$) - ProfessionalMessageWidget renders with flutter_math
+    // - Math display ($$...$$) - ProfessionalMessageWidget renders with flutter_math
+    // - Headings (#, ##, ###) - ProfessionalMessageWidget renders with hierarchy
+    // - Lists and code blocks - ProfessionalMessageWidget handles these
 
-    // Unwrap display math $$...$$ and inline math $...$
-    text = text.replaceAllMapped(
-      RegExp(r'\$\$([\s\S]*?)\$\$'),
-      (m) => m.group(1) ?? '',
-    );
-    text = text.replaceAllMapped(
-      RegExp(r'\$([^\$]+)\$'),
-      (m) => m.group(1) ?? '',
-    );
-
-    // Unescape any escaped dollar signs (\$) to literal $
-    text = text.replaceAll(RegExp(r'\\\$'), r'\$');
-
-    // Remove any remaining stray $ characters that may remain
-    text = text.replaceAll('\$', '');
-
-    // Clean up multiple spaces
+    // Clean up multiple spaces but preserve formatting
     text = text.replaceAll(RegExp(r' {2,}'), ' ');
 
     return text.trim();

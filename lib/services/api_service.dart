@@ -134,6 +134,9 @@ class ApiService {
     final requestType = supportedTypes.contains(type) ? type : 'chat';
     final body = jsonEncode({'type': requestType, 'data': data});
 
+    print('📡 [sendRaw] POST $baseUrl/api/ask');
+    print('📦 [sendRaw] Request Body: $body');
+
     final response = await http
         .post(
           Uri.parse("$baseUrl/api/ask"),
@@ -141,6 +144,9 @@ class ApiService {
           body: body,
         )
         .timeout(const Duration(seconds: 60));
+
+    print('✅ [sendRaw] Response Status: ${response.statusCode}');
+    print('📄 [sendRaw] Response Body: ${response.body}');
 
     if (response.statusCode == 200 || response.statusCode == 201) {
       try {
