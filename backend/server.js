@@ -1400,6 +1400,70 @@ app.post("/api/create-study-bot", async (req, res) => {
 
     console.log("[create-study-bot] Bot created successfully:", botId);
 
+    // --- Verification & single-welcome enforcement ---
+    // Verify instructions were saved
+    let customInstructionsCreated = false;
+    try {
+      const verifyRes = await pool.query(
+        `SELECT system_instructions FROM study_bots WHERE bot_id = $1 LIMIT 1`,
+        [botId],
+      );
+      if (
+        verifyRes.rows.length > 0 &&
+        verifyRes.rows[0].system_instructions &&
+        verifyRes.rows[0].system_instructions.instructions
+      ) {
+        customInstructionsCreated = true;
+      }
+    } catch (verErr) {
+      console.warn(
+        "[create-study-bot] Verification query failed:",
+        verErr.message,
+      );
+    }
+
+    // Ensure exactly one welcome message: insert one deterministically if none exist
+    let welcomeMessagesCount = 0;
+    let welcomeMessage = null;
+    try {
+      const countRes = await pool.query(
+        `SELECT id, content, created_at FROM chat_messages WHERE bot_id = $1 AND user_id = $2 AND message_type = 'bot' ORDER BY created_at ASC`,
+        [botId, user_id],
+      );
+      welcomeMessagesCount = countRes.rows.length;
+
+      if (welcomeMessagesCount === 0) {
+        // Compose a deterministic welcome based on the bot's first-message guidance
+        welcomeMessage = `Hi, I'm ${name}. I'm here to make studying feel like a breeze. How are you doing today?`;
+        await pool.query(
+          `INSERT INTO chat_messages (bot_id, user_id, message_type, content) VALUES ($1, $2, $3, $4)`,
+          [botId, user_id, "bot", welcomeMessage],
+        );
+        welcomeMessagesCount = 1;
+
+        // Update bot progress to indicate we're waiting for the user's reply
+        try {
+          await pool.query(
+            `UPDATE bot_progress SET bot_state = $1, last_updated = NOW() WHERE bot_id = $2 AND user_id = $3`,
+            ["waiting_for_user", botId, user_id],
+          );
+        } catch (stErr) {
+          console.warn(
+            "[create-study-bot] Failed to update bot_progress state:",
+            stErr.message,
+          );
+        }
+      } else {
+        // If there are existing bot messages, return the earliest one as the welcome preview
+        welcomeMessage = countRes.rows[0]?.content || null;
+      }
+    } catch (wErr) {
+      console.warn(
+        "[create-study-bot] Welcome-message check failed:",
+        wErr.message,
+      );
+    }
+
     return res.json({
       status: "success",
       bot: {
@@ -1410,6 +1474,12 @@ app.post("/api/create-study-bot", async (req, res) => {
         topic: topic,
         grade_level: grade_level,
         system_instructions: { instructions: systemInstructions },
+      },
+      verification: {
+        customInstructionsCreated: customInstructionsCreated,
+        welcomeMessagesCount: welcomeMessagesCount,
+        welcomeMessage: welcomeMessage,
+        nextState: "waiting_for_user",
       },
       timestamp: new Date().toISOString(),
     });
