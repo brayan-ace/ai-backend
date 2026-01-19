@@ -79,14 +79,13 @@ class _BotProcessingScreenState extends State<BotProcessingScreen> {
     final stepDuration = Duration(seconds: 10 ~/ _steps.length);
 
     _timer = Timer.periodic(stepDuration, (timer) {
-      if (mounted) {
-        setState(() {
-          _currentStep = timer.tick - 1;
-          if (_currentStep < _steps.length) {
-            _statusMessage = _steps[_currentStep];
-          }
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _currentStep = timer.tick - 1;
+        if (_currentStep < _steps.length) {
+          _statusMessage = _steps[_currentStep];
+        }
+      });
 
       if (timer.tick >= _steps.length) {
         timer.cancel();
@@ -167,23 +166,26 @@ class _BotProcessingScreenState extends State<BotProcessingScreen> {
         );
         return bot;
       }
-
       final errorMsg =
           'Server error (${resp.statusCode}). Response: ${resp.body}';
       print('[BotProcessingScreen] $errorMsg');
-      setState(() {
-        _isError = true;
-        _errorMessage = errorMsg;
-      });
+      if (mounted) {
+        setState(() {
+          _isError = true;
+          _errorMessage = errorMsg;
+        });
+      }
       return null;
     } catch (err, stackTrace) {
       final errorMsg = 'Network error: $err';
       print('[BotProcessingScreen] $errorMsg');
       print('[BotProcessingScreen] Stack: $stackTrace');
-      setState(() {
-        _isError = true;
-        _errorMessage = errorMsg;
-      });
+      if (mounted) {
+        setState(() {
+          _isError = true;
+          _errorMessage = errorMsg;
+        });
+      }
       return null;
     }
   }
@@ -229,29 +231,41 @@ class _BotProcessingScreenState extends State<BotProcessingScreen> {
         child: SafeArea(
           child: SingleChildScrollView(
             padding: EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: _isError
-                  ? [
-                      // Premium error state
-                      _buildErrorState(),
-                    ]
-                  : [
-                      // Premium animated progress indicator
-                      _buildPremiumProgressIndicator(),
-                      SizedBox(height: 40),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight:
+                    MediaQuery.of(context).size.height -
+                    kToolbarHeight -
+                    MediaQuery.of(context).padding.vertical,
+              ),
+              child: IntrinsicHeight(
+                child: Column(
+                  mainAxisSize: MainAxisSize.max,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: _isError
+                      ? [
+                          // Premium error state
+                          _buildErrorState(),
+                        ]
+                      : [
+                          // Premium animated progress indicator
+                          _buildPremiumProgressIndicator(),
+                          SizedBox(height: 40),
 
-                      // Premium progress steps with glassmorphism
-                      _buildPremiumStepsIndicator(),
-                      SizedBox(height: 40),
+                          // Premium progress steps with glassmorphism
+                          _buildPremiumStepsIndicator(),
+                          SizedBox(height: 40),
 
-                      // Current status with premium styling
-                      _buildStatusMessage(),
-                      SizedBox(height: 30),
+                          // Current status with premium styling
+                          _buildStatusMessage(),
+                          SizedBox(height: 30),
 
-                      // Animated loading dots
-                      _buildLoadingDots(),
-                    ],
+                          // Animated loading dots
+                          _buildLoadingDots(),
+                          Spacer(),
+                        ],
+                ),
+              ),
             ),
           ),
         ),
