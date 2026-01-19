@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
-import 'dart:typed_data';
+// 'dart:typed_data' is available via 'package:flutter/services.dart'
 import 'package:image/image.dart' as img;
 
 import 'package:flutter/material.dart';
@@ -28,7 +28,7 @@ class OnlineAiScreen extends StatefulWidget {
   const OnlineAiScreen({Key? key}) : super(key: key);
 
   @override
-  _OnlineAiScreenState createState() => _OnlineAiScreenState();
+  State<OnlineAiScreen> createState() => _OnlineAiScreenState();
 }
 
 class _OnlineAiScreenState extends State<OnlineAiScreen>
@@ -1115,17 +1115,14 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
     final relevantMessages = _messages
         .where((m) => !m.isTyping && m.text.isNotEmpty)
         .toList();
-    
+
     // Take last 10 for context
     final recentMessages = relevantMessages.length > 10
         ? relevantMessages.sublist(relevantMessages.length - 10)
         : relevantMessages;
-    
-    return recentMessages.map((m) => {
-      return {
-        'role': m.fromUser ? 'user' : 'assistant',
-        'content': m.text,
-      };
+
+    return recentMessages.map((m) {
+      return {'role': m.fromUser ? 'user' : 'assistant', 'content': m.text};
     }).toList();
   }
 
@@ -2040,12 +2037,16 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                       width: 48,
                       height: 48,
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(colors: AppTheme.primaryGradient),
+                        gradient: LinearGradient(
+                          colors: AppTheme.primaryGradient,
+                        ),
                         shape: BoxShape.circle,
                       ),
                       child: Center(
                         child: Text(
-                          displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U',
+                          displayName.isNotEmpty
+                              ? displayName[0].toUpperCase()
+                              : 'U',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 20,
@@ -2093,7 +2094,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                     label: Text('Sign Out'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppTheme.textSecondary,
-                      side: BorderSide(color: AppTheme.textTertiary.withOpacity(0.3)),
+                      side: BorderSide(
+                        color: AppTheme.textTertiary.withOpacity(0.3),
+                      ),
                       padding: EdgeInsets.symmetric(vertical: 10),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
@@ -2127,10 +2130,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
             SizedBox(height: 8),
             Text(
               'Sign in to save your chats',
-              style: TextStyle(
-                color: AppTheme.textSecondary,
-                fontSize: 14,
-              ),
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
             ),
             SizedBox(height: 12),
             Row(
@@ -2144,7 +2144,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                     child: Text('Log In'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppTheme.primaryBlue,
-                      side: BorderSide(color: AppTheme.primaryBlue.withOpacity(0.5)),
+                      side: BorderSide(
+                        color: AppTheme.primaryBlue.withOpacity(0.5),
+                      ),
                       padding: EdgeInsets.symmetric(vertical: 10),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
@@ -2182,7 +2184,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
     try {
       await FirebaseAuth.instance.signOut();
       await UserProfileService.instance.clearUserData();
-      
+
       if (mounted) {
         setState(() {
           _messages.clear();
@@ -2191,7 +2193,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
           _isSavingEnabled = false;
         });
         _greetingAnimationController.forward();
-        
+
         _showSnackBar('Signed out successfully', isError: false);
       }
     } catch (e) {
@@ -2518,8 +2520,12 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                       decoration: BoxDecoration(
                                         gradient: LinearGradient(
                                           colors: [
-                                            AppTheme.primaryBlue.withOpacity(0.1),
-                                            AppTheme.primaryBlue.withOpacity(0.8),
+                                            AppTheme.primaryBlue.withOpacity(
+                                              0.1,
+                                            ),
+                                            AppTheme.primaryBlue.withOpacity(
+                                              0.8,
+                                            ),
                                           ],
                                         ),
                                         borderRadius: BorderRadius.circular(
@@ -2693,8 +2699,12 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                       decoration: BoxDecoration(
                                         gradient: LinearGradient(
                                           colors: [
-                                            AppTheme.primaryBlue.withOpacity(0.1),
-                                            AppTheme.primaryBlue.withOpacity(0.8),
+                                            AppTheme.primaryBlue.withOpacity(
+                                              0.1,
+                                            ),
+                                            AppTheme.primaryBlue.withOpacity(
+                                              0.8,
+                                            ),
                                           ],
                                         ),
                                         borderRadius: BorderRadius.circular(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/user_profile_service.dart';
 import '../screens/welcome_screen.dart';
+import '../screens/email_verification_screen.dart';
 import '../screens/main_tabs.dart';
 import '../utils/theme.dart';
 
@@ -88,7 +89,20 @@ class _AuthGateState extends State<AuthGate> with SingleTickerProviderStateMixin
         final user = snapshot.data;
         
         if (user != null) {
-          // User is logged in - go to main app
+          // User is logged in - check if email is verified
+          if (!user.emailVerified) {
+            // Email not verified - show verification screen
+            final displayName = user.displayName ?? 'User';
+            return FadeTransition(
+              opacity: _fadeAnimation,
+              child: EmailVerificationScreen(
+                email: user.email ?? '',
+                username: displayName,
+              ),
+            );
+          }
+          
+          // Email verified - go to main app
           return FadeTransition(
             opacity: _fadeAnimation,
             child: const MainTabs(),

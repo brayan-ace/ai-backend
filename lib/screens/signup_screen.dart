@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../utils/theme.dart';
 import '../services/auth_services.dart';
 import '../services/user_profile_service.dart';
+import 'email_verification_screen.dart';
 
 /// Sign-up screen with username, email, password fields
 /// Features inline validation, loading states, and detailed error handling
@@ -148,23 +149,26 @@ class _SignUpScreenState extends State<SignUpScreen>
         // Update Firebase display name
         await credential.user!.updateDisplayName(username);
 
-        // Save username locally
-        await _userProfileService.saveUsername(username);
-
-        // Mark onboarding as complete
-        await _userProfileService.setOnboardingComplete(true);
-
         // Send verification email
         try {
           await credential.user!.sendEmailVerification();
         } catch (e) {
-          // Ignore verification email errors
+          // Log but continue - user can resend from verification screen
         }
 
         if (!mounted) return;
 
-        // Navigate to main app
-        Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+        // Navigate to email verification screen
+        // Username will be saved after email is verified
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => EmailVerificationScreen(
+              email: email,
+              username: username,
+            ),
+          ),
+        );
       }
     } on FirebaseAuthException catch (e) {
       setState(() {
