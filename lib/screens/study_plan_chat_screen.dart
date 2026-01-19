@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -13,6 +14,9 @@ import 'quiz_config_screen.dart';
 import '../widgets/quiz_artifact_widget.dart';
 import '../widgets/study_plan_hamburger_menu.dart';
 import '../widgets/professional_message_widget.dart';
+import '../widgets/premium_study_plan_menu.dart';
+import '../widgets/premium_typing_indicator.dart';
+import '../widgets/premium_message_bubble.dart';
 
 // Premium color palette matching bot creation and processing screens
 class PremiumColors {
@@ -1182,125 +1186,45 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
               if (_showToc && _botState?.tableOfContents != null)
                 _buildTableOfContentsWidget(),
 
-              // Chat Messages
+              // Chat Messages with Premium Bubbles
               Expanded(
                 child: ListView.builder(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: AppTheme.spaceMd,
-                    vertical: AppTheme.spaceMd,
-                  ),
-                  itemCount: _messages.length,
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  itemCount: _messages.length + (_isLoading ? 1 : 0),
                   itemBuilder: (context, index) {
+                    // Show typing indicator at the end when loading
+                    if (_isLoading && index == _messages.length) {
+                      return PremiumTypingIndicator(
+                        botName: widget.botName,
+                        showAvatar: true,
+                      );
+                    }
+                    
                     final msg = _messages[index];
                     final isBot = msg.senderType == 'bot';
-                    return Padding(
-                      padding: EdgeInsets.only(bottom: AppTheme.spaceMd),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: isBot
-                            ? MainAxisAlignment.start
-                            : MainAxisAlignment.end,
-                        children: [
-                          if (isBot)
-                            Container(
-                              width: 32,
-                              height: 32,
-                              margin: EdgeInsets.only(right: AppTheme.spaceSm),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: LinearGradient(
-                                  colors: [
-                                    PremiumColors.accentGradient2,
-                                    PremiumColors.accentGradient1,
-                                  ],
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: PremiumColors.accentGradient2
-                                        .withOpacity(0.3),
-                                    blurRadius: 12,
-                                    spreadRadius: 1,
-                                  ),
-                                ],
-                              ),
-                              child: Center(
-                                child: Icon(
-                                  Icons.psychology,
-                                  color: Colors.white,
-                                  size: 16,
-                                ),
-                              ),
-                            ),
-                          Flexible(
-                            child: Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                gradient: isBot
-                                    ? LinearGradient(
-                                        colors: [
-                                          PremiumColors.cardBg.withOpacity(0.8),
-                                          PremiumColors.darkBg2.withOpacity(
-                                            0.6,
-                                          ),
-                                        ],
-                                      )
-                                    : LinearGradient(
-                                        colors: [
-                                          PremiumColors.accentGradient2,
-                                          PremiumColors.accentGradient1,
-                                        ],
-                                      ),
-                                borderRadius: BorderRadius.only(
-                                  topLeft: Radius.circular(isBot ? 4 : 16),
-                                  topRight: Radius.circular(isBot ? 16 : 4),
-                                  bottomLeft: Radius.circular(16),
-                                  bottomRight: Radius.circular(16),
-                                ),
-                                border: isBot
-                                    ? Border.all(
-                                        color: PremiumColors.accentGradient1
-                                            .withOpacity(0.2),
-                                        width: 1,
-                                      )
-                                    : null,
-                                boxShadow: isBot
-                                    ? [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.2),
-                                          blurRadius: 12,
-                                          spreadRadius: 1,
-                                        ),
-                                      ]
-                                    : [],
-                              ),
-                              child: isBot
-                                  ? ProfessionalMessageWidget(
-                                      msg.text,
-                                      isBot: true,
-                                    )
-                                  : Text(
-                                      msg.text,
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        height: 1.5,
-                                        fontSize: 15,
-                                      ),
-                                    ),
-                            ),
-                          ),
-                          if (!isBot) SizedBox(width: AppTheme.spaceXs),
-                        ],
-                      ),
+                    final isLastMessage = index == _messages.length - 1;
+                    
+                    return PremiumMessageBubble(
+                      message: msg.text,
+                      isBot: isBot,
+                      timestamp: msg.timestamp,
+                      botName: widget.botName,
+                      showAvatar: isBot,
+                      animate: isLastMessage,
+                      onLongPress: () {
+                        HapticFeedback.mediumImpact();
+                      },
                     );
                   },
                 ),
               ),
 
-              // Input Area
-              _buildInputArea(),
+              // Quick Action Chips (show contextual suggestions)
+              if (!_isLoading && _messages.isNotEmpty)
+                _buildQuickActionChips(),
+
+              // Premium Input Area
+              _buildPremiumInputArea(),
             ],
           ),
         ),
@@ -1308,7 +1232,317 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     );
   }
 
-  // Input Area
+  // Quick Action Chips for common responses
+  Widget _buildQuickActionChips() {
+    final lastMessage = _messages.isNotEmpty ? _messages.last : null;
+    final isBot = lastMessage?.senderType == 'bot';
+    
+    // Contextual suggestions based on conversation state
+    List<String> suggestions = [];
+    
+    if (_botCurrentState == 'waiting_for_user' || _botCurrentState == 'intro') {
+      suggestions = ['Yes, create my plan', 'Tell me more', 'What topics?'];
+    } else if (_botCurrentState == 'in_study' || _botCurrentState == 'learning') {
+      suggestions = ['I understand', 'Explain more', 'Give an example', 'Next topic'];
+    } else {
+      suggestions = ['Continue', 'I understand', 'Tell me more'];
+    }
+    
+    return Container(
+      padding: EdgeInsets.only(bottom: 8),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          children: suggestions.map((text) {
+            return Padding(
+              padding: EdgeInsets.only(right: 8),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    _addUserMessage(text);
+                  },
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          PremiumColors.accentGradient1.withOpacity(0.15),
+                          PremiumColors.accentGradient2.withOpacity(0.1),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: PremiumColors.accentGradient1.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Text(
+                      text,
+                      style: TextStyle(
+                        color: PremiumColors.accentGradient1,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  // Premium Input Area with enhanced design
+  Widget _buildPremiumInputArea() {
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            PremiumColors.darkBg2.withOpacity(0.9),
+            PremiumColors.cardBg,
+          ],
+        ),
+        border: Border(
+          top: BorderSide(
+            color: PremiumColors.accentGradient1.withOpacity(0.2),
+            width: 1,
+          ),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 20,
+            offset: Offset(0, -5),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          children: [
+            // Attachment button
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: IconButton(
+                icon: Icon(Icons.add, color: Colors.white54),
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  _showAttachmentOptions();
+                },
+              ),
+            ),
+            SizedBox(width: 12),
+            // Text input
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.white.withOpacity(0.08),
+                      Colors.white.withOpacity(0.04),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: PremiumColors.accentGradient1.withOpacity(0.2),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _inputController,
+                        enabled: !_isLoading,
+                        style: TextStyle(color: Colors.white, fontSize: 15),
+                        maxLines: 4,
+                        minLines: 1,
+                        decoration: InputDecoration(
+                          hintText: 'Message ${widget.botName ?? "AI"}...',
+                          hintStyle: TextStyle(
+                            color: Colors.white38,
+                            fontSize: 15,
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                        ),
+                        onSubmitted: (text) {
+                          if (text.isNotEmpty && !_isLoading) {
+                            _addUserMessage(text);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(width: 12),
+            // Send button with animation
+            AnimatedContainer(
+              duration: Duration(milliseconds: 200),
+              decoration: BoxDecoration(
+                gradient: _inputController.text.isNotEmpty || _isLoading
+                    ? LinearGradient(
+                        colors: [
+                          PremiumColors.accentGradient2,
+                          PremiumColors.accentGradient1,
+                        ],
+                      )
+                    : null,
+                color: _inputController.text.isEmpty && !_isLoading
+                    ? Colors.white.withOpacity(0.1)
+                    : null,
+                shape: BoxShape.circle,
+                boxShadow: _inputController.text.isNotEmpty
+                    ? [
+                        BoxShadow(
+                          color: PremiumColors.accentGradient2.withOpacity(0.4),
+                          blurRadius: 12,
+                          spreadRadius: 2,
+                        ),
+                      ]
+                    : [],
+              ),
+              child: IconButton(
+                icon: _isLoading
+                    ? SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation(Colors.white),
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : Icon(
+                        Icons.arrow_upward,
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                onPressed: _isLoading
+                    ? null
+                    : () {
+                        if (_inputController.text.isNotEmpty) {
+                          HapticFeedback.mediumImpact();
+                          _addUserMessage(_inputController.text);
+                        }
+                      },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAttachmentOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [PremiumColors.cardBg, PremiumColors.darkBg2],
+          ),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildAttachmentOption(
+                    icon: Icons.quiz,
+                    label: 'Take Quiz',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showQuizPopup();
+                    },
+                  ),
+                  _buildAttachmentOption(
+                    icon: Icons.note_add,
+                    label: 'Save Note',
+                    onTap: () {
+                      Navigator.pop(context);
+                    },
+                  ),
+                  _buildAttachmentOption(
+                    icon: Icons.mic,
+                    label: 'Voice',
+                    onTap: () {
+                      Navigator.pop(context);
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAttachmentOption({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
+      child: Column(
+        children: [
+          Container(
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  PremiumColors.accentGradient1.withOpacity(0.2),
+                  PremiumColors.accentGradient2.withOpacity(0.1),
+                ],
+              ),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: PremiumColors.accentGradient1, size: 28),
+          ),
+          SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Legacy Input Area (kept for reference)
   Widget _buildInputArea() {
     return Container(
       padding: EdgeInsets.all(16),
@@ -1541,16 +1775,21 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         ? _convertStudyPlanToToc() 
         : _botState?.tableOfContents ?? [];
     
-    return StudyPlanHamburgerMenu(
+    return PremiumStudyPlanMenu(
       tableOfContents: tocItems.isNotEmpty ? tocItems : null,
       currentModule: _botState?.currentModule ?? 0,
       completedModules: _botState?.completedModules,
       progressPercentage: _progressPercentage,
       planVersion: _planVersion,
+      planTitle: _studyPlan?['title'] as String?,
       onModuleEdit: (moduleIndex, moduleName) {
-        // Handle module edit - navigate to editor
         print('[ChatScreen] Edit module $moduleIndex: $moduleName');
         _openPlanEditor();
+      },
+      onModuleTap: (moduleIndex) {
+        print('[ChatScreen] Module $moduleIndex tapped');
+        Navigator.pop(context);
+        _sendMessageToBackend('Let\'s focus on module ${moduleIndex + 1}');
       },
       onEditPlan: () {
         print('[ChatScreen] Edit plan button pressed');
