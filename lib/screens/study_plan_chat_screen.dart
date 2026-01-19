@@ -613,19 +613,27 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
           final instructionSource = body['instructionSource'] ?? 'unknown';
           final profileApplied = body['learnerProfileApplied'] ?? false;
           final moodApplied = body['moodApplied'] ?? false;
+          final moduleCompleted = body['moduleCompleted'] ?? false;
 
           print('[ChatScreen] ✅ Backend processing info:');
           print('[ChatScreen]    - Instructions from: $instructionSource');
           print('[ChatScreen]    - Learner profile applied: $profileApplied');
           print('[ChatScreen]    - Mood applied: $moodApplied');
+          print('[ChatScreen]    - Module completed: $moduleCompleted');
 
           setState(() {
             _botCurrentState = newState;
             if (progress != null) {
               _progressPercentage = (progress['percentage'] ?? 0).toDouble();
+              print('[ChatScreen] 📊 Progress: $_progressPercentage%');
             }
             print('[ChatScreen] 📊 State updated: $_botCurrentState');
           });
+
+          // Show celebration if module was completed
+          if (moduleCompleted) {
+            _showModuleCompletionCelebration(progress);
+          }
 
           // If backend returned a generated study plan, open editor for review
           if (body['showStudyPlan'] == true) {
@@ -2265,6 +2273,202 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       }
       return false;
     }
+  }
+
+  /// Show celebration dialog when a module is completed
+  void _showModuleCompletionCelebration(Map<String, dynamic>? progress) {
+    final percentage = progress?['percentage'] ?? 0;
+    final currentModule = (progress?['currentModule'] ?? 0) + 1;
+    final completedCount = progress?['completedModules'] ?? 1;
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  PremiumColors.cardBg,
+                  PremiumColors.darkBg2,
+                ],
+              ),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: PremiumColors.accentGradient1.withOpacity(0.3),
+                width: 2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: PremiumColors.accentGradient2.withOpacity(0.3),
+                  blurRadius: 30,
+                  spreadRadius: 5,
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Celebration icon with glow
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [
+                        PremiumColors.accentGradient2,
+                        PremiumColors.accentGradient1,
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: PremiumColors.accentGradient2.withOpacity(0.5),
+                        blurRadius: 20,
+                        spreadRadius: 5,
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Text(
+                      '🎉',
+                      style: TextStyle(fontSize: 40),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 20),
+                
+                // Title
+                Text(
+                  'Module Complete!',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                SizedBox(height: 8),
+                
+                // Subtitle
+                Text(
+                  'Great job! You\'ve mastered this module.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white70,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 24),
+                
+                // Progress indicator
+                Container(
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Overall Progress',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                          ),
+                          Text(
+                            '$percentage%',
+                            style: TextStyle(
+                              color: PremiumColors.accentGradient1,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 8),
+                      // Premium progress bar
+                      Container(
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: FractionallySizedBox(
+                          alignment: Alignment.centerLeft,
+                          widthFactor: percentage / 100,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  PremiumColors.accentGradient2,
+                                  PremiumColors.accentGradient1,
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(4),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: PremiumColors.accentGradient1.withOpacity(0.5),
+                                  blurRadius: 6,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 12),
+                      Text(
+                        '$completedCount modules completed',
+                        style: TextStyle(
+                          color: Colors.white54,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 24),
+                
+                // Continue button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      // Reload study plan to get updated progress
+                      _loadStudyPlan();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: PremiumColors.accentGradient1,
+                      padding: EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      'Continue to Next Module →',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   /// Show quiz popup asking if user wants to take quiz now or later

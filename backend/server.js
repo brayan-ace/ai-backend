@@ -1275,6 +1275,9 @@ app.post("/api/chat-enhanced", async (req, res) => {
         completedModulesCount = completedModules.length;
 
         if (plan && plan.modules && plan.modules.length > 0) {
+          const totalModules = plan.modules.length;
+          const progressPercent = Math.round((completedModulesCount / totalModules) * 100);
+          
           const modulesSummary = plan.modules
             .map((m, idx) => {
               const status = completedModules.includes(idx) 
@@ -1287,27 +1290,79 @@ app.post("/api/chat-enhanced", async (req, res) => {
             .join("\n");
 
           const currentModule = plan.modules[currentModuleIndex];
+          const keyTopics = currentModule?.key_topics || currentModule?.subtopics || [];
           const currentModuleDetails = currentModule 
-            ? `\nCurrent Module: "${currentModule.title || currentModule.module_name}"
+            ? `
+═══════════════════════════════════════════════════════════
+📚 CURRENT MODULE: "${currentModule.title || currentModule.module_name}"
+═══════════════════════════════════════════════════════════
 Objective: ${currentModule.objective || currentModule.description || "N/A"}
-Key Topics: ${(currentModule.key_topics || currentModule.subtopics || []).join(", ") || "N/A"}`
+Key Topics to Cover: ${keyTopics.join(" → ") || "N/A"}
+Difficulty: ${currentModule.difficulty || "Medium"}
+Estimated Time: ${currentModule.estimated_effort || "30 minutes"}`
             : "";
 
           studyPlanContext = `
-[ACTIVE STUDY PLAN - Version ${currentPlanVersion}]
-Plan Title: ${plan.title || "Study Plan"}
-Subject: ${plan.subject || "General"}
-Grade Level: ${plan.grade_level || "General"}
-Progress: ${completedModulesCount}/${plan.modules.length} modules completed
+╔══════════════════════════════════════════════════════════╗
+║  ACTIVE STUDY PLAN - Version ${currentPlanVersion}
+║  Progress: ${progressPercent}% (${completedModulesCount}/${totalModules} modules)
+╚══════════════════════════════════════════════════════════╝
 
-Modules:
 ${modulesSummary}
 ${currentModuleDetails}
 
-IMPORTANT: Follow this study plan. Do NOT invent new modules. Reference the current module when teaching. When the student masters the current module, acknowledge completion and ask if they want to proceed to the next module.`;
+═══════════════════════════════════════════════════════════
+🎓 PREMIUM TEACHING METHODOLOGY - FOLLOW STRICTLY
+═══════════════════════════════════════════════════════════
+
+**STEP-BY-STEP LEARNING APPROACH:**
+1. Focus ONLY on the current module - never jump ahead
+2. Break down each topic into small, digestible chunks (1-2 concepts per message)
+3. Use the Socratic method - ask questions to check understanding
+4. Include real-world anecdotes and relatable examples
+5. Use analogies that connect to everyday life
+
+**INTERACTIVE LEARNING FLOW:**
+- After explaining a concept, ask: "Does this make sense?" or "Can you see how this works?"
+- Wait for user confirmation before moving to the next concept
+- If user seems confused, rephrase using simpler terms or different analogies
+- Celebrate small wins: "Great! You've got it! 🎉"
+
+**PACING RULES:**
+- Never overwhelm with walls of text
+- Maximum 3-4 short paragraphs per response
+- One key concept at a time
+- Use bullet points for clarity
+- Include breathing room between ideas
+
+**ENGAGEMENT TECHNIQUES:**
+- Start with a hook or interesting fact
+- Use "Imagine..." or "Think of it like..." for analogies
+- Ask "Have you ever...?" to connect to their experience
+- Use emojis sparingly for warmth: 💡 🎯 ✨ 🧠
+
+**MODULE COMPLETION DETECTION:**
+When the user indicates understanding of ALL key topics in the current module:
+- Phrases like: "I understand", "Got it", "Makes sense", "I'm ready for the next"
+- Summarize what they learned
+- Congratulate them warmly
+- Ask: "Ready to move on to the next module?"
+- IMPORTANT: Signal module completion with [MODULE_COMPLETE] in your response
+
+**PROGRESS CHECKPOINTS:**
+- After covering each key topic, do a quick check-in
+- Use mini-quizzes: "Quick check: What's the main purpose of...?"
+- Provide encouraging feedback
+
+**NEVER DO:**
+- Skip ahead to future modules
+- Dump all information at once
+- Use jargon without explanation
+- Move on without confirming understanding
+- Invent topics not in the study plan`;
 
           enhancedInstructions = `${enhancedInstructions}${studyPlanContext}`;
-          console.log("[Chat-Enhanced] Instructions enhanced with study plan context (v" + currentPlanVersion + ")");
+          console.log("[Chat-Enhanced] Instructions enhanced with premium teaching methodology (v" + currentPlanVersion + ", " + progressPercent + "% complete)");
         }
       }
     } catch (planErr) {
@@ -1415,12 +1470,66 @@ Always prioritize clarity and professional formatting.`;
     );
 
     // Normalize the model response to unescape markdown/newline artifacts
-    const aiResponse = normalizeModelResponse(aiResponseRaw);
+    let aiResponse = normalizeModelResponse(aiResponseRaw);
 
     console.log(
       "[Chat-Enhanced] 🔧 Normalized AI response preview:",
       aiResponse.substring(0, 200).replace(/\n/g, "␤"),
     );
+
+    // STEP 7: Detect module completion and update progress
+    let moduleCompleted = false;
+    let newProgressPercentage = 0;
+    let updatedCurrentModule = currentModuleIndex;
+    try {
+      // Check if AI signaled module completion
+      if (aiResponse.includes("[MODULE_COMPLETE]")) {
+        moduleCompleted = true;
+        aiResponse = aiResponse.replace(/\[MODULE_COMPLETE\]/g, "").trim();
+        console.log("[Chat-Enhanced] 🎉 Module completion detected!");
+        
+        const progressResult = await pool.query(
+          `SELECT study_plan, current_module, completed_modules 
+           FROM bot_progress WHERE bot_id = $1 AND user_id = $2 LIMIT 1`,
+          [botId, userId],
+        );
+        
+        if (progressResult.rows.length > 0) {
+          const row = progressResult.rows[0];
+          const plan = row.study_plan;
+          let currentMod = row.current_module || 0;
+          let completedMods = row.completed_modules || [];
+          
+          if (plan && plan.modules && plan.modules.length > 0) {
+            const totalModules = plan.modules.length;
+            
+            if (!completedMods.includes(currentMod)) {
+              completedMods.push(currentMod);
+            }
+            
+            // Move to next module if available
+            if (currentMod < totalModules - 1) {
+              currentMod = currentMod + 1;
+            }
+            
+            newProgressPercentage = Math.round((completedMods.length / totalModules) * 100);
+            updatedCurrentModule = currentMod;
+            
+            // Update database
+            await pool.query(
+              `UPDATE bot_progress 
+               SET current_module = $1, completed_modules = $2, progress_percentage = $3, last_updated = NOW()
+               WHERE bot_id = $4 AND user_id = $5`,
+              [currentMod, JSON.stringify(completedMods), newProgressPercentage, botId, userId],
+            );
+            
+            console.log(`[Chat-Enhanced] 📊 Progress updated: ${newProgressPercentage}%, Module ${currentMod + 1}/${totalModules}`);
+          }
+        }
+      }
+    } catch (progressErr) {
+      console.warn("[Chat-Enhanced] Progress update failed:", progressErr.message);
+    }
 
     // Persist AI greeting and update bot progress state to avoid repeats
     try {
@@ -1477,7 +1586,12 @@ Always prioritize clarity and professional formatting.`;
       status: "success",
       response: aiResponse,
       state: botProgressState || "intro",
-      progress: { percentage: 0 },
+      progress: { 
+        percentage: moduleCompleted ? newProgressPercentage : (completedModulesCount > 0 ? Math.round((completedModulesCount / (completedModulesCount + 1)) * 100) : 0),
+        currentModule: updatedCurrentModule,
+        completedModules: completedModulesCount + (moduleCompleted ? 1 : 0),
+      },
+      moduleCompleted: moduleCompleted,
       instructionSource: instructionSource,
       learnerProfileApplied: !!learnerProfile,
       moodApplied: !!currentMood,

@@ -1,4 +1,4 @@
-/// Study Plan Hamburger Menu Widget
+0/// Study Plan Hamburger Menu Widget
 /// Displays the full study plan and allows for real-time editing
 
 import 'package:flutter/material.dart';
@@ -85,41 +85,93 @@ class _StudyPlanHamburgerMenuState extends State<StudyPlanHamburgerMenu> {
                       ],
                     ),
                     SizedBox(height: AppTheme.spaceMd),
-                    // Progress bar in header
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Overall Progress',
-                              style: AppTheme.bodySmall.copyWith(
-                                color: Colors.white70,
-                              ),
-                            ),
-                            Text(
-                              '${widget.progressPercentage.toStringAsFixed(0)}%',
-                              style: AppTheme.bodySmall.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
+                    // Premium progress display
+                    Container(
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.2),
+                          width: 1,
                         ),
-                        SizedBox(height: AppTheme.spaceSm),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: LinearProgressIndicator(
-                            value: widget.progressPercentage / 100,
-                            minHeight: 6,
-                            backgroundColor: Colors.white24,
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              Colors.white,
-                            ),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              // Circular progress indicator
+                              SizedBox(
+                                width: 56,
+                                height: 56,
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    SizedBox(
+                                      width: 56,
+                                      height: 56,
+                                      child: CircularProgressIndicator(
+                                        value: widget.progressPercentage / 100,
+                                        strokeWidth: 5,
+                                        backgroundColor: Colors.white.withOpacity(0.2),
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                    Text(
+                                      '${widget.progressPercentage.toStringAsFixed(0)}%',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(width: 16),
+                              // Progress details
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Learning Progress',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      '${widget.completedModules?.length ?? 0} of ${widget.tableOfContents?.length ?? 0} modules',
+                                      style: TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    SizedBox(height: 8),
+                                    // Mini progress bar
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(4),
+                                      child: LinearProgressIndicator(
+                                        value: widget.progressPercentage / 100,
+                                        minHeight: 4,
+                                        backgroundColor: Colors.white24,
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.greenAccent,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ],
                 ),
