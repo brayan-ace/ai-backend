@@ -1007,8 +1007,9 @@ app.post("/api/chat-enhanced", async (req, res) => {
 
     // Conversational guardrail: detect short confirmations or mood replies
     try {
+      // Expanded pattern to catch more affirmative responses
       const shortAffirmative =
-        /^\s*(yes|yep|sure|okay|ok|please do|go ahead|create|yes please|i'?m ready|im ready|lets do it|let's do it)\s*\.?$/i;
+        /^\s*(yes|yep|sure|okay|ok|please|please do|go ahead|create|yes please|i'?m ready|im ready|lets do it|let's do it|create it|yes.*create|looks good|sounds good|that'?s? good|perfect|great|do it|start|begin)\b/i;
       const shortMoodReply =
         /^\s*(fine|good|ok|okay|not bad|great|i'?m fine|im fine|doing well)\b/i;
 
@@ -1027,17 +1028,23 @@ app.post("/api/chat-enhanced", async (req, res) => {
         );
       }
 
+      // Detect if bot asked about creating a study plan
       const asksForPlan =
         lastBotMsg &&
         (/create.*study plan/i.test(lastBotMsg) ||
-          /would you like.*study plan/i.test(lastBotMsg));
+          /would you like.*study plan/i.test(lastBotMsg) ||
+          /personalized study plan/i.test(lastBotMsg) ||
+          /study plan for you/i.test(lastBotMsg));
       const asksMood =
         lastBotMsg &&
         /how are you|how's your|how are you doing/i.test(lastBotMsg);
 
+      // Also detect if user is explicitly asking for plan creation
+      const userWantsPlan = /create|make|generate|build|start.*plan/i.test(message || "");
+
       if (
-        botProgressState === "waiting_for_user" &&
-        shortAffirmative.test(message || "")
+        (botProgressState === "waiting_for_user" && shortAffirmative.test(message || "")) ||
+        userWantsPlan
       ) {
         // If the bot just asked to create a study plan, generate a structured plan,
         // save it atomically, and return it to the frontend for review.
@@ -1057,9 +1064,10 @@ app.post("/api/chat-enhanced", async (req, res) => {
             );
           }
 
-          // Generate structured plan via AI if the last bot message asked for a plan
+          // Generate structured plan via AI - always generate when user confirms or asks
           let generatedPlan = null;
-          if (asksForPlan) {
+          if (asksForPlan || userWantsPlan || botProgressState === "waiting_for_user") {
+            console.log("[Chat-Enhanced] Generating study plan for user...");
             generatedPlan = await generateStructuredStudyPlan(
               botMeta?.name || "Study Bot",
               botMeta?.topic || "General",

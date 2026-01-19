@@ -234,32 +234,38 @@ class _BotProcessingScreenState extends State<BotProcessingScreen> {
                   padding: EdgeInsets.all(24),
                   child: _buildErrorState(),
                 )
-              : Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      // Premium animated progress indicator
-                      _buildPremiumProgressIndicator(),
-                      SizedBox(height: 40),
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    return SingleChildScrollView(
+                      padding: EdgeInsets.all(24),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: constraints.maxHeight - 48, // Account for padding
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Premium animated progress indicator
+                            _buildPremiumProgressIndicator(),
+                            SizedBox(height: 32),
 
-                      // Premium progress steps with glassmorphism
-                      Flexible(
-                        child: SingleChildScrollView(
-                          child: _buildPremiumStepsIndicator(),
+                            // Premium progress steps with glassmorphism
+                            _buildPremiumStepsIndicator(),
+                            SizedBox(height: 32),
+
+                            // Current status with premium styling
+                            _buildStatusMessage(),
+                            SizedBox(height: 24),
+
+                            // Animated loading dots
+                            _buildLoadingDots(),
+                          ],
                         ),
                       ),
-                      SizedBox(height: 40),
-
-                      // Current status with premium styling
-                      _buildStatusMessage(),
-                      SizedBox(height: 30),
-
-                      // Animated loading dots
-                      _buildLoadingDots(),
-                    ],
-                  ),
+                    );
+                  },
                 ),
         ),
       ),

@@ -242,8 +242,9 @@ class ProfessionalMessageWidget extends StatelessWidget {
     var lastIndex = 0;
 
     // Pattern for **bold**, *italic*, `code`, and $math$
+    // Using non-greedy matching and allowing for edge cases
     final pattern = RegExp(
-      r'\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`|\$([^\$]+)\$',
+      r'\*\*([^*]+?)\*\*|\*([^*]+?)\*|`([^`]+?)`|\$([^\$]+?)\$',
       multiLine: true,
       dotAll: true,
     );
@@ -347,7 +348,8 @@ class ProfessionalMessageWidget extends StatelessWidget {
     var last = 0;
     // Accept two-or-more asterisks as delimiters and allow inner whitespace.
     // This catches ****bold****, ******bold******, and ** bold ** variants.
-    final pat = RegExp(r'\*{2,}\s*(.+?)\s*\*{2,}', dotAll: true);
+    // Also handle **text** at start/end of string and with punctuation
+    final pat = RegExp(r'\*\*([^*]+?)\*\*', dotAll: true);
     for (final m in pat.allMatches(s)) {
       if (m.start > last) {
         out.add(
