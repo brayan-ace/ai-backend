@@ -635,32 +635,19 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
             _showModuleCompletionCelebration(progress);
           }
 
-          // If backend returned a generated study plan, open editor for review
+          // If backend returned a generated study plan, save it and show in hamburger
           if (body['showStudyPlan'] == true) {
             final planPayload = body['studyPlan'] ?? body['study_plan'];
             if (planPayload != null) {
               setState(
                 () => _studyPlan = Map<String, dynamic>.from(planPayload),
               );
-
-              // Navigate to editor so user can review and save/apply
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => StudyPlanEditorScreen(
-                    studyPlan: _studyPlan!,
-                    onSave: (updatedPlan) async {
-                      await _savePlanChanges(updatedPlan, userId, apply: true);
-                    },
-                  ),
-                ),
-              );
-
-              if (result != null) {
-                await _loadStudyPlan();
-              }
+              print('[ChatScreen] 📚 Study plan received and set: ${_studyPlan?['modules']?.length ?? 0} modules');
             }
           }
+
+          // Always reload study plan from backend to ensure hamburger menu is updated
+          await _loadStudyPlan();
 
           await _addBotMessage(botResponse);
         } catch (parseErr) {

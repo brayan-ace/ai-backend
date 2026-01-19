@@ -1274,6 +1274,8 @@ app.post("/api/chat-enhanced", async (req, res) => {
         const completedModules = row.completed_modules || [];
         completedModulesCount = completedModules.length;
 
+        console.log("[Chat-Enhanced] 📚 Study plan found in DB:", plan ? `${plan.modules?.length || 0} modules` : "null");
+
         if (plan && plan.modules && plan.modules.length > 0) {
           const totalModules = plan.modules.length;
           const progressPercent = Math.round((completedModulesCount / totalModules) * 100);
@@ -1403,6 +1405,15 @@ Always prioritize clarity and professional formatting.`;
         role: "system",
         content:
           "NOTE: An initial greeting has already been sent in this conversation. Do NOT repeat the initial welcome message. Continue the conversation based on the user's latest input and proceed to the study flow when appropriate.",
+      });
+    }
+
+    // CRITICAL: If a study plan exists, tell AI to NOT ask about creating one
+    if (studyPlanContext && studyPlanContext.length > 0) {
+      messages.push({
+        role: "system",
+        content:
+          "CRITICAL: A study plan ALREADY EXISTS for this student. DO NOT ask if they want to create a study plan. DO NOT offer to create a new plan. Instead, IMMEDIATELY start teaching the CURRENT MODULE listed above. Begin with the first key topic and teach it step by step.",
       });
     }
 

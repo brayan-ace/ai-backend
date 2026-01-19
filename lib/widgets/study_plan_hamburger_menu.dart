@@ -1,4 +1,4 @@
-0/// Study Plan Hamburger Menu Widget
+/// Study Plan Hamburger Menu Widget
 /// Displays the full study plan and allows for real-time editing
 
 import 'package:flutter/material.dart';
@@ -408,3 +408,4 @@ class _StudyPlanHamburgerMenuState extends State<StudyPlanHamburgerMenu> {
     );
   }
 }
+
