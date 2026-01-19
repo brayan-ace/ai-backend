@@ -587,9 +587,7 @@ When the conversation starts, greet the student warmly BEFORE diving into studyi
  
 4. Offer to create a personalized study plan:
    - Ask: "Would you like me to create a personalized study plan for you now?"
-   - If the user agrees, present a concise summary of the proposed study plan and include the literal token `[
-    SHOW_STUDY_PLAN
-  ]` in your response to signal the frontend to open the Study Plan screen.
+   - If the user agrees, present a concise summary of the proposed study plan and signal the frontend to open the Study Plan screen for review.
    - Do NOT generate or apply a study plan without explicit user consent. Wait for the user to confirm before creating or saving the plan.
 
 ### HANDLING CASUAL RESPONSES
@@ -955,8 +953,7 @@ app.post("/api/chat-enhanced", async (req, res) => {
 
       const asksForPlan =
         lastBotMsg &&
-        (lastBotMsg.includes("[SHOW_STUDY_PLAN]") ||
-          /create.*study plan/i.test(lastBotMsg) ||
+        (/create.*study plan/i.test(lastBotMsg) ||
           /would you like.*study plan/i.test(lastBotMsg));
       const asksMood =
         lastBotMsg &&
