@@ -813,6 +813,51 @@ app.post("/api/chat-enhanced", async (req, res) => {
       hasMood: !!currentMood,
     });
 
+    // Fetch bot progress state to avoid repeating the initial greeting
+    let botProgressState = null;
+    try {
+      const bpRes = await pool.query(
+        `SELECT bot_state FROM bot_progress WHERE bot_id = $1 AND user_id = $2 LIMIT 1`,
+        [botId, userId],
+      );
+      if (bpRes.rows.length > 0) botProgressState = bpRes.rows[0].bot_state;
+    } catch (bpErr) {
+      console.warn(
+        "[Chat-Enhanced] Could not fetch bot_progress:",
+        bpErr.message,
+      );
+    }
+
+    // If this is an initial session start request, prefer returning an existing DB welcome
+    const isStartSession =
+      typeof message === "string" && message.trim() === "[START_SESSION]";
+    if (isStartSession) {
+      try {
+        const msgRes = await pool.query(
+          `SELECT content FROM chat_messages WHERE bot_id = $1 AND user_id = $2 AND message_type = 'bot' ORDER BY created_at ASC LIMIT 1`,
+          [botId, userId],
+        );
+        if (msgRes.rows.length > 0) {
+          const existingGreeting = msgRes.rows[0].content;
+          return res.json({
+            status: "success",
+            response: existingGreeting,
+            state: botProgressState || "intro",
+            progress: { percentage: 0 },
+            instructionSource: dbInstructions ? "database" : "frontend",
+            learnerProfileApplied: !!learnerProfile,
+            moodApplied: !!currentMood,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      } catch (gErr) {
+        console.warn(
+          "[Chat-Enhanced] Could not read existing greeting:",
+          gErr.message,
+        );
+      }
+    }
+
     // STEP 1: Fetch fresh instructions from database (always review)
     let dbInstructions = null;
     try {
@@ -872,10 +917,7 @@ app.post("/api/chat-enhanced", async (req, res) => {
     }
 
     // STEP 5: Prepare messages for AI model with MARKDOWN formatting requirement
-    const messages = [
-      {
-        role: "system",
-        content: `${enhancedInstructions}
+    const systemMessageContent = `${enhancedInstructions}
 
 ## RESPONSE FORMAT REQUIREMENT
 Format your response using Markdown to ensure professional presentation:
@@ -898,13 +940,21 @@ Details about the concept...
 ### Sub-topic
 More information...
 
-Always prioritize clarity and professional formatting.`,
-      },
-      {
-        role: "user",
-        content: message,
-      },
-    ];
+Always prioritize clarity and professional formatting.`;
+
+    const messages = [{ role: "system", content: systemMessageContent }];
+
+    // If bot has already sent its initial greeting, instruct the model not to repeat it
+    if (botProgressState && botProgressState !== "intro") {
+      messages.push({
+        role: "system",
+        content:
+          "NOTE: An initial greeting has already been sent in this conversation. Do NOT repeat the initial welcome message. Continue the conversation based on the user's latest input and proceed to the study flow when appropriate.",
+      });
+    }
+
+    // Append the user message
+    messages.push({ role: "user", content: message });
 
     console.log("[Chat-Enhanced] Messages prepared, calling AI model...");
 
@@ -973,6 +1023,57 @@ Always prioritize clarity and professional formatting.`,
       "[Chat-Enhanced] 🔧 Normalized AI response preview:",
       aiResponse.substring(0, 200).replace(/\n/g, "␤"),
     );
+
+    // Persist AI greeting and update bot progress state to avoid repeats
+    try {
+      // If bot progress indicates intro or null, and AI likely sent an initial greeting, insert it and set waiting state
+      const lowerResp = (aiResponse || "").toLowerCase();
+      const looksLikeGreeting =
+        /hi[,! ]|hello[,! ]|i'm |i am /i.test(lowerResp) ||
+        aiResponse.includes("How are you doing");
+
+      if (!botProgressState || botProgressState === "intro") {
+        // Save AI message into chat_messages if not already present
+        try {
+          // Check for duplicate content
+          const dup = await pool.query(
+            `SELECT id FROM chat_messages WHERE bot_id = $1 AND user_id = $2 AND content = $3 LIMIT 1`,
+            [botId, userId, aiResponse],
+          );
+          if (dup.rows.length === 0) {
+            await pool.query(
+              `INSERT INTO chat_messages (bot_id, user_id, message_type, content) VALUES ($1, $2, $3, $4)`,
+              [botId, userId, "bot", aiResponse],
+            );
+          }
+        } catch (insErr) {
+          console.warn(
+            "[Chat-Enhanced] Failed to save AI message:",
+            insErr.message,
+          );
+        }
+
+        // Update bot_progress state
+        try {
+          const newState = looksLikeGreeting ? "waiting_for_user" : "in_study";
+          await pool.query(
+            `UPDATE bot_progress SET bot_state = $1, last_updated = NOW() WHERE bot_id = $2 AND user_id = $3`,
+            [newState, botId, userId],
+          );
+          botProgressState = newState;
+        } catch (stErr) {
+          console.warn(
+            "[Chat-Enhanced] Failed to update bot_progress:",
+            stErr.message,
+          );
+        }
+      }
+    } catch (persistErr) {
+      console.warn(
+        "[Chat-Enhanced] Greeting persistence check failed:",
+        persistErr.message,
+      );
+    }
 
     return res.json({
       status: "success",
