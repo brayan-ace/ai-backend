@@ -227,33 +227,31 @@ class _BotProcessingScreenState extends State<BotProcessingScreen> {
           ),
         ),
         child: SafeArea(
-          child: Center(
-            child: Padding(
-              padding: EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (!_isError) ...[
-                    // Premium animated progress indicator
-                    _buildPremiumProgressIndicator(),
-                    SizedBox(height: 40),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: _isError
+                  ? [
+                      // Premium error state
+                      _buildErrorState(),
+                    ]
+                  : [
+                      // Premium animated progress indicator
+                      _buildPremiumProgressIndicator(),
+                      SizedBox(height: 40),
 
-                    // Premium progress steps with glassmorphism
-                    _buildPremiumStepsIndicator(),
-                    SizedBox(height: 40),
+                      // Premium progress steps with glassmorphism
+                      _buildPremiumStepsIndicator(),
+                      SizedBox(height: 40),
 
-                    // Current status with premium styling
-                    _buildStatusMessage(),
-                    SizedBox(height: 30),
+                      // Current status with premium styling
+                      _buildStatusMessage(),
+                      SizedBox(height: 30),
 
-                    // Animated loading dots
-                    _buildLoadingDots(),
-                  ] else ...[
-                    // Premium error state
-                    _buildErrorState(),
-                  ],
-                ],
-              ),
+                      // Animated loading dots
+                      _buildLoadingDots(),
+                    ],
             ),
           ),
         ),

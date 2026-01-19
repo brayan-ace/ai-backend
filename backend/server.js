@@ -437,15 +437,81 @@ Create COMPREHENSIVE system instructions that:
 4. Suggest hands-on examples for ${gradeLevel} students
 5. Recommend appropriate assessment methods`
     : `Create comprehensive system instructions for teaching this topic at ${gradeLevel} level`
+}`;
+
+    /**
+     * Generate a structured study plan JSON using the AI model.
+     * Returns an object: { plan: { title, modules: [...] } } or null on failure.
+     */
+    async function generateStructuredStudyPlan(
+      botName,
+      topic,
+      description,
+      gradeLevel,
+      learnerProfile,
+    ) {
+      try {
+        const groqApiKey = process.env.GROQ_API_KEY;
+        if (!groqApiKey) {
+          console.warn("[StudyPlan] GROQ_API_KEY not configured");
+          return null;
+        }
+
+        const prompt = `You are an expert curriculum designer. Produce ONLY valid JSON describing a study plan for a student.
+
+Output JSON structure exactly as follows:
+{
+  "plan": {
+    "title": "<short title>",
+    "description": "<short description>",
+    "grade_level": "<grade level>",
+    "modules": [
+      {
+        "module_name": "<name>",
+        "estimated_time_minutes": 30,
+        "difficulty": "Easy|Medium|Hard",
+        "learning_objectives": ["obj1", "obj2"],
+        "subtopics": ["sub1","sub2"],
+        "resources": [{"title":"","url":""}]
+      }
+    ]
+  }
 }
 
-Return ONLY valid JSON with this exact structure:
-{
-  "instructions": "Detailed teaching directives...",
-  "key_concepts": ["concept1", "concept2"],
-  "real_world_examples": ["example1", "example2"],
-  "assessment_methods": ["method1", "method2"]
-}`;
+Generate 4-8 modules appropriate for the topic: ${topic} and grade level: ${gradeLevel}.
+Keep titles short. Use learner profile when available:
+${learnerProfile ? JSON.stringify(learnerProfile) : "none"}
+
+Do NOT include explanatory text or markdown — return ONLY the JSON.`;
+
+        const groqRes = await axios.post(
+          "https://api.groq.com/openai/v1/chat/completions",
+          {
+            model: "openai/gpt-oss-20b",
+            messages: [{ role: "user", content: prompt }],
+            max_tokens: 1200,
+            temperature: 0.7,
+          },
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${groqApiKey}`,
+            },
+            timeout: 30000,
+          },
+        );
+
+        let responseText = groqRes?.data?.choices?.[0]?.message?.content || "";
+        // Clean code fences if present
+        responseText = responseText.replace(/```json\n?|```/g, "").trim();
+
+        const parsed = JSON.parse(responseText);
+        return parsed;
+      } catch (err) {
+        console.error("[generateStructuredStudyPlan] Error:", err.message);
+        return null;
+      }
+    }
 
     const groqRes = await axios.post(
       "https://api.groq.com/openai/v1/chat/completions",
@@ -518,6 +584,13 @@ When the conversation starts, greet the student warmly BEFORE diving into studyi
 1. Start with: "Hi, I'm ${botName}. I'm here to make studying feel like a breeze."
 2. Immediately follow with: "How are you doing today?"
 3. DO NOT jump into study content yet
+ 
+4. Offer to create a personalized study plan:
+   - Ask: "Would you like me to create a personalized study plan for you now?"
+   - If the user agrees, present a concise summary of the proposed study plan and include the literal token `[
+    SHOW_STUDY_PLAN
+  ]` in your response to signal the frontend to open the Study Plan screen.
+   - Do NOT generate or apply a study plan without explicit user consent. Wait for the user to confirm before creating or saving the plan.
 
 ### HANDLING CASUAL RESPONSES
 
@@ -858,6 +931,191 @@ app.post("/api/chat-enhanced", async (req, res) => {
       }
     }
 
+    // Conversational guardrail: detect short confirmations or mood replies
+    try {
+      const shortAffirmative =
+        /^\s*(yes|yep|sure|okay|ok|please do|go ahead|create|yes please|i'?m ready|im ready|lets do it|let's do it)\s*\.?$/i;
+      const shortMoodReply =
+        /^\s*(fine|good|ok|okay|not bad|great|i'?m fine|im fine|doing well)\b/i;
+
+      // Pull last bot message for context
+      let lastBotMsg = null;
+      try {
+        const lastRes = await pool.query(
+          `SELECT content FROM chat_messages WHERE bot_id = $1 AND user_id = $2 ORDER BY created_at DESC LIMIT 1`,
+          [botId, userId],
+        );
+        if (lastRes.rows.length > 0) lastBotMsg = lastRes.rows[0].content;
+      } catch (lErr) {
+        console.warn(
+          "[Chat-Enhanced] Failed to fetch last bot message:",
+          lErr.message,
+        );
+      }
+
+      const asksForPlan =
+        lastBotMsg &&
+        (lastBotMsg.includes("[SHOW_STUDY_PLAN]") ||
+          /create.*study plan/i.test(lastBotMsg) ||
+          /would you like.*study plan/i.test(lastBotMsg));
+      const asksMood =
+        lastBotMsg &&
+        /how are you|how's your|how are you doing/i.test(lastBotMsg);
+
+      if (
+        botProgressState === "waiting_for_user" &&
+        shortAffirmative.test(message || "")
+      ) {
+        // If the bot just asked to create a study plan, generate a structured plan,
+        // save it atomically, and return it to the frontend for review.
+        try {
+          // Fetch bot metadata to build plan context
+          let botMeta = null;
+          try {
+            const bm = await pool.query(
+              `SELECT name, topic, grade_level, description FROM study_bots WHERE bot_id = $1 LIMIT 1`,
+              [botId],
+            );
+            if (bm.rows.length > 0) botMeta = bm.rows[0];
+          } catch (bmErr) {
+            console.warn(
+              "[Chat-Enhanced] Failed to fetch bot metadata:",
+              bmErr.message,
+            );
+          }
+
+          // Generate structured plan via AI if the last bot message asked for a plan
+          let generatedPlan = null;
+          if (asksForPlan) {
+            generatedPlan = await generateStructuredStudyPlan(
+              botMeta?.name || "Study Bot",
+              botMeta?.topic || "General",
+              botMeta?.description || "",
+              botMeta?.grade_level || "General",
+              learnerProfile || null,
+            );
+          }
+
+          // Persist plan and update state
+          try {
+            const planToSave = generatedPlan?.plan || { modules: [] };
+            await pool.query(
+              `INSERT INTO bot_progress (bot_id, user_id, study_plan, bot_state, last_updated)
+               VALUES ($1, $2, $3, $4, NOW())
+               ON CONFLICT (bot_id, user_id) DO UPDATE
+               SET study_plan = $3, bot_state = $4, last_updated = NOW()`,
+              [botId, userId, JSON.stringify(planToSave), "in_study"],
+            );
+            botProgressState = "in_study";
+          } catch (saveErr) {
+            console.warn(
+              "[Chat-Enhanced] Failed to persist generated plan:",
+              saveErr.message,
+            );
+          }
+
+          // Save user's acceptance message
+          try {
+            await pool.query(
+              `INSERT INTO chat_messages (bot_id, user_id, message_type, content) VALUES ($1, $2, $3, $4)`,
+              [botId, userId, "user", message],
+            );
+          } catch (mErr) {
+            console.warn(
+              "[Chat-Enhanced] Failed to save user acceptance message:",
+              mErr.message,
+            );
+          }
+
+          // Insert a bot confirmation message summarizing the plan
+          try {
+            const summary = generatedPlan
+              ? `I've created a study plan with ${generatedPlan.plan.modules.length} modules. Open the Study Plan to review and adjust.`
+              : "Study plan prepared. Open the Study Plan to review and adjust.";
+            await pool.query(
+              `INSERT INTO chat_messages (bot_id, user_id, message_type, content) VALUES ($1, $2, $3, $4)`,
+              [botId, userId, "bot", summary],
+            );
+          } catch (bErr) {
+            console.warn(
+              "[Chat-Enhanced] Failed to save plan summary message:",
+              bErr.message,
+            );
+          }
+
+          return res.json({
+            status: "success",
+            response: generatedPlan
+              ? "I prepared a study plan for you. Opening the Study Plan for review."
+              : "Prepared a placeholder study plan. Open the Study Plan to review.",
+            showStudyPlan: true,
+            studyPlan: generatedPlan?.plan || { modules: [] },
+            state: botProgressState,
+            progress: { percentage: 0 },
+            instructionSource: dbInstructions ? "database" : "frontend",
+            learnerProfileApplied: !!learnerProfile,
+            moodApplied: !!currentMood,
+            timestamp: new Date().toISOString(),
+          });
+        } catch (errPlan) {
+          console.warn(
+            "[Chat-Enhanced] Plan generation flow failed:",
+            errPlan.message,
+          );
+          // Fallback: update state and return showStudyPlan without plan
+          try {
+            await pool.query(
+              `UPDATE bot_progress SET bot_state = $1, last_updated = NOW() WHERE bot_id = $2 AND user_id = $3`,
+              ["in_study", botId, userId],
+            );
+            botProgressState = "in_study";
+          } catch (upErr) {
+            console.warn(
+              "[Chat-Enhanced] Failed to update bot_progress in fallback:",
+              upErr.message,
+            );
+          }
+
+          return res.json({
+            status: "success",
+            response: "Opening Study Plan for you to create manually.",
+            showStudyPlan: true,
+            studyPlan: { modules: [] },
+            state: botProgressState,
+            progress: { percentage: 0 },
+            instructionSource: dbInstructions ? "database" : "frontend",
+            learnerProfileApplied: !!learnerProfile,
+            moodApplied: !!currentMood,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
+
+      if (
+        botProgressState === "intro" &&
+        asksMood &&
+        shortMoodReply.test(message || "")
+      ) {
+        try {
+          await pool.query(
+            `UPDATE bot_progress SET bot_state = $1, last_updated = NOW() WHERE bot_id = $2 AND user_id = $3`,
+            ["in_study", botId, userId],
+          );
+          botProgressState = "in_study";
+        } catch (upErr) {
+          console.warn(
+            "[Chat-Enhanced] Failed to update bot_progress on mood reply:",
+            upErr.message,
+          );
+        }
+      }
+    } catch (guardErr) {
+      console.warn(
+        "[Chat-Enhanced] Conversational guardrail error:",
+        guardErr.message,
+      );
+    }
+
     // STEP 1: Fetch fresh instructions from database (always review)
     let dbInstructions = null;
     try {
@@ -1078,7 +1336,7 @@ Always prioritize clarity and professional formatting.`;
     return res.json({
       status: "success",
       response: aiResponse,
-      state: "intro",
+      state: botProgressState || "intro",
       progress: { percentage: 0 },
       instructionSource: instructionSource,
       learnerProfileApplied: !!learnerProfile,
@@ -1112,6 +1370,39 @@ app.get("/test-env", (req, res) => {
       message: error.message,
       timestamp: new Date().toISOString(),
     });
+  }
+});
+
+// Provide bot progress and study plan to frontend
+app.get("/api/bot-progress/:botId/:userId", async (req, res) => {
+  try {
+    const { botId, userId } = req.params;
+    if (!botId || !userId) {
+      return res.status(400).json({ error: "botId and userId required" });
+    }
+
+    const result = await pool.query(
+      `SELECT bot_state, progress_percentage, study_plan FROM bot_progress WHERE bot_id = $1 AND user_id = $2 LIMIT 1`,
+      [botId, userId],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Bot progress not found" });
+    }
+
+    const row = result.rows[0];
+    return res.json({
+      status: "success",
+      bot_state: row.bot_state || "intro",
+      progress: { percentage: row.progress_percentage || 0 },
+      study_plan: row.study_plan || { modules: [] },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("[GET /api/bot-progress] Error:", err.message);
+    return res
+      .status(500)
+      .json({ error: "Failed to fetch bot progress", message: err.message });
   }
 });
 
@@ -1191,6 +1482,7 @@ app.post("/api/update-study-plan", async (req, res) => {
 
   try {
     const { botId, userId, updatedPlan } = req.body;
+    const applyPlan = req.body.apply === true;
 
     if (!botId || !userId || !updatedPlan) {
       return res.status(400).json({
@@ -1210,10 +1502,17 @@ app.post("/api/update-study-plan", async (req, res) => {
       });
     }
 
-    await pool.query(
-      `UPDATE bot_progress SET study_plan = $1, last_updated = NOW() WHERE bot_id = $2 AND user_id = $3`,
-      [JSON.stringify(updatedPlan), botId, userId],
-    );
+    if (applyPlan) {
+      await pool.query(
+        `UPDATE bot_progress SET study_plan = $1, bot_state = $2, last_updated = NOW() WHERE bot_id = $3 AND user_id = $4`,
+        [JSON.stringify(updatedPlan), "in_study", botId, userId],
+      );
+    } else {
+      await pool.query(
+        `UPDATE bot_progress SET study_plan = $1, last_updated = NOW() WHERE bot_id = $2 AND user_id = $3`,
+        [JSON.stringify(updatedPlan), botId, userId],
+      );
+    }
     console.log("[update-study-plan] Plan updated in database");
 
     return res.json({
@@ -1229,6 +1528,51 @@ app.post("/api/update-study-plan", async (req, res) => {
       message: err.message,
       timestamp: new Date().toISOString(),
     });
+  }
+});
+
+// Apply a study plan atomically and transition bot to in_study
+app.post("/api/apply-study-plan", async (req, res) => {
+  try {
+    const { botId, userId, plan } = req.body;
+    if (!botId || !userId || plan == null) {
+      return res
+        .status(400)
+        .json({ error: "botId, userId and plan are required" });
+    }
+
+    await pool.query(
+      `INSERT INTO bot_progress (bot_id, user_id, study_plan, bot_state, last_updated)
+         VALUES ($1, $2, $3, $4, NOW())
+         ON CONFLICT (bot_id, user_id) DO UPDATE
+         SET study_plan = $3, bot_state = $4, last_updated = NOW()`,
+      [botId, userId, JSON.stringify(plan), "in_study"],
+    );
+
+    // Save a system chat message announcing plan application
+    try {
+      const applyMsg = "User accepted the study plan. Study session started.";
+      await pool.query(
+        `INSERT INTO chat_messages (bot_id, user_id, message_type, content) VALUES ($1, $2, $3, $4)`,
+        [botId, userId, "bot", applyMsg],
+      );
+    } catch (msgErr) {
+      console.warn(
+        "[apply-study-plan] Failed to insert chat message:",
+        msgErr.message,
+      );
+    }
+
+    return res.json({
+      status: "success",
+      applied: true,
+      bot_state: "in_study",
+    });
+  } catch (err) {
+    console.error("[POST /api/apply-study-plan] Error:", err.message);
+    return res
+      .status(500)
+      .json({ error: "Failed to apply study plan", message: err.message });
   }
 });
 

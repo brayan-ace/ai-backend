@@ -653,6 +653,33 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
             print('[ChatScreen] 📊 State updated: $_botCurrentState');
           });
 
+          // If backend returned a generated study plan, open editor for review
+          if (body['showStudyPlan'] == true) {
+            final planPayload = body['studyPlan'] ?? body['study_plan'];
+            if (planPayload != null) {
+              setState(
+                () => _studyPlan = Map<String, dynamic>.from(planPayload),
+              );
+
+              // Navigate to editor so user can review and save/apply
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => StudyPlanEditorScreen(
+                    studyPlan: _studyPlan!,
+                    onSave: (updatedPlan) async {
+                      await _savePlanChanges(updatedPlan, userId, apply: true);
+                    },
+                  ),
+                ),
+              );
+
+              if (result != null) {
+                await _loadStudyPlan();
+              }
+            }
+          }
+
           await _addBotMessage(botResponse);
         } catch (parseErr) {
           print('[ChatScreen] ❌ Error parsing response JSON: $parseErr');
@@ -2014,14 +2041,15 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
 
   Future<void> _savePlanChanges(
     Map<String, dynamic> updatedPlan,
-    String userId,
-  ) async {
+    String userId, {
+    bool apply = true,
+  }) async {
     try {
       // Update plan in state
       setState(() => _studyPlan = updatedPlan);
 
-      // Send to backend
-      final uri = Uri.parse('$_backendUrl/api/update-study-plan');
+      // Send to backend - apply immediately to make plan active
+      final uri = Uri.parse('$_backendUrl/api/apply-study-plan');
 
       final response = await http
           .post(
@@ -2030,7 +2058,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
             body: jsonEncode({
               'botId': widget.botId,
               'userId': userId,
-              'updatedPlan': updatedPlan,
+              'studyPlan': updatedPlan,
             }),
           )
           .timeout(const Duration(seconds: 30));
@@ -2038,14 +2066,36 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-              '✅ Study plan updated! I\'ll adjust my teaching strategy.',
-            ),
+            content: Text('✅ Study plan applied and saved!'),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 2),
           ),
         );
-        print('[ChatScreen] Plan saved successfully');
+        print('[ChatScreen] Plan applied successfully');
+      } else if (response.statusCode == 400 || response.statusCode == 404) {
+        // Fallback to update endpoint if apply not available
+        final fallbackUri = Uri.parse('$_backendUrl/api/update-study-plan');
+        final fallbackResp = await http.post(
+          fallbackUri,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'botId': widget.botId,
+            'userId': userId,
+            'updatedPlan': updatedPlan,
+            'apply': apply,
+          }),
+        );
+
+        if (fallbackResp.statusCode == 200) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Study plan updated (fallback)'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          throw Exception('Server error: ${response.statusCode}');
+        }
       } else {
         throw Exception('Server error: ${response.statusCode}');
       }
