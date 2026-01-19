@@ -210,6 +210,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
 
   // Study plan management
   Map<String, dynamic>? _studyPlan;
+  int _planVersion = 1;
 
   // Progress tracking
   double _progressPercentage = 0;
@@ -346,12 +347,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         await _fetchFreshSystemInstructions(widget.botId!);
       }
 
-      // Generate warm greeting and initial learner profile building
-      _initializeWarmGreeting();
-
       // Always fetch initial greeting from backend - ALL responses come from AI
       // The backend will use system instructions to generate personalized greeting
-      _fetchInitialGreeting();
+      await _fetchInitialGreeting();
 
       setState(() {});
     } catch (e) {
@@ -359,31 +357,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     }
   }
 
-  /// Initialize warm greeting and begin learner profile building
-  void _initializeWarmGreeting() {
-    if (_botState == null) return;
-
-    // Generate warm, casual greeting (NOT the system's standard greeting)
-    final warmGreeting = _tutorService.generateWarmGreeting(
-      widget.botName ?? 'Your Tutor',
-      widget.planName ?? 'Study Plan',
-    );
-
-    // Create initial greeting message
-    final greetingMessage = StudyBotMessage(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      senderType: 'bot',
-      text: warmGreeting,
-      timestamp: DateTime.now(),
-    );
-
-    // Add to messages
-    setState(() {
-      _messages = [greetingMessage];
-    });
-
-    print('[ChatScreen] Warm greeting initialized: $warmGreeting');
-  }
+  // Note: frontend warm greetings removed. All greetings must come from backend.
 
   /// Fetch the latest system instructions from the backend database
   Future<void> _fetchFreshSystemInstructions(String botId) async {
@@ -1545,16 +1519,47 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     );
   }
 
+  /// Convert backend study plan to TableOfContentsItem list
+  List<TableOfContentsItem> _convertStudyPlanToToc() {
+    if (_studyPlan == null) return [];
+    
+    final modules = _studyPlan!['modules'] as List? ?? [];
+    return modules.asMap().entries.map((entry) {
+      final idx = entry.key;
+      final mod = entry.value as Map<String, dynamic>;
+      
+      return TableOfContentsItem(
+        moduleNumber: idx + 1,
+        title: mod['title'] ?? mod['module_name'] ?? 'Module ${idx + 1}',
+        description: mod['objective'] ?? mod['description'] ?? '',
+        subtopics: List<String>.from(mod['key_topics'] ?? mod['subtopics'] ?? mod['learning_objectives'] ?? []),
+        estimatedTime: mod['estimated_effort'] ?? mod['duration'] ?? '30 minutes',
+        difficultyLevel: mod['difficulty'] ?? 'Medium',
+      );
+    }).toList();
+  }
+
   /// Build drawer menu with navigation options
   Widget _buildDrawer() {
+    // Use converted study plan or fallback to botState tableOfContents
+    final tocItems = _studyPlan != null 
+        ? _convertStudyPlanToToc() 
+        : _botState?.tableOfContents ?? [];
+    
     return StudyPlanHamburgerMenu(
-      tableOfContents: _botState?.tableOfContents,
+      tableOfContents: tocItems.isNotEmpty ? tocItems : null,
       currentModule: _botState?.currentModule ?? 0,
       completedModules: _botState?.completedModules,
       progressPercentage: _progressPercentage,
+      planVersion: _planVersion,
       onModuleEdit: (moduleIndex, moduleName) {
-        // Handle module edit - can navigate to editor
+        // Handle module edit - navigate to editor
         print('[ChatScreen] Edit module $moduleIndex: $moduleName');
+        _openPlanEditor();
+      },
+      onEditPlan: () {
+        print('[ChatScreen] Edit plan button pressed');
+        _openPlanEditor();
       },
       onClose: () {
         print('[ChatScreen] Hamburger menu closed');
@@ -2006,20 +2011,40 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   }
 
   Future<void> _openPlanEditor() async {
+    // Try to load plan if not available
     if (_studyPlan == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Study plan not loaded yet. Please try again.'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Loading study plan...'),
+            backgroundColor: Colors.blue,
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+      
+      final loaded = await _loadStudyPlan();
+      if (!loaded || _studyPlan == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No study plan available yet. Ask your tutor to create one!'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
     }
 
     final currentUser = FirebaseAuth.instance.currentUser;
     final userId = currentUser?.uid ?? 'anonymous';
 
-    Navigator.pop(context); // Close the modal
+    // Close any open modal/drawer first
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    }
 
     final result = await Navigator.push(
       context,
@@ -2033,9 +2058,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       ),
     );
 
-    // Reload plan after editor closes
-    if (result != null) {
-      _loadStudyPlan();
+    // Reload plan after editor closes to sync any changes
+    if (result != null || mounted) {
+      await _loadStudyPlan();
     }
   }
 
@@ -2044,8 +2069,48 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     String userId, {
     bool apply = true,
   }) async {
+    // Store backup of current plan in case save fails
+    final backupPlan = _studyPlan != null 
+        ? Map<String, dynamic>.from(_studyPlan!) 
+        : null;
+    final backupVersion = _planVersion;
+
     try {
-      // Update plan in state
+      // Validate plan structure before saving
+      if (updatedPlan['modules'] == null || 
+          !(updatedPlan['modules'] is List) ||
+          (updatedPlan['modules'] as List).isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('⚠️ Invalid plan: Must have at least one module'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+
+      // Validate each module has a title
+      for (int i = 0; i < (updatedPlan['modules'] as List).length; i++) {
+        final mod = updatedPlan['modules'][i] as Map<String, dynamic>;
+        if ((mod['title'] == null || mod['title'].toString().isEmpty) &&
+            (mod['module_name'] == null || mod['module_name'].toString().isEmpty)) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('⚠️ Module ${i + 1} must have a title'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+          return;
+        }
+      }
+
+      // Optimistically update local state
       setState(() => _studyPlan = updatedPlan);
 
       // Send to backend - apply immediately to make plan active
@@ -2064,14 +2129,27 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
           .timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Study plan applied and saved!'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
-        print('[ChatScreen] Plan applied successfully');
+        final body = jsonDecode(response.body);
+        final newVersion = body['plan_version'] as int? ?? (_planVersion + 1);
+        
+        setState(() {
+          _planVersion = newVersion;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('✅ Study plan saved (v$newVersion)! AI will adapt to your changes.'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        print('[ChatScreen] Plan applied successfully, version: $newVersion');
+        
+        // Notify AI about plan update
+        await _addBotMessage("Got it — I've updated our study route. We'll continue with the revised plan.");
+        
       } else if (response.statusCode == 400 || response.statusCode == 404) {
         // Fallback to update endpoint if apply not available
         final fallbackUri = Uri.parse('$_backendUrl/api/update-study-plan');
@@ -2084,36 +2162,63 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
             'updatedPlan': updatedPlan,
             'apply': apply,
           }),
-        );
+        ).timeout(const Duration(seconds: 30));
 
         if (fallbackResp.statusCode == 200) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('✅ Study plan updated (fallback)'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          final body = jsonDecode(fallbackResp.body);
+          final newVersion = body['plan_version'] as int? ?? (_planVersion + 1);
+          
+          setState(() {
+            _planVersion = newVersion;
+          });
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('✅ Study plan updated (v$newVersion)'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
         } else {
-          throw Exception('Server error: ${response.statusCode}');
+          throw Exception('Server error: ${fallbackResp.statusCode}');
         }
       } else {
         throw Exception('Server error: ${response.statusCode}');
       }
     } catch (e) {
       print('[ChatScreen] Error saving plan: $e');
+      
+      // Restore backup on failure - don't lose local edits
+      if (backupPlan != null) {
+        setState(() {
+          _studyPlan = backupPlan;
+          _planVersion = backupVersion;
+        });
+      }
+      
       if (mounted) {
+        // Show retry option
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error saving plan: $e'),
+            content: Text('❌ Failed to save plan. Your changes are preserved locally.'),
             backgroundColor: Colors.red,
+            duration: Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'RETRY',
+              textColor: Colors.white,
+              onPressed: () {
+                _savePlanChanges(updatedPlan, userId, apply: apply);
+              },
+            ),
           ),
         );
       }
     }
   }
 
-  Future<void> _loadStudyPlan() async {
-    if (widget.botId == null) return;
+  Future<bool> _loadStudyPlan() async {
+    if (widget.botId == null) return false;
 
     try {
       final currentUser = FirebaseAuth.instance.currentUser;
@@ -2128,10 +2233,37 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         final body = jsonDecode(response.body);
         setState(() {
           _studyPlan = body['study_plan'] as Map<String, dynamic>?;
+          _planVersion = body['plan_version'] as int? ?? 1;
+          _progressPercentage = (body['progress']?['percentage'] as num?)?.toDouble() ?? 0.0;
+          _botCurrentState = body['bot_state'] as String? ?? 'intro';
         });
+        print('[ChatScreen] Loaded study plan v$_planVersion');
+        return true;
+      } else if (response.statusCode == 404) {
+        // No progress record yet - this is okay for new bots
+        print('[ChatScreen] No study plan found (404) - new bot');
+        return false;
+      } else {
+        print('[ChatScreen] Failed to load study plan: ${response.statusCode}');
+        return false;
       }
     } catch (e) {
       print('[ChatScreen] Error loading study plan: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not load study plan. Check your connection.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 3),
+            action: SnackBarAction(
+              label: 'RETRY',
+              textColor: Colors.white,
+              onPressed: () => _loadStudyPlan(),
+            ),
+          ),
+        );
+      }
+      return false;
     }
   }
 

@@ -11,7 +11,9 @@ class StudyPlanHamburgerMenu extends StatefulWidget {
   final List<int>? completedModules;
   final Function(int, String)? onModuleEdit;
   final VoidCallback? onClose;
+  final VoidCallback? onEditPlan;
   final double progressPercentage;
+  final int? planVersion;
 
   const StudyPlanHamburgerMenu({
     Key? key,
@@ -20,7 +22,9 @@ class StudyPlanHamburgerMenu extends StatefulWidget {
     this.completedModules,
     this.onModuleEdit,
     this.onClose,
+    this.onEditPlan,
     this.progressPercentage = 0.0,
+    this.planVersion,
   }) : super(key: key);
 
   @override
@@ -121,9 +125,40 @@ class _StudyPlanHamburgerMenuState extends State<StudyPlanHamburgerMenu> {
                 ),
               ),
             ),
-            // Modules list
+            // Modules list or empty state
             Expanded(
-              child: ListView.builder(
+              child: widget.tableOfContents == null || widget.tableOfContents!.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(AppTheme.spaceLg),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.menu_book_outlined,
+                              size: 64,
+                              color: AppTheme.textTertiary,
+                            ),
+                            SizedBox(height: AppTheme.spaceMd),
+                            Text(
+                              'No Study Plan Yet',
+                              style: AppTheme.headlineSmall.copyWith(
+                                color: AppTheme.textSecondary,
+                              ),
+                            ),
+                            SizedBox(height: AppTheme.spaceSm),
+                            Text(
+                              'Your study plan will appear here once it\'s created. Ask your tutor to generate one!',
+                              textAlign: TextAlign.center,
+                              style: AppTheme.bodySmall.copyWith(
+                                color: AppTheme.textTertiary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
                 padding: EdgeInsets.all(AppTheme.spaceMd),
                 itemCount: widget.tableOfContents?.length ?? 0,
                 itemBuilder: (context, index) {
@@ -259,6 +294,21 @@ class _StudyPlanHamburgerMenuState extends State<StudyPlanHamburgerMenu> {
                 },
               ),
             ),
+            // Plan version indicator
+            if (widget.planVersion != null)
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppTheme.spaceMd,
+                  vertical: AppTheme.spaceSm,
+                ),
+                child: Text(
+                  'Plan Version: ${widget.planVersion}',
+                  style: AppTheme.bodySmall.copyWith(
+                    color: AppTheme.textTertiary,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
             // Footer action buttons
             Container(
               padding: EdgeInsets.all(AppTheme.spaceMd),
@@ -283,14 +333,17 @@ class _StudyPlanHamburgerMenuState extends State<StudyPlanHamburgerMenu> {
                   SizedBox(width: AppTheme.spaceMd),
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                        // TODO: Implement edit plan functionality
-                        Navigator.pop(context);
-                      },
+                      onPressed: widget.tableOfContents != null && widget.tableOfContents!.isNotEmpty
+                          ? () {
+                              Navigator.pop(context);
+                              widget.onEditPlan?.call();
+                            }
+                          : null,
                       icon: const Icon(Icons.edit),
-                      label: const Text('Edit'),
+                      label: const Text('Edit Plan'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primaryBlue,
+                        disabledBackgroundColor: AppTheme.primaryBlue.withOpacity(0.3),
                       ),
                     ),
                   ),

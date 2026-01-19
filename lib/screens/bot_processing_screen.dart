@@ -229,45 +229,38 @@ class _BotProcessingScreenState extends State<BotProcessingScreen> {
           ),
         ),
         child: SafeArea(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight:
-                    MediaQuery.of(context).size.height -
-                    kToolbarHeight -
-                    MediaQuery.of(context).padding.vertical,
-              ),
-              child: IntrinsicHeight(
-                child: Column(
-                  mainAxisSize: MainAxisSize.max,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: _isError
-                      ? [
-                          // Premium error state
-                          _buildErrorState(),
-                        ]
-                      : [
-                          // Premium animated progress indicator
-                          _buildPremiumProgressIndicator(),
-                          SizedBox(height: 40),
+          child: _isError
+              ? SingleChildScrollView(
+                  padding: EdgeInsets.all(24),
+                  child: _buildErrorState(),
+                )
+              : Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Premium animated progress indicator
+                      _buildPremiumProgressIndicator(),
+                      SizedBox(height: 40),
 
-                          // Premium progress steps with glassmorphism
-                          _buildPremiumStepsIndicator(),
-                          SizedBox(height: 40),
+                      // Premium progress steps with glassmorphism
+                      Flexible(
+                        child: SingleChildScrollView(
+                          child: _buildPremiumStepsIndicator(),
+                        ),
+                      ),
+                      SizedBox(height: 40),
 
-                          // Current status with premium styling
-                          _buildStatusMessage(),
-                          SizedBox(height: 30),
+                      // Current status with premium styling
+                      _buildStatusMessage(),
+                      SizedBox(height: 30),
 
-                          // Animated loading dots
-                          _buildLoadingDots(),
-                          Spacer(),
-                        ],
+                      // Animated loading dots
+                      _buildLoadingDots(),
+                    ],
+                  ),
                 ),
-              ),
-            ),
-          ),
         ),
       ),
     );

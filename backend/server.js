@@ -408,6 +408,135 @@ Provide a concise and informative summary based on the search results. Ensure th
   }
 }
 
+/**
+ * Generate a structured study plan JSON using the AI model.
+ * Returns an object: { plan: { title, modules: [...] } } or null on failure.
+ * 
+ * Study Plan Structure (per HYPER PROMPT requirements):
+ * - Plan title, subject, grade level
+ * - Ordered modules with: id, title, objective, key_topics, expected_outcome, estimated_effort
+ * - Machine-readable AND human-readable format
+ */
+async function generateStructuredStudyPlan(
+  botName,
+  topic,
+  description,
+  gradeLevel,
+  learnerProfile,
+) {
+  try {
+    const groqApiKey = process.env.GROQ_API_KEY;
+    if (!groqApiKey) {
+      console.warn("[StudyPlan] GROQ_API_KEY not configured");
+      return null;
+    }
+
+    console.log("[StudyPlan] Generating structured plan for:", {
+      botName,
+      topic,
+      gradeLevel,
+      hasDescription: !!description,
+      hasLearnerProfile: !!learnerProfile,
+    });
+
+    const prompt = `You are an expert curriculum designer creating a personalized study plan.
+
+CONTEXT:
+- Bot Name: ${botName}
+- Topic: ${topic}
+- Grade Level: ${gradeLevel}
+- Student Goals: ${description || "General learning"}
+${learnerProfile ? `- Learner Profile: ${JSON.stringify(learnerProfile)}` : ""}
+
+OUTPUT REQUIREMENTS:
+Produce ONLY valid JSON with this exact structure:
+{
+  "plan": {
+    "title": "<descriptive plan title>",
+    "subject": "${topic}",
+    "grade_level": "${gradeLevel}",
+    "description": "<brief plan overview>",
+    "total_estimated_hours": <number>,
+    "modules": [
+      {
+        "id": "module_1",
+        "title": "<module title>",
+        "objective": "<what student will learn>",
+        "key_topics": ["topic1", "topic2", "topic3"],
+        "expected_outcome": "<what student can do after completing>",
+        "estimated_effort": "<e.g., 30 minutes>",
+        "difficulty": "Easy|Medium|Hard",
+        "order": 1
+      }
+    ]
+  }
+}
+
+INSTRUCTIONS:
+1. Generate 4-8 modules appropriate for ${gradeLevel} level
+2. Order modules from foundational to advanced concepts
+3. Each module should build on previous ones
+4. Keep titles concise but descriptive
+5. Make objectives specific and measurable
+6. Tailor content to the student's goals: "${description || "General mastery of " + topic}"
+
+Return ONLY the JSON object, no explanations or markdown.`;
+
+    const groqRes = await axios.post(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        model: "llama-3.3-70b-versatile",
+        messages: [
+          {
+            role: "system",
+            content: "You are a curriculum design expert. Output only valid JSON.",
+          },
+          { role: "user", content: prompt },
+        ],
+        max_tokens: 2000,
+        temperature: 0.7,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${groqApiKey}`,
+        },
+        timeout: 45000,
+      },
+    );
+
+    let responseText = groqRes?.data?.choices?.[0]?.message?.content || "";
+    // Clean code fences if present
+    responseText = responseText.replace(/```json\n?|```/g, "").trim();
+
+    const parsed = JSON.parse(responseText);
+    
+    // Validate structure
+    if (!parsed.plan || !Array.isArray(parsed.plan.modules)) {
+      console.error("[StudyPlan] Invalid plan structure received");
+      return null;
+    }
+
+    // Ensure each module has required fields and proper IDs
+    parsed.plan.modules = parsed.plan.modules.map((mod, idx) => ({
+      id: mod.id || `module_${idx + 1}`,
+      title: mod.title || `Module ${idx + 1}`,
+      objective: mod.objective || mod.description || "",
+      key_topics: mod.key_topics || mod.subtopics || mod.learning_objectives || [],
+      expected_outcome: mod.expected_outcome || "",
+      estimated_effort: mod.estimated_effort || mod.estimated_time_minutes ? `${mod.estimated_time_minutes} minutes` : "30 minutes",
+      difficulty: mod.difficulty || "Medium",
+      order: mod.order || idx + 1,
+    }));
+
+    console.log("[StudyPlan] Successfully generated plan with", parsed.plan.modules.length, "modules");
+    return parsed;
+  } catch (err) {
+    console.error("[generateStructuredStudyPlan] Error:", err.message);
+    return null;
+  }
+}
+
 async function generateEnhancedInstructions(
   topic,
   description,
@@ -438,80 +567,6 @@ Create COMPREHENSIVE system instructions that:
 5. Recommend appropriate assessment methods`
     : `Create comprehensive system instructions for teaching this topic at ${gradeLevel} level`
 }`;
-
-    /**
-     * Generate a structured study plan JSON using the AI model.
-     * Returns an object: { plan: { title, modules: [...] } } or null on failure.
-     */
-    async function generateStructuredStudyPlan(
-      botName,
-      topic,
-      description,
-      gradeLevel,
-      learnerProfile,
-    ) {
-      try {
-        const groqApiKey = process.env.GROQ_API_KEY;
-        if (!groqApiKey) {
-          console.warn("[StudyPlan] GROQ_API_KEY not configured");
-          return null;
-        }
-
-        const prompt = `You are an expert curriculum designer. Produce ONLY valid JSON describing a study plan for a student.
-
-Output JSON structure exactly as follows:
-{
-  "plan": {
-    "title": "<short title>",
-    "description": "<short description>",
-    "grade_level": "<grade level>",
-    "modules": [
-      {
-        "module_name": "<name>",
-        "estimated_time_minutes": 30,
-        "difficulty": "Easy|Medium|Hard",
-        "learning_objectives": ["obj1", "obj2"],
-        "subtopics": ["sub1","sub2"],
-        "resources": [{"title":"","url":""}]
-      }
-    ]
-  }
-}
-
-Generate 4-8 modules appropriate for the topic: ${topic} and grade level: ${gradeLevel}.
-Keep titles short. Use learner profile when available:
-${learnerProfile ? JSON.stringify(learnerProfile) : "none"}
-
-Do NOT include explanatory text or markdown — return ONLY the JSON.`;
-
-        const groqRes = await axios.post(
-          "https://api.groq.com/openai/v1/chat/completions",
-          {
-            model: "openai/gpt-oss-20b",
-            messages: [{ role: "user", content: prompt }],
-            max_tokens: 1200,
-            temperature: 0.7,
-          },
-          {
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${groqApiKey}`,
-            },
-            timeout: 30000,
-          },
-        );
-
-        let responseText = groqRes?.data?.choices?.[0]?.message?.content || "";
-        // Clean code fences if present
-        responseText = responseText.replace(/```json\n?|```/g, "").trim();
-
-        const parsed = JSON.parse(responseText);
-        return parsed;
-      } catch (err) {
-        console.error("[generateStructuredStudyPlan] Error:", err.message);
-        return null;
-      }
-    }
 
     const groqRes = await axios.post(
       "https://api.groq.com/openai/v1/chat/completions",
@@ -587,8 +642,15 @@ When the conversation starts, greet the student warmly BEFORE diving into studyi
  
 4. Offer to create a personalized study plan:
    - Ask: "Would you like me to create a personalized study plan for you now?"
-   - If the user agrees, present a concise summary of the proposed study plan and signal the frontend to open the Study Plan screen for review.
+  - If the user agrees, present a concise summary of the proposed study plan and signal the frontend to open the Study Plan screen for review.
    - Do NOT generate or apply a study plan without explicit user consent. Wait for the user to confirm before creating or saving the plan.
+
+### STUDY CONTEXT
+
+- Target Topic: ${botTopic}
+- Description (user-provided): ${description || "No description provided."}
+
+Include the user's description in any plan-generation prompts and initial instructions so the Study Bot always knows what the user intends to study.
 
 ### HANDLING CASUAL RESPONSES
 
@@ -684,14 +746,28 @@ async function ensureTables() {
         bot_id TEXT NOT NULL REFERENCES study_bots(bot_id),
         user_id TEXT NOT NULL,
         study_plan JSONB,
+        plan_version INT DEFAULT 1,
         current_module INT DEFAULT 0,
         completed_modules JSONB DEFAULT '[]'::jsonb,
         progress_percentage FLOAT DEFAULT 0,
         bot_state VARCHAR(50) DEFAULT 'intro',
-        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(bot_id, user_id)
       );
     `);
     console.log("[DB] bot_progress table ensured");
+
+    // Add plan_version column if it doesn't exist (for existing tables)
+    await pool.query(`
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                       WHERE table_name='bot_progress' AND column_name='plan_version') THEN
+          ALTER TABLE bot_progress ADD COLUMN plan_version INT DEFAULT 1;
+        END IF;
+      END $$;
+    `);
+    console.log("[DB] bot_progress plan_version column ensured");
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS quiz_data (
@@ -1171,6 +1247,65 @@ app.post("/api/chat-enhanced", async (req, res) => {
       console.log("[Chat-Enhanced] Instructions enhanced with mood context");
     }
 
+    // STEP 4.5: Fetch and include active study plan context
+    let studyPlanContext = "";
+    let currentPlanVersion = 1;
+    let currentModuleIndex = 0;
+    let completedModulesCount = 0;
+    try {
+      const planResult = await pool.query(
+        `SELECT study_plan, plan_version, current_module, completed_modules 
+         FROM bot_progress WHERE bot_id = $1 AND user_id = $2 LIMIT 1`,
+        [botId, userId],
+      );
+      if (planResult.rows.length > 0) {
+        const row = planResult.rows[0];
+        const plan = row.study_plan;
+        currentPlanVersion = row.plan_version || 1;
+        currentModuleIndex = row.current_module || 0;
+        const completedModules = row.completed_modules || [];
+        completedModulesCount = completedModules.length;
+
+        if (plan && plan.modules && plan.modules.length > 0) {
+          const modulesSummary = plan.modules
+            .map((m, idx) => {
+              const status = completedModules.includes(idx) 
+                ? "✅ Completed" 
+                : idx === currentModuleIndex 
+                  ? "📍 Current" 
+                  : "⏳ Pending";
+              return `${idx + 1}. ${m.title || m.module_name} [${status}]`;
+            })
+            .join("\n");
+
+          const currentModule = plan.modules[currentModuleIndex];
+          const currentModuleDetails = currentModule 
+            ? `\nCurrent Module: "${currentModule.title || currentModule.module_name}"
+Objective: ${currentModule.objective || currentModule.description || "N/A"}
+Key Topics: ${(currentModule.key_topics || currentModule.subtopics || []).join(", ") || "N/A"}`
+            : "";
+
+          studyPlanContext = `
+[ACTIVE STUDY PLAN - Version ${currentPlanVersion}]
+Plan Title: ${plan.title || "Study Plan"}
+Subject: ${plan.subject || "General"}
+Grade Level: ${plan.grade_level || "General"}
+Progress: ${completedModulesCount}/${plan.modules.length} modules completed
+
+Modules:
+${modulesSummary}
+${currentModuleDetails}
+
+IMPORTANT: Follow this study plan. Do NOT invent new modules. Reference the current module when teaching. When the student masters the current module, acknowledge completion and ask if they want to proceed to the next module.`;
+
+          enhancedInstructions = `${enhancedInstructions}${studyPlanContext}`;
+          console.log("[Chat-Enhanced] Instructions enhanced with study plan context (v" + currentPlanVersion + ")");
+        }
+      }
+    } catch (planErr) {
+      console.warn("[Chat-Enhanced] Could not fetch study plan:", planErr.message);
+    }
+
     // STEP 5: Prepare messages for AI model with MARKDOWN formatting requirement
     const systemMessageContent = `${enhancedInstructions}
 
@@ -1379,7 +1514,8 @@ app.get("/api/bot-progress/:botId/:userId", async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT bot_state, progress_percentage, study_plan FROM bot_progress WHERE bot_id = $1 AND user_id = $2 LIMIT 1`,
+      `SELECT bot_state, progress_percentage, study_plan, plan_version, current_module, completed_modules 
+       FROM bot_progress WHERE bot_id = $1 AND user_id = $2 LIMIT 1`,
       [botId, userId],
     );
 
@@ -1393,6 +1529,9 @@ app.get("/api/bot-progress/:botId/:userId", async (req, res) => {
       bot_state: row.bot_state || "intro",
       progress: { percentage: row.progress_percentage || 0 },
       study_plan: row.study_plan || { modules: [] },
+      plan_version: row.plan_version || 1,
+      current_module: row.current_module || 0,
+      completed_modules: row.completed_modules || [],
       timestamp: new Date().toISOString(),
     });
   } catch (err) {
@@ -1491,6 +1630,7 @@ app.post("/api/update-study-plan", async (req, res) => {
 
     console.log("[update-study-plan] Updating plan for bot:", botId);
 
+    // Validate plan structure
     if (!updatedPlan.modules || !Array.isArray(updatedPlan.modules)) {
       return res.status(400).json({
         error: "Invalid plan structure",
@@ -1499,23 +1639,48 @@ app.post("/api/update-study-plan", async (req, res) => {
       });
     }
 
+    // Validate each module has required fields
+    for (let i = 0; i < updatedPlan.modules.length; i++) {
+      const mod = updatedPlan.modules[i];
+      if (!mod.title && !mod.module_name) {
+        return res.status(400).json({
+          error: "Invalid module structure",
+          message: `Module ${i + 1} must have a title`,
+          timestamp,
+        });
+      }
+    }
+
+    // Increment plan version on update
+    const versionResult = await pool.query(
+      `SELECT plan_version FROM bot_progress WHERE bot_id = $1 AND user_id = $2`,
+      [botId, userId],
+    );
+    const currentVersion = versionResult.rows[0]?.plan_version || 1;
+    const newVersion = currentVersion + 1;
+
     if (applyPlan) {
       await pool.query(
-        `UPDATE bot_progress SET study_plan = $1, bot_state = $2, last_updated = NOW() WHERE bot_id = $3 AND user_id = $4`,
-        [JSON.stringify(updatedPlan), "in_study", botId, userId],
+        `UPDATE bot_progress 
+         SET study_plan = $1, bot_state = $2, plan_version = $3, last_updated = NOW() 
+         WHERE bot_id = $4 AND user_id = $5`,
+        [JSON.stringify(updatedPlan), "in_study", newVersion, botId, userId],
       );
     } else {
       await pool.query(
-        `UPDATE bot_progress SET study_plan = $1, last_updated = NOW() WHERE bot_id = $2 AND user_id = $3`,
-        [JSON.stringify(updatedPlan), botId, userId],
+        `UPDATE bot_progress 
+         SET study_plan = $1, plan_version = $2, last_updated = NOW() 
+         WHERE bot_id = $3 AND user_id = $4`,
+        [JSON.stringify(updatedPlan), newVersion, botId, userId],
       );
     }
-    console.log("[update-study-plan] Plan updated in database");
+    console.log("[update-study-plan] Plan updated to version", newVersion);
 
     return res.json({
       status: "success",
       message: "Study plan updated successfully",
       plan_updated: true,
+      plan_version: newVersion,
       timestamp,
     });
   } catch (err) {
@@ -1531,24 +1696,38 @@ app.post("/api/update-study-plan", async (req, res) => {
 // Apply a study plan atomically and transition bot to in_study
 app.post("/api/apply-study-plan", async (req, res) => {
   try {
-    const { botId, userId, plan } = req.body;
-    if (!botId || !userId || plan == null) {
+    const { botId, userId, plan, studyPlan } = req.body;
+    const planData = plan || studyPlan; // Support both parameter names
+    
+    if (!botId || !userId || planData == null) {
       return res
         .status(400)
-        .json({ error: "botId, userId and plan are required" });
+        .json({ error: "botId, userId and plan/studyPlan are required" });
     }
 
-    await pool.query(
-      `INSERT INTO bot_progress (bot_id, user_id, study_plan, bot_state, last_updated)
-         VALUES ($1, $2, $3, $4, NOW())
-         ON CONFLICT (bot_id, user_id) DO UPDATE
-         SET study_plan = $3, bot_state = $4, last_updated = NOW()`,
-      [botId, userId, JSON.stringify(plan), "in_study"],
+    console.log("[apply-study-plan] Applying plan for bot:", botId, "user:", userId);
+
+    // Get current version and increment
+    const versionResult = await pool.query(
+      `SELECT plan_version FROM bot_progress WHERE bot_id = $1 AND user_id = $2`,
+      [botId, userId],
     );
+    const currentVersion = versionResult.rows[0]?.plan_version || 0;
+    const newVersion = currentVersion + 1;
+
+    await pool.query(
+      `INSERT INTO bot_progress (bot_id, user_id, study_plan, plan_version, bot_state, last_updated)
+         VALUES ($1, $2, $3, $4, $5, NOW())
+         ON CONFLICT (bot_id, user_id) DO UPDATE
+         SET study_plan = $3, plan_version = $4, bot_state = $5, last_updated = NOW()`,
+      [botId, userId, JSON.stringify(planData), newVersion, "in_study"],
+    );
+
+    console.log("[apply-study-plan] Plan applied, version:", newVersion);
 
     // Save a system chat message announcing plan application
     try {
-      const applyMsg = "User accepted the study plan. Study session started.";
+      const applyMsg = "✅ Study plan applied! Let's begin your learning journey.";
       await pool.query(
         `INSERT INTO chat_messages (bot_id, user_id, message_type, content) VALUES ($1, $2, $3, $4)`,
         [botId, userId, "bot", applyMsg],
@@ -1564,6 +1743,7 @@ app.post("/api/apply-study-plan", async (req, res) => {
       status: "success",
       applied: true,
       bot_state: "in_study",
+      plan_version: newVersion,
     });
   } catch (err) {
     console.error("[POST /api/apply-study-plan] Error:", err.message);
@@ -1818,7 +1998,7 @@ app.post("/api/create-study-bot", async (req, res) => {
       grade_level,
     );
 
-    // Save to database
+    // Save to database (include description as metadata inside system_instructions)
     await pool.query(
       `INSERT INTO study_bots (bot_id, user_id, name, description, topic, grade_level, system_instructions)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
@@ -1829,7 +2009,10 @@ app.post("/api/create-study-bot", async (req, res) => {
         description,
         topic,
         grade_level,
-        JSON.stringify({ instructions: systemInstructions }),
+        JSON.stringify({
+          instructions: systemInstructions,
+          description: description,
+        }),
       ],
     );
 
@@ -1841,6 +2024,57 @@ app.post("/api/create-study-bot", async (req, res) => {
     );
 
     console.log("[create-study-bot] Bot created successfully:", botId);
+
+    // Auto-generate an initial structured study plan based on user description
+    let generatedPlan = null;
+    try {
+      generatedPlan = await generateStructuredStudyPlan(
+        name,
+        topic,
+        description || "",
+        grade_level,
+        null,
+      );
+
+      if (generatedPlan && generatedPlan.plan) {
+        // Persist the generated plan to bot_progress and set state to plan_review
+        try {
+          const planWithMeta = {
+            plan: generatedPlan.plan,
+            metadata: {
+              version: 1,
+              user_id: user_id,
+              conversation_id: botId,
+              last_updated: new Date().toISOString(),
+            },
+          };
+
+          await pool.query(
+            `UPDATE bot_progress SET study_plan = $1, bot_state = $2, last_updated = NOW() WHERE bot_id = $3 AND user_id = $4`,
+            [JSON.stringify(planWithMeta), "plan_review", botId, user_id],
+          );
+
+          // Do NOT insert the full plan into chat_messages (plan must not be dumped into chat)
+          // Instead, include plan in response so frontend can open the editor for review
+          // Reflect new next state
+          welcomeMessagesCount = Math.max(1, welcomeMessagesCount);
+          // Attach to response via local variable
+          // (we'll attach below when composing the response)
+          // store plan to include in response
+          var _initialGeneratedPlanForResponse = generatedPlan.plan;
+        } catch (saveErr) {
+          console.warn(
+            "[create-study-bot] Failed to persist generated study plan:",
+            saveErr.message,
+          );
+        }
+      }
+    } catch (planErr) {
+      console.warn(
+        "[create-study-bot] Study plan generation failed:",
+        planErr.message,
+      );
+    }
 
     // --- Verification & single-welcome enforcement ---
     // Verify instructions were saved
@@ -1906,7 +2140,7 @@ app.post("/api/create-study-bot", async (req, res) => {
       );
     }
 
-    return res.json({
+    const respPayload = {
       status: "success",
       bot: {
         bot_id: botId,
@@ -1924,7 +2158,15 @@ app.post("/api/create-study-bot", async (req, res) => {
         nextState: "waiting_for_user",
       },
       timestamp: new Date().toISOString(),
-    });
+    };
+
+    if (generatedPlan && generatedPlan.plan) {
+      respPayload.studyPlan = generatedPlan.plan;
+      respPayload.showStudyPlan = true;
+      respPayload.verification.nextState = "plan_review";
+    }
+
+    return res.json(respPayload);
   } catch (err) {
     console.error("[POST /api/create-study-bot] Error:", err.message);
     return res.status(500).json({
