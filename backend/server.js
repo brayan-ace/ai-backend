@@ -320,6 +320,85 @@ function reformatLeadingNumberedDefinition(text) {
 
 // ============= TAVILY WEB SEARCH =============
 
+/**
+ * Summarize conversation history to provide context for web searches.
+ * This ensures Tavily searches are relevant to the ongoing conversation.
+ * @param {Array} messages - Array of {role, content} message objects
+ * @param {string} currentQuery - The current search query from the user
+ * @returns {Promise<string>} - A concise summary + enhanced query for search
+ */
+async function summarizeConversationForSearch(messages, currentQuery) {
+  try {
+    const groqApiKey = process.env.GROQ_API_KEY;
+    if (!groqApiKey || !messages || messages.length === 0) {
+      return currentQuery; // Fallback to original query
+    }
+
+    // Take last 10 messages for context (to avoid token limits)
+    const recentMessages = messages.slice(-10);
+    const conversationText = recentMessages
+      .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
+      .join("\n");
+
+    console.log("[Search Context] Summarizing conversation for search context...");
+
+    const response = await fetch(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${groqApiKey}`,
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: "system",
+              content: `You are a search query optimizer. Your task is to create an enhanced search query that combines the user's current search request with relevant context from their conversation.
+
+RULES:
+1. Output ONLY the enhanced search query - no explanations, no quotes, no prefixes
+2. Keep it concise (under 100 words)
+3. Include key topics, entities, and context from the conversation that are relevant to the search
+4. Make it a natural search query that would return relevant results
+5. If the conversation context isn't relevant to the search, just return the original query slightly improved`,
+            },
+            {
+              role: "user",
+              content: `CONVERSATION HISTORY:
+${conversationText}
+
+CURRENT SEARCH REQUEST: "${currentQuery}"
+
+Create an enhanced search query that incorporates relevant conversation context:`,
+            },
+          ],
+          model: "llama-3.1-8b-instant",
+          max_tokens: 150,
+          temperature: 0.3,
+        }),
+        timeout: 15000,
+      }
+    );
+
+    if (!response.ok) {
+      console.warn("[Search Context] Failed to summarize, using original query");
+      return currentQuery;
+    }
+
+    const result = await response.json();
+    const enhancedQuery = result.choices?.[0]?.message?.content?.trim() || currentQuery;
+    
+    console.log("[Search Context] Original query:", currentQuery);
+    console.log("[Search Context] Enhanced query:", enhancedQuery);
+    
+    return enhancedQuery;
+  } catch (err) {
+    console.warn("[Search Context] Summarization error:", err.message);
+    return currentQuery; // Fallback to original query
+  }
+}
+
 async function searchTopicOnline(topic, gradeLevel) {
   try {
     const tavilyApiKey = process.env.tavily;
@@ -362,7 +441,7 @@ async function searchTopicOnline(topic, gradeLevel) {
   }
 }
 
-async function enhanceSearchResultsWithAI(query, searchResults) {
+async function enhanceSearchResultsWithAI(query, searchResults, conversationMessages = []) {
   try {
     const groqApiKey = process.env.GROQ_API_KEY;
     if (!groqApiKey) {
@@ -371,23 +450,47 @@ async function enhanceSearchResultsWithAI(query, searchResults) {
     }
 
     const searchResultsText = JSON.stringify(searchResults, null, 2);
-    const prompt = `You are an expert assistant. Enhance the following search results for the query: "${query}".
+    
+    // Build conversation context if available
+    let conversationContext = "";
+    if (conversationMessages && conversationMessages.length > 0) {
+      const recentMessages = conversationMessages.slice(-8);
+      conversationContext = `
+CONVERSATION CONTEXT (use this to understand what the user has been discussing):
+${recentMessages.map((m) => `${m.role.toUpperCase()}: ${m.content}`).join("\n")}
 
-Search Results:
+`;
+    }
+
+    const prompt = `You are an expert assistant helping a user who has been having a conversation. Your task is to provide a helpful answer based on web search results while considering the conversation context.
+${conversationContext}
+USER'S SEARCH QUERY: "${query}"
+
+SEARCH RESULTS:
 ${searchResultsText}
 
-Provide a concise and informative summary based on the search results. Ensure the summary is clear and directly addresses the query.`;
+INSTRUCTIONS:
+1. Provide a clear, informative answer that directly addresses the user's query
+2. If there's conversation context, make sure your answer is relevant to what they were discussing
+3. Use the search results to provide accurate, up-to-date information
+4. Format your response with markdown for readability (bold for key terms, bullet points for lists)
+5. If the search results don't fully answer the query in the context of the conversation, acknowledge this
+
+Provide your enhanced answer:`;
 
     const response = await axios.post(
       "https://api.groq.com/openai/v1/chat/completions",
       {
-        model: "openai/gpt-oss-20b",
+        model: "llama-3.1-8b-instant",
         messages: [
-          { role: "system", content: "You are a helpful assistant." },
+          { 
+            role: "system", 
+            content: "You are a helpful assistant that synthesizes web search results into clear, contextual answers. You consider the user's conversation history to provide relevant responses." 
+          },
           { role: "user", content: prompt },
         ],
         max_tokens: 1500,
-        temperature: 0.7,
+        temperature: 0.5,
       },
       {
         headers: {
@@ -1417,10 +1520,43 @@ Always prioritize clarity and professional formatting.`;
       });
     }
 
-    // Append the user message
+    // STEP 5.5: Fetch conversation history from database and include in messages
+    try {
+      const historyResult = await pool.query(
+        `SELECT message_type, content FROM chat_messages 
+         WHERE bot_id = $1 AND user_id = $2 
+         ORDER BY created_at ASC 
+         LIMIT 20`,
+        [botId, userId],
+      );
+      
+      if (historyResult.rows.length > 0) {
+        console.log(`[Chat-Enhanced] 📜 Loading ${historyResult.rows.length} messages from conversation history`);
+        
+        for (const row of historyResult.rows) {
+          const role = row.message_type === 'user' ? 'user' : 'assistant';
+          messages.push({ role, content: row.content });
+        }
+      }
+    } catch (histErr) {
+      console.warn("[Chat-Enhanced] Could not load conversation history:", histErr.message);
+    }
+
+    // Append the current user message
     messages.push({ role: "user", content: message });
 
-    console.log("[Chat-Enhanced] Messages prepared, calling AI model...");
+    // Save the current user message to database for future history
+    try {
+      await pool.query(
+        `INSERT INTO chat_messages (bot_id, user_id, message_type, content) VALUES ($1, $2, $3, $4)`,
+        [botId, userId, "user", message],
+      );
+      console.log("[Chat-Enhanced] 💬 User message saved to history");
+    } catch (saveUserErr) {
+      console.warn("[Chat-Enhanced] Could not save user message:", saveUserErr.message);
+    }
+
+    console.log(`[Chat-Enhanced] Messages prepared (${messages.length} total), calling AI model...`);
 
     // STEP 6: Call AI model with proper instructions
     const groqApiKey = process.env.GROQ_API_KEY;
@@ -3155,11 +3291,11 @@ If the user specifies length, format, or style, follow the user exactly and igno
             });
           }
 
-          const query =
+          const originalQuery =
             data.query ||
             data.q ||
             (typeof data === "string" ? data : undefined);
-          if (!query) {
+          if (!originalQuery) {
             return res.status(400).json({
               error: "Invalid search request",
               message:
@@ -3168,11 +3304,31 @@ If the user specifies length, format, or style, follow the user exactly and igno
             });
           }
 
+          // Get conversation history from request (if provided by client)
+          const conversationMessages = Array.isArray(data.messages) ? data.messages : [];
+          
+          // Enhance the search query with conversation context
+          // This ensures the search is relevant to what the user was discussing
+          let enhancedSearchQuery = originalQuery;
+          if (conversationMessages.length > 0) {
+            console.log("[Search] Enhancing query with conversation context...");
+            enhancedSearchQuery = await summarizeConversationForSearch(
+              conversationMessages,
+              originalQuery
+            );
+          }
+
+          console.log("[Search] Final search query:", enhancedSearchQuery);
+
           const resp = await axios.post(
             "https://api.tavily.com/search",
-            { query },
+            { 
+              api_key: TAVILY_KEY,
+              query: enhancedSearchQuery,
+              include_answer: true,
+              max_results: 5,
+            },
             {
-              headers: { Authorization: `Bearer ${TAVILY_KEY}` },
               timeout: 30000,
             },
           );
@@ -3187,9 +3343,11 @@ If the user specifies length, format, or style, follow the user exactly and igno
           const formattedResults = formatResponseForReadability(resultsText);
 
           // Send the search results to the AI model for enhancement
+          // Pass both original query and conversation context for better answers
           const enhancedAnswer = await enhanceSearchResultsWithAI(
-            query,
+            originalQuery,
             resp.data,
+            conversationMessages,
           );
 
           return res.json({
@@ -3198,6 +3356,8 @@ If the user specifies length, format, or style, follow the user exactly and igno
             reply: formattedResults,
             structured: structured,
             enhancedAnswer: enhancedAnswer,
+            originalQuery: originalQuery,
+            enhancedQuery: enhancedSearchQuery,
             timestamp: new Date().toISOString(),
             status: "success",
           });

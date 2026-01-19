@@ -194,7 +194,10 @@ class _NotesScreenState extends State<NotesScreen> {
                               margin: EdgeInsets.only(bottom: AppTheme.spaceMd),
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
-                                  colors: [AppTheme.error, AppTheme.error],
+                                  colors: [
+                                    AppTheme.primaryBlue.withOpacity(0.1),
+                                    AppTheme.primaryBlue.withOpacity(0.8),
+                                  ],
                                 ),
                                 borderRadius: BorderRadius.circular(
                                   AppTheme.radiusLg,
@@ -203,7 +206,7 @@ class _NotesScreenState extends State<NotesScreen> {
                               alignment: Alignment.centerRight,
                               padding: EdgeInsets.only(right: AppTheme.spaceLg),
                               child: Icon(
-                                Icons.delete,
+                                Icons.delete_outline,
                                 color: Colors.white,
                                 size: 28,
                               ),

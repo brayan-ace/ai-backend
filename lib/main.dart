@@ -14,6 +14,12 @@ import 'screens/settings_screen.dart';
 import 'screens/api_test_screen.dart';
 import 'screens/notes_screen.dart';
 import 'screens/chat_history_screen.dart';
+import 'screens/welcome_screen.dart';
+import 'screens/signup_screen.dart';
+import 'screens/login_screen.dart';
+import 'screens/recent_study_bots_screen.dart';
+import 'widgets/auth_gate.dart';
+import 'services/user_profile_service.dart';
 import 'utils/globals.dart';
 import 'utils/theme.dart';
 import 'utils/theme_provider.dart';
@@ -54,7 +60,7 @@ class MyApp extends StatelessWidget {
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Flutter Demo',
+      title: 'Nexa Smart AI',
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: themeProvider.themeMode,
@@ -66,11 +72,15 @@ class MyApp extends StatelessWidget {
           child: child!,
         );
       },
-      // Use the tabbed shell as the app home
+      // Use AuthGate as the app home for centralized auth management
       scaffoldMessengerKey: scaffoldMessengerKey,
       navigatorKey: navigatorKey,
-      home: const MainTabs(),
+      home: const AuthGate(),
       routes: {
+        '/welcome': (_) => const WelcomeScreen(),
+        '/signup': (_) => const SignUpScreen(),
+        '/login': (_) => const LoginScreen(),
+        '/main': (_) => const MainTabs(),
         '/auth': (_) => AuthScreen(),
         '/profile': (_) => ProfileScreen(),
         '/ai': (_) => const OnlineAiScreen(),
@@ -81,44 +91,13 @@ class MyApp extends StatelessWidget {
         '/api-test': (_) => const ApiTestScreen(),
         '/notes': (_) => const NotesScreen(),
         '/chat-history': (_) => const ChatHistoryScreen(),
+        '/recent-study-bots': (_) => const RecentStudyBotsScreen(),
       },
     );
   }
 }
 
-/// Shows either [AuthScreen] or [ProfileScreen] depending on auth state.
-class AuthGate extends StatelessWidget {
-  const AuthGate({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
-        if (snapshot.hasData) {
-          return ProfileScreen();
-        }
-        return AuthScreen();
-      },
-    );
-  }
-}
-
-// -------------------------
-// Keep the original demo home below
-// -------------------------
-
-// (MyHomePage class remains unchanged)
-
-/*
-  The rest of the file (MyHomePage and its State) is unchanged.
-*/
-
+// Demo widget kept for reference
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
 

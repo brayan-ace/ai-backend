@@ -4,10 +4,15 @@ import 'api_service.dart';
 class WebSearchService {
   /// Performs a web search by delegating to the backend. The backend
   /// can call Tavily or other search providers securely.
+  /// 
+  /// [conversationHistory] - Optional list of conversation messages to provide
+  /// context for the search. This helps the AI understand what the user was
+  /// discussing and return more relevant search results.
   Future<String> search({
     required String query,
     int maxResults = 5,
     String searchDepth = 'basic',
+    List<Map<String, String>>? conversationHistory,
   }) async {
     try {
       final input = {
@@ -15,6 +20,9 @@ class WebSearchService {
         'maxResults': maxResults,
         'searchDepth': searchDepth,
         'includeAnswer': true,
+        // Include conversation history for context-aware searches
+        if (conversationHistory != null && conversationHistory.isNotEmpty)
+          'messages': conversationHistory,
       };
       final resp = await ApiService.send('search', input);
       return resp;

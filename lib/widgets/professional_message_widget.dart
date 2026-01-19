@@ -13,16 +13,34 @@ import '../utils/theme.dart';
 /// - Numbered lists with proper indentation
 /// - Dynamic block spacing based on content type
 /// - Professional typography and line heights (1.6-1.8 for text)
+/// - Full text selection support
 class ProfessionalMessageWidget extends StatelessWidget {
   final String text;
   final bool isBot;
+
+  // Static regex patterns for performance - compiled once
+  static final RegExp _escapedNewlinePattern = RegExp(r'\\n');
+  static final RegExp _brTagPattern = RegExp(r'<br\s*\/?>', caseSensitive: false);
+  static final RegExp _crlfPattern = RegExp(r'\r\n');
+  static final RegExp _trailingSpacesPattern = RegExp(r' {2,}\n');
+  static final RegExp _lineEndSpacesPattern = RegExp(r'[ \t]+\n');
+  static final RegExp _codeBlockStartPattern = RegExp(r'^```');
+  static final RegExp _codeBlockEndPattern = RegExp(r'```$');
+  static final RegExp _headingPattern = RegExp(r'^(#{1,3})\s+(.*)$');
+  static final RegExp _numberedListPattern = RegExp(r'^(\d+)\.\s+(.*)$');
+  static final RegExp _bulletListPattern = RegExp(r'^[-•*]\s+(.*)$');
+  static final RegExp _displayMathPattern = RegExp(r'^\$\$([\s\S]*?)\$\$$', multiLine: true);
+  static final RegExp _latexBracketOpenPattern = RegExp(r'\\\[');
+  static final RegExp _latexBracketClosePattern = RegExp(r'\\\]');
+  static final RegExp _latexParenOpenPattern = RegExp(r'\\\(');
+  static final RegExp _latexParenClosePattern = RegExp(r'\\\)');
 
   const ProfessionalMessageWidget(this.text, {Key? key, this.isBot = true})
     : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    // Split into blocks (paragraphs, code, lists, etc.)
+    // Split into blocks (paragraphs, code, lists, etc.) using state machine
     final blocks = _parseMessageBlocks(text);
 
     return Padding(
@@ -42,27 +60,104 @@ class ProfessionalMessageWidget extends StatelessWidget {
     );
   }
 
-  /// Parse message into structured blocks
+  /// Parse message into structured blocks using a state machine approach
+  /// This properly handles multi-line code blocks and math blocks
   List<MessageBlock> _parseMessageBlocks(String text) {
     final blocks = <MessageBlock>[];
     final normalized = _normalizeText(text);
     final lines = normalized.split('\n');
+    
     var currentBlock = <String>[];
     var blockType = BlockType.paragraph;
+    var inCodeBlock = false;
+    var inMathBlock = false;
+    var codeLanguage = '';
 
-    for (final line in lines) {
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i];
       final trimmed = line.trim();
 
-      if (trimmed.isEmpty) {
-        if (currentBlock.isNotEmpty) {
-          blocks.add(MessageBlock(blockType, currentBlock.join('\n')));
+      // Handle code block boundaries
+      if (trimmed.startsWith('```')) {
+        if (!inCodeBlock && !inMathBlock) {
+          // Starting a code block
+          if (currentBlock.isNotEmpty) {
+            blocks.add(MessageBlock(blockType, currentBlock.join('\n')));
+            currentBlock = [];
+          }
+          inCodeBlock = true;
+          blockType = BlockType.code;
+          // Extract language if present
+          codeLanguage = trimmed.substring(3).trim();
+          if (codeLanguage.isNotEmpty) {
+            currentBlock.add('```$codeLanguage');
+          } else {
+            currentBlock.add('```');
+          }
+        } else if (inCodeBlock) {
+          // Ending a code block
+          currentBlock.add('```');
+          blocks.add(MessageBlock(BlockType.code, currentBlock.join('\n')));
           currentBlock = [];
+          inCodeBlock = false;
+          blockType = BlockType.paragraph;
+          codeLanguage = '';
+        } else {
+          // Inside math block, treat as content
+          currentBlock.add(line);
         }
         continue;
       }
 
+      // Handle display math block boundaries ($$)
+      if (trimmed.startsWith(r'$$') && !inCodeBlock) {
+        if (!inMathBlock) {
+          // Starting a math block
+          if (currentBlock.isNotEmpty) {
+            blocks.add(MessageBlock(blockType, currentBlock.join('\n')));
+            currentBlock = [];
+          }
+          inMathBlock = true;
+          blockType = BlockType.mathBlock;
+          // Check if it's a single-line math block like $$x^2$$
+          if (trimmed.length > 4 && trimmed.endsWith(r'$$')) {
+            blocks.add(MessageBlock(BlockType.mathBlock, trimmed));
+            inMathBlock = false;
+            blockType = BlockType.paragraph;
+          } else {
+            currentBlock.add(line);
+          }
+        } else {
+          // Ending a math block
+          currentBlock.add(line);
+          blocks.add(MessageBlock(BlockType.mathBlock, currentBlock.join('\n')));
+          currentBlock = [];
+          inMathBlock = false;
+          blockType = BlockType.paragraph;
+        }
+        continue;
+      }
+
+      // If inside code or math block, just add the line
+      if (inCodeBlock || inMathBlock) {
+        currentBlock.add(line);
+        continue;
+      }
+
+      // Handle empty lines - they separate blocks
+      if (trimmed.isEmpty) {
+        if (currentBlock.isNotEmpty) {
+          blocks.add(MessageBlock(blockType, currentBlock.join('\n')));
+          currentBlock = [];
+          blockType = BlockType.paragraph;
+        }
+        continue;
+      }
+
+      // Detect block type for this line
       final newBlockType = _detectBlockType(trimmed);
 
+      // If block type changes, save current block and start new one
       if (newBlockType != blockType && currentBlock.isNotEmpty) {
         blocks.add(MessageBlock(blockType, currentBlock.join('\n')));
         currentBlock = [];
@@ -72,6 +167,7 @@ class ProfessionalMessageWidget extends StatelessWidget {
       currentBlock.add(line);
     }
 
+    // Don't forget the last block
     if (currentBlock.isNotEmpty) {
       blocks.add(MessageBlock(blockType, currentBlock.join('\n')));
     }
@@ -79,115 +175,71 @@ class ProfessionalMessageWidget extends StatelessWidget {
     return blocks;
   }
 
-  /// Normalize common newline/linebreak encodings so markdown-like
-  /// formatting is preserved when the backend returns escaped sequences
-  /// or HTML `<br>` tags. This converts literal `\\n` into real
-  /// newlines, normalizes `<br>` to newline, and treats trailing two
-  /// spaces + newline as a paragraph break.
+  /// Normalize common newline/linebreak encodings
   String _normalizeText(String text) {
     if (text.isEmpty) return text;
     var t = text;
 
     // Convert escaped newline sequences (literal backslash-n) into real newlines
-    t = t.replaceAll('\\n', '\n');
+    t = t.replaceAll(_escapedNewlinePattern, '\n');
 
-    // Normalize bold markers that have stray spaces/newlines inside them
-    // e.g. "** Hello **" -> "**Hello**" so our inline parser catches them
-    t = t.replaceAllMapped(
-      RegExp(r'\*{2}\s*(.+?)\s*\*{2}', dotAll: true),
-      (m) => '**${m.group(1)!.trim()}**',
-    );
-
-    // Collapse accidental long runs of asterisks into a valid bold marker
-    // e.g., "*****" or "****" -> "**" to avoid literal **** showing.
-    t = t.replaceAllMapped(RegExp(r'\*{3,}'), (_) => '**');
-
-    // Convert HTML <br> tags to newline (case-insensitive)
-    t = t.replaceAll(RegExp(r'<br\s*\/?>', caseSensitive: false), '\n');
+    // Convert HTML <br> tags to newline
+    t = t.replaceAll(_brTagPattern, '\n');
 
     // Normalize CRLF to LF
-    t = t.replaceAll('\r\n', '\n');
+    t = t.replaceAll(_crlfPattern, '\n');
 
     // Convert LaTeX display and inline bracket forms to dollar forms
-    // so the existing parser can handle them. Convert \[ ... \] -> $$...$$
-    // and \( ... \) -> $...$ (handles backslash-escaped bracket forms).
-    t = t.replaceAll(RegExp(r'\\\[', caseSensitive: false), '\$\$');
-    t = t.replaceAll(RegExp(r'\\\]', caseSensitive: false), '\$\$');
-    t = t.replaceAll(RegExp(r'\\\(', caseSensitive: false), '\$');
-    t = t.replaceAll(RegExp(r'\\\)', caseSensitive: false), '\$');
+    t = t.replaceAll(_latexBracketOpenPattern, r'$$');
+    t = t.replaceAll(_latexBracketClosePattern, r'$$');
+    t = t.replaceAll(_latexParenOpenPattern, r'$');
+    t = t.replaceAll(_latexParenClosePattern, r'$');
 
-    // Treat two or more trailing spaces before a newline as an explicit
-    // markdown line break — convert to an extra blank line (paragraph break)
-    t = t.replaceAllMapped(RegExp(r' {2,}\n'), (m) => '\n\n');
+    // Treat two or more trailing spaces before a newline as paragraph break
+    t = t.replaceAll(_trailingSpacesPattern, '\n\n');
 
     // Trim trailing spaces at end of lines while preserving line breaks
-    t = t.replaceAll(RegExp(r'[ \t]+\n'), '\n');
+    t = t.replaceAll(_lineEndSpacesPattern, '\n');
 
     return t;
   }
 
-  /// Detect block type from content
+  /// Detect block type from content (for non-code, non-math lines)
   BlockType _detectBlockType(String line) {
     final trimmed = line.trim();
 
-    // Treat a single-line bold-only paragraph as a top-level heading only
-    // when it's likely meaningful (not generic words like 'answer' or 'response').
-    final boldOnlyMatch = RegExp(r'^\*\*(.+)\*\*$').firstMatch(trimmed);
-    if (boldOnlyMatch != null) {
-      final content = boldOnlyMatch.group(1)?.trim() ?? '';
-      final lower = content.toLowerCase();
-      // Reject generic labels that are not useful as headings
-      final generic = {
-        'answer',
-        'answers',
-        'response',
-        'reply',
-        'greeting',
-        'greetings',
-        'hello',
-        'hi',
-        'note',
-        'summary',
-        'definition',
-      };
-      // Heuristics: must contain letters, be reasonably short (<=6 words),
-      // and not be a generic label.
-      final wordCount = content
-          .split(RegExp(r'\s+'))
-          .where((s) => s.isNotEmpty)
-          .length;
-      final hasLetter = RegExp(r'[A-Za-z]').hasMatch(content);
-      if (hasLetter && wordCount <= 6 && !generic.contains(lower)) {
-        return BlockType.heading1;
-      }
-    }
-
-    // Headings
+    // Headings with # prefix
     if (trimmed.startsWith('###')) return BlockType.heading3;
     if (trimmed.startsWith('##')) return BlockType.heading2;
     if (trimmed.startsWith('#')) return BlockType.heading1;
 
-    // Code block
-    if (trimmed.startsWith('```')) return BlockType.code;
+    // Check for bold-only line that could be a heading
+    // Must be **text** with no other content
+    if (trimmed.startsWith('**') && trimmed.endsWith('**')) {
+      final inner = trimmed.substring(2, trimmed.length - 2).trim();
+      // Only treat as heading if it's short and not generic
+      if (inner.isNotEmpty && !inner.contains('**')) {
+        final wordCount = inner.split(RegExp(r'\s+')).where((s) => s.isNotEmpty).length;
+        final lower = inner.toLowerCase();
+        final generic = {'answer', 'answers', 'response', 'reply', 'greeting', 
+                         'greetings', 'hello', 'hi', 'note', 'summary', 'definition'};
+        if (wordCount <= 6 && !generic.contains(lower)) {
+          return BlockType.heading1;
+        }
+      }
+    }
 
-    // Lists
-    if (trimmed.startsWith('•') ||
-        trimmed.startsWith('-') ||
-        trimmed.startsWith('*') ||
-        RegExp(r'^\d+\.').hasMatch(trimmed)) {
+    // Lists - be careful with * to not confuse with italic
+    // Only treat as list if followed by space
+    if (trimmed.startsWith('• ') || trimmed.startsWith('- ')) {
       return BlockType.bulletList;
     }
-
-    // Math (LaTeX)
-    if (trimmed.startsWith('\$\$') || trimmed.startsWith(r'$$')) {
-      return BlockType.mathBlock;
+    // For *, only treat as bullet if followed by space and not **
+    if (trimmed.startsWith('* ') && !trimmed.startsWith('**')) {
+      return BlockType.bulletList;
     }
-
-    // Also accept LaTeX bracket forms and begin/end environments
-    if (trimmed.startsWith('\\[') ||
-        trimmed.startsWith('\\(') ||
-        trimmed.contains('\\begin{')) {
-      return BlockType.mathBlock;
+    if (_numberedListPattern.hasMatch(trimmed)) {
+      return BlockType.bulletList;
     }
 
     return BlockType.paragraph;
@@ -218,183 +270,240 @@ class ProfessionalMessageWidget extends StatelessWidget {
     final text = content.trim();
     if (text.isEmpty) return SizedBox.shrink();
 
-    // Use RichText with a merged DefaultTextStyle so WidgetSpan (math/code)
-    // can be rendered inline. SelectableText.rich does not reliably support
-    // WidgetSpan in all Flutter versions, so RichText is safer here.
+    final spans = _parseInlineContent(text);
+    
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: DefaultTextStyle.merge(
-        style: TextStyle(
-          fontSize: 15,
-          height: 1.75,
-          fontWeight: FontWeight.w400,
-          color: AppTheme.textPrimary,
-          letterSpacing: 0.2,
+      child: SelectableText.rich(
+        TextSpan(
+          children: spans,
+          style: TextStyle(
+            fontSize: 15,
+            height: 1.75,
+            fontWeight: FontWeight.w400,
+            color: AppTheme.textPrimary,
+            letterSpacing: 0.2,
+          ),
         ),
-        child: RichText(text: _parseInlineMarkdown(text)),
       ),
     );
   }
 
-  /// Parse inline markdown formatting (**bold**, *italic*, `code`, $math$)
-  InlineSpan _parseInlineMarkdown(String text) {
+  /// Parse inline content with proper handling of all markdown formats
+  /// Uses a token-based approach to avoid regex conflicts
+  List<InlineSpan> _parseInlineContent(String text) {
     final spans = <InlineSpan>[];
-    var lastIndex = 0;
-
-    // Pattern for **bold**, *italic*, `code`, and $math$
-    // Using non-greedy matching and allowing for edge cases
-    final pattern = RegExp(
-      r'\*\*([^*]+?)\*\*|\*([^*]+?)\*|`([^`]+?)`|\$([^\$]+?)\$',
-      multiLine: true,
-      dotAll: true,
+    var i = 0;
+    var plainBuffer = StringBuffer();
+    
+    final defaultStyle = TextStyle(
+      fontSize: 15,
+      height: 1.75,
+      color: AppTheme.textPrimary,
+      fontWeight: FontWeight.w400,
+      letterSpacing: 0.2,
+    );
+    
+    final boldStyle = TextStyle(
+      fontSize: 15,
+      height: 1.75,
+      color: AppTheme.textPrimary,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 0.2,
+    );
+    
+    final italicStyle = TextStyle(
+      fontSize: 15,
+      height: 1.75,
+      color: AppTheme.textPrimary,
+      fontStyle: FontStyle.italic,
+      letterSpacing: 0.2,
     );
 
-    for (final match in pattern.allMatches(text)) {
-      // Add plain text before match; pass it through the bold-fallback
-      // splitter so any literal **bold** is rendered even if the main
-      // pattern misses an edge case.
-      if (match.start > lastIndex) {
-        final plainSegment = text.substring(lastIndex, match.start);
-        spans.addAll(_splitBoldFallback(plainSegment));
+    void flushPlain() {
+      if (plainBuffer.isNotEmpty) {
+        spans.add(TextSpan(text: plainBuffer.toString(), style: defaultStyle));
+        plainBuffer.clear();
+      }
+    }
+
+    while (i < text.length) {
+      // Check for escaped characters
+      if (text[i] == '\\' && i + 1 < text.length) {
+        final next = text[i + 1];
+        if (r'*`$\'.contains(next)) {
+          plainBuffer.write(next);
+          i += 2;
+          continue;
+        }
       }
 
-      if (match.group(1) != null) {
-        // **Bold**
-        spans.add(
-          TextSpan(
-            text: match.group(1),
-            style: TextStyle(
-              fontSize: 15,
-              height: 1.75,
-              color: AppTheme.textPrimary,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.2,
-            ),
-          ),
-        );
-      } else if (match.group(2) != null) {
-        // *Italic*
-        spans.add(
-          TextSpan(
-            text: match.group(2),
-            style: TextStyle(
-              fontSize: 15,
-              height: 1.75,
-              color: AppTheme.textPrimary,
-              fontStyle: FontStyle.italic,
-              letterSpacing: 0.2,
-            ),
-          ),
-        );
-      } else if (match.group(3) != null) {
-        // `code`
-        spans.add(
-          WidgetSpan(
-            alignment: PlaceholderAlignment.middle,
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: Color(0xFF2D333B),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                match.group(3) ?? '',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFFE06C75),
-                  fontFamily: 'monospace',
+      // Check for inline code `code`
+      if (text[i] == '`') {
+        final endIdx = text.indexOf('`', i + 1);
+        if (endIdx != -1) {
+          flushPlain();
+          final code = text.substring(i + 1, endIdx);
+          spans.add(
+            WidgetSpan(
+              alignment: PlaceholderAlignment.middle,
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceElevated.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  code,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppTheme.primaryBlue,
+                    fontFamily: 'monospace',
+                  ),
                 ),
               ),
             ),
-          ),
-        );
-      } else if (match.group(4) != null) {
-        // $math$
-        spans.add(
-          WidgetSpan(
-            alignment: PlaceholderAlignment.middle,
-            child: Math.tex(
-              match.group(4) ?? '',
-              textStyle: TextStyle(color: AppTheme.primaryBlue, fontSize: 15),
-              onErrorFallback: (_) => Text(
-                '\$${match.group(4)}\$',
-                style: TextStyle(
-                  color: AppTheme.primaryBlue,
-                  fontFamily: 'monospace',
-                ),
-              ),
-            ),
-          ),
-        );
+          );
+          i = endIdx + 1;
+          continue;
+        }
       }
 
-      lastIndex = match.end;
+      // Check for inline math $math$ (but not $$)
+      if (text[i] == r'$' && (i + 1 >= text.length || text[i + 1] != r'$')) {
+        // Find closing $ that's not escaped and not $$
+        var endIdx = -1;
+        for (var j = i + 1; j < text.length; j++) {
+          if (text[j] == r'$' && (j == 0 || text[j - 1] != '\\')) {
+            if (j + 1 >= text.length || text[j + 1] != r'$') {
+              endIdx = j;
+              break;
+            }
+          }
+        }
+        if (endIdx != -1 && endIdx > i + 1) {
+          final mathContent = text.substring(i + 1, endIdx);
+          // Only treat as math if it looks like math (contains letters/symbols)
+          if (_looksLikeMath(mathContent)) {
+            flushPlain();
+            spans.add(
+              WidgetSpan(
+                alignment: PlaceholderAlignment.middle,
+                child: Math.tex(
+                  mathContent,
+                  textStyle: TextStyle(color: AppTheme.textPrimary, fontSize: 15),
+                  onErrorFallback: (_) => Text(
+                    mathContent,
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontFamily: 'monospace',
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ),
+            );
+            i = endIdx + 1;
+            continue;
+          }
+        }
+      }
+
+      // Check for bold **text** (must check before italic)
+      if (i + 1 < text.length && text[i] == '*' && text[i + 1] == '*') {
+        // Find closing **
+        final closeIdx = text.indexOf('**', i + 2);
+        if (closeIdx != -1) {
+          flushPlain();
+          final boldContent = text.substring(i + 2, closeIdx);
+          // Recursively parse bold content for nested formatting
+          if (boldContent.contains('*') || boldContent.contains('`') || boldContent.contains(r'$')) {
+            final innerSpans = _parseInlineContent(boldContent);
+            for (final span in innerSpans) {
+              if (span is TextSpan) {
+                spans.add(TextSpan(
+                  text: span.text,
+                  style: boldStyle.merge(span.style?.copyWith(fontWeight: FontWeight.w700)),
+                ));
+              } else {
+                spans.add(span);
+              }
+            }
+          } else {
+            spans.add(TextSpan(text: boldContent, style: boldStyle));
+          }
+          i = closeIdx + 2;
+          continue;
+        }
+      }
+
+      // Check for italic *text* (single asterisk, not followed by another)
+      if (text[i] == '*' && (i + 1 >= text.length || text[i + 1] != '*')) {
+        // Find closing * that's not part of **
+        var endIdx = -1;
+        for (var j = i + 1; j < text.length; j++) {
+          if (text[j] == '*') {
+            // Make sure it's not **
+            if (j + 1 >= text.length || text[j + 1] != '*') {
+              // Also make sure previous char wasn't *
+              if (j == i + 1 || text[j - 1] != '*') {
+                endIdx = j;
+                break;
+              }
+            }
+          }
+        }
+        if (endIdx != -1 && endIdx > i + 1) {
+          flushPlain();
+          final italicContent = text.substring(i + 1, endIdx);
+          spans.add(TextSpan(text: italicContent, style: italicStyle));
+          i = endIdx + 1;
+          continue;
+        }
+      }
+
+      // Regular character
+      plainBuffer.write(text[i]);
+      i++;
     }
 
-    // Add remaining text and ensure leftover bold markers are handled
-    if (lastIndex < text.length) {
-      final remaining = text.substring(lastIndex);
-      spans.addAll(_splitBoldFallback(remaining));
+    flushPlain();
+    
+    if (spans.isEmpty) {
+      return [TextSpan(text: text, style: defaultStyle)];
     }
-
-    return TextSpan(children: spans.isEmpty ? [TextSpan(text: text)] : spans);
+    
+    return spans;
   }
 
-  /// Fallback splitter: converts any literal `**bold**` occurrences in `s`
-  /// into TextSpans, leaving other text as normal TextSpans. This is a
-  /// safety net when the primary regex misses some edge cases.
-  List<InlineSpan> _splitBoldFallback(String s) {
-    final out = <InlineSpan>[];
-    var last = 0;
-    // Accept two-or-more asterisks as delimiters and allow inner whitespace.
-    // This catches ****bold****, ******bold******, and ** bold ** variants.
-    // Also handle **text** at start/end of string and with punctuation
-    final pat = RegExp(r'\*\*([^*]+?)\*\*', dotAll: true);
-    for (final m in pat.allMatches(s)) {
-      if (m.start > last) {
-        out.add(
-          TextSpan(
-            text: s.substring(last, m.start),
-            style: TextStyle(
-              fontSize: 15,
-              height: 1.75,
-              color: AppTheme.textPrimary,
-              fontWeight: FontWeight.w400,
-              letterSpacing: 0.2,
-            ),
-          ),
-        );
-      }
-      final boldText = m.group(1) ?? '';
-      out.add(
-        TextSpan(
-          text: boldText,
-          style: TextStyle(
-            fontSize: 15,
-            height: 1.75,
-            color: AppTheme.textPrimary,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.2,
-          ),
-        ),
-      );
-      last = m.end;
+  /// Check if content looks like math (not just a price like $5)
+  bool _looksLikeMath(String content) {
+    if (content.isEmpty) return false;
+    // If it's just a number, it's probably a price
+    if (RegExp(r'^\d+\.?\d*$').hasMatch(content.trim())) return false;
+    // If it contains math operators or LaTeX commands, it's math
+    if (content.contains('^') || content.contains('_') || 
+        content.contains('\\') || content.contains('{') ||
+        content.contains('frac') || content.contains('sqrt') ||
+        content.contains('sum') || content.contains('int') ||
+        content.contains('=') || content.contains('+') ||
+        content.contains('-') && content.length > 2) {
+      return true;
     }
-    if (last < s.length) {
-      out.add(
-        TextSpan(
-          text: s.substring(last),
-          style: TextStyle(
-            fontSize: 15,
-            height: 1.75,
-            color: AppTheme.textPrimary,
-            fontWeight: FontWeight.w400,
-            letterSpacing: 0.2,
-          ),
-        ),
-      );
+    // If it has letters and numbers mixed with operators, likely math
+    if (RegExp(r'[a-zA-Z]').hasMatch(content) && 
+        RegExp(r'[\^_{}=+\-*/]').hasMatch(content)) {
+      return true;
     }
-    return out;
+    // Single letter variables are math
+    if (RegExp(r'^[a-zA-Z]$').hasMatch(content.trim())) return true;
+    // Greek letters or common math expressions
+    if (content.contains('alpha') || content.contains('beta') ||
+        content.contains('gamma') || content.contains('pi') ||
+        content.contains('theta') || content.contains('lambda')) {
+      return true;
+    }
+    return content.length > 1;
   }
 
   /// Build heading with enhanced visual hierarchy
@@ -534,33 +643,36 @@ class ProfessionalMessageWidget extends StatelessWidget {
     );
   }
 
-  /// Build single list item with enhanced styling
+  /// Build single list item with enhanced styling and inline markdown support
   Widget _buildListItem(String item) {
     String bullet = '•';
     String text = item;
     Color bulletColor = AppTheme.primaryBlue;
 
-    // Extract bullet/number
-    if (item.startsWith('•')) {
-      text = item.replaceFirst('•', '').trim();
+    // Extract bullet/number - be careful with * to not confuse with bold
+    if (item.startsWith('• ')) {
+      text = item.substring(2).trim();
       bullet = '•';
       bulletColor = AppTheme.textPrimary;
-    } else if (item.startsWith('-')) {
-      text = item.replaceFirst('-', '').trim();
+    } else if (item.startsWith('- ')) {
+      text = item.substring(2).trim();
       bullet = '•';
       bulletColor = AppTheme.textPrimary;
-    } else if (item.startsWith('*')) {
-      text = item.replaceFirst('*', '').trim();
+    } else if (item.startsWith('* ') && !item.startsWith('**')) {
+      text = item.substring(2).trim();
       bullet = '◦';
       bulletColor = AppTheme.textPrimary.withOpacity(0.9);
     } else {
-      final match = RegExp(r'^(\d+)\.').firstMatch(item);
+      final match = RegExp(r'^(\d+)\.\s+').firstMatch(item);
       if (match != null) {
         bullet = '${match.group(1)}.';
         text = item.substring(match.end).trim();
         bulletColor = AppTheme.textPrimary;
       }
     }
+
+    // Parse inline markdown within list item text
+    final spans = _parseInlineContent(text);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -578,14 +690,16 @@ class ProfessionalMessageWidget extends StatelessWidget {
           ),
         ),
         Expanded(
-          child: SelectableText(
-            text,
-            style: TextStyle(
-              fontSize: 16,
-              height: 1.75,
-              color: AppTheme.textPrimary,
-              fontWeight: FontWeight.w400,
-              letterSpacing: 0.2,
+          child: SelectableText.rich(
+            TextSpan(
+              children: spans,
+              style: TextStyle(
+                fontSize: 16,
+                height: 1.75,
+                color: AppTheme.textPrimary,
+                fontWeight: FontWeight.w400,
+                letterSpacing: 0.2,
+              ),
             ),
           ),
         ),

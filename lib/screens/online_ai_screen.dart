@@ -19,6 +19,7 @@ import '../services/api_service.dart';
 import '../services/web_search_service.dart';
 import '../utils/ai_constants.dart';
 import '../services/chat_storage_service.dart';
+import '../services/user_profile_service.dart';
 import 'notes_screen.dart';
 import 'chat_history_screen.dart';
 import 'bot_creation_screen.dart';
@@ -942,7 +943,10 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
           }
         });
         try {
-          final searchResults = await _webSearchService.search(query: text);
+          final searchResults = await _webSearchService.search(
+            query: text,
+            conversationHistory: _getConversationHistoryForSearch(),
+          );
           setState(
             () => _currentStatusMessage = 'Processing search results...',
           );
@@ -983,7 +987,10 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
             _logAndAddAiMessage('🔍 Searching the web...');
 
             try {
-              final searchResults = await _webSearchService.search(query: text);
+              final searchResults = await _webSearchService.search(
+                query: text,
+                conversationHistory: _getConversationHistoryForSearch(),
+              );
               final enhancedPrompt = _webSearchService.createEnhancedPrompt(
                 text,
                 searchResults,
@@ -1099,6 +1106,27 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
     }
 
     return _webSearchService.shouldSuggestWebSearch(query);
+  }
+
+  /// Converts the current message history to the format expected by the search service.
+  /// This provides conversation context for more relevant web searches.
+  List<Map<String, String>> _getConversationHistoryForSearch() {
+    // Take last 10 messages (excluding typing indicators)
+    final relevantMessages = _messages
+        .where((m) => !m.isTyping && m.text.isNotEmpty)
+        .toList();
+    
+    // Take last 10 for context
+    final recentMessages = relevantMessages.length > 10
+        ? relevantMessages.sublist(relevantMessages.length - 10)
+        : relevantMessages;
+    
+    return recentMessages.map((m) => {
+      return {
+        'role': m.fromUser ? 'user' : 'assistant',
+        'content': m.text,
+      };
+    }).toList();
   }
 
   Future<bool?> _showWebSearchDialog() async {
@@ -1218,7 +1246,10 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
         });
 
         try {
-          final searchResults = await _webSearchService.search(query: prompt);
+          final searchResults = await _webSearchService.search(
+            query: prompt,
+            conversationHistory: _getConversationHistoryForSearch(),
+          );
           final enhancedPrompt = _webSearchService.createEnhancedPrompt(
             prompt,
             searchResults,
@@ -1603,7 +1634,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
   Future<void> _deleteChat(String chatId, String title) async {
     try {
       await _chatStorage.deleteChat(chatId);
-      _showSnackBar('🗑️ "$title" deleted', isError: false);
+      // Silent delete - no notification shown
       if (_currentChatId == chatId) {
         setState(() {
           _currentChatId = null;
@@ -1613,6 +1644,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
         });
       }
     } catch (e) {
+      // Only show error if something goes wrong
       _showSnackBar('Error deleting: $e', isError: true);
     }
   }
@@ -1846,8 +1878,40 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                           });
                         },
                       ),
+                      SizedBox(height: 8),
+
+                      _buildMenuItemAdvanced(
+                        ctx,
+                        icon: Icons.smart_toy_outlined,
+                        title: 'Recent Bots',
+                        subtitle: 'View your study bot history',
+                        gradient: [Color(0xFF8B5CF6), Color(0xFFA855F7)],
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          Navigator.pushNamed(context, '/recent-study-bots');
+                        },
+                      ),
+                      SizedBox(height: 8),
+
+                      _buildMenuItemAdvanced(
+                        ctx,
+                        icon: Icons.settings_outlined,
+                        title: 'Settings',
+                        subtitle: 'App preferences',
+                        gradient: [Color(0xFF6B7280), Color(0xFF4B5563)],
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          Navigator.pushNamed(context, '/settings');
+                        },
+                      ),
                     ],
                   ),
+                ),
+
+                // Account section
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: _buildAccountSection(ctx),
                 ),
 
                 SizedBox(height: 20),
@@ -1940,6 +2004,199 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
         ),
       ),
     );
+  }
+
+  Widget _buildAccountSection(BuildContext ctx) {
+    final user = FirebaseAuth.instance.currentUser;
+    final isLoggedIn = user != null;
+
+    if (isLoggedIn) {
+      return FutureBuilder<String>(
+        future: UserProfileService.instance.getDisplayName(),
+        builder: (context, snapshot) {
+          final displayName = snapshot.data ?? 'User';
+          final email = user.email ?? '';
+
+          return Container(
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppTheme.primaryBlue.withOpacity(0.1),
+                  AppTheme.primaryBlue.withOpacity(0.05),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: AppTheme.primaryBlue.withOpacity(0.2),
+                width: 1,
+              ),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(colors: AppTheme.primaryGradient),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            displayName,
+                            style: TextStyle(
+                              color: AppTheme.textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          if (email.isNotEmpty)
+                            Text(
+                              email,
+                              style: TextStyle(
+                                color: AppTheme.textSecondary,
+                                fontSize: 13,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      await _handleLogout();
+                    },
+                    icon: Icon(Icons.logout, size: 18),
+                    label: Text('Sign Out'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.textSecondary,
+                      side: BorderSide(color: AppTheme.textTertiary.withOpacity(0.3)),
+                      padding: EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    } else {
+      return Container(
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceElevated.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: AppTheme.primaryBlue.withOpacity(0.1),
+            width: 0.5,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              Icons.account_circle_outlined,
+              size: 48,
+              color: AppTheme.textTertiary,
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Sign in to save your chats',
+              style: TextStyle(
+                color: AppTheme.textSecondary,
+                fontSize: 14,
+              ),
+            ),
+            SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      Navigator.pushNamed(context, '/login');
+                    },
+                    child: Text('Log In'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.primaryBlue,
+                      side: BorderSide(color: AppTheme.primaryBlue.withOpacity(0.5)),
+                      padding: EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      Navigator.pushNamed(context, '/signup');
+                    },
+                    child: Text('Sign Up'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryBlue,
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleLogout() async {
+    try {
+      await FirebaseAuth.instance.signOut();
+      await UserProfileService.instance.clearUserData();
+      
+      if (mounted) {
+        setState(() {
+          _messages.clear();
+          _currentChatId = null;
+          _showGreeting = true;
+          _isSavingEnabled = false;
+        });
+        _greetingAnimationController.forward();
+        
+        _showSnackBar('Signed out successfully', isError: false);
+      }
+    } catch (e) {
+      _showSnackBar('Error signing out: $e', isError: true);
+    }
   }
 
   Widget _buildDrawer() {
@@ -2247,11 +2504,6 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                   child: Dismissible(
                                     key: Key(chatId),
                                     direction: DismissDirection.endToStart,
-                                    confirmDismiss: (direction) async {
-                                      return await _showDeleteConfirmDialog(
-                                        chatTitle,
-                                      );
-                                    },
                                     onDismissed: (direction) {
                                       _deleteChat(chatId, chatTitle);
                                     },
@@ -2266,8 +2518,8 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                       decoration: BoxDecoration(
                                         gradient: LinearGradient(
                                           colors: [
-                                            Colors.red.withOpacity(0.1),
-                                            Colors.red,
+                                            AppTheme.primaryBlue.withOpacity(0.1),
+                                            AppTheme.primaryBlue.withOpacity(0.8),
                                           ],
                                         ),
                                         borderRadius: BorderRadius.circular(
@@ -2276,7 +2528,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                       ),
                                       alignment: Alignment.centerRight,
                                       child: Icon(
-                                        Icons.delete,
+                                        Icons.delete_outline,
                                         color: Colors.white,
                                         size: 24,
                                       ),
@@ -2430,11 +2682,6 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                   child: Dismissible(
                                     key: Key(chatId),
                                     direction: DismissDirection.endToStart,
-                                    confirmDismiss: (direction) async {
-                                      return await _showDeleteConfirmDialog(
-                                        chatTitle,
-                                      );
-                                    },
                                     onDismissed: (direction) {
                                       _deleteChat(chatId, chatTitle);
                                     },
@@ -2446,8 +2693,8 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                       decoration: BoxDecoration(
                                         gradient: LinearGradient(
                                           colors: [
-                                            Colors.red.withOpacity(0.1),
-                                            Colors.red,
+                                            AppTheme.primaryBlue.withOpacity(0.1),
+                                            AppTheme.primaryBlue.withOpacity(0.8),
                                           ],
                                         ),
                                         borderRadius: BorderRadius.circular(
@@ -2455,7 +2702,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                         ),
                                       ),
                                       child: Icon(
-                                        Icons.delete,
+                                        Icons.delete_outline,
                                         color: Colors.white,
                                         size: 24,
                                       ),
@@ -3034,17 +3281,23 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
             SizedBox(height: AppTheme.spaceLg),
 
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: AppTheme.space2xl),
-              child: Text(
-                GreetingUtils.getGreeting(),
-                textAlign: TextAlign.center,
-                style: AppTheme.displaySmall.copyWith(
-                  color: AppTheme.textPrimary,
-                  fontWeight: FontWeight.w500,
-                  fontSize: 32,
-                  height: 1.2,
-                  letterSpacing: -0.5,
-                ),
+              padding: EdgeInsets.symmetric(horizontal: AppTheme.spaceLg),
+              child: FutureBuilder<String>(
+                future: GreetingUtils.getPersonalizedGreetingAsync(),
+                builder: (context, snapshot) {
+                  final greeting = snapshot.data ?? GreetingUtils.getGreeting();
+                  return Text(
+                    greeting,
+                    textAlign: TextAlign.center,
+                    style: AppTheme.displaySmall.copyWith(
+                      color: AppTheme.textPrimary,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 28,
+                      height: 1.3,
+                      letterSpacing: -0.3,
+                    ),
+                  );
+                },
               ),
             ),
           ],

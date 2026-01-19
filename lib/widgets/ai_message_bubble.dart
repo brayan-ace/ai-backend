@@ -86,21 +86,28 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
       color: Colors.transparent,
       child: InkWell(
         onTap: () => _toggleReaction(emoji),
-        borderRadius: BorderRadius.circular(6),
-        child: Container(
-          padding: EdgeInsets.all(6),
+        borderRadius: BorderRadius.circular(8),
+        child: AnimatedContainer(
+          duration: Duration(milliseconds: 150),
+          padding: EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: isSelected
-                ? AppTheme.primaryBlue.withOpacity(0.12)
-                : AppTheme.primaryBlue.withOpacity(0.04),
-            borderRadius: BorderRadius.circular(6),
+                ? AppTheme.primaryBlue.withOpacity(0.25)
+                : Color(0xFF1E2530),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isSelected
+                  ? AppTheme.primaryBlue.withOpacity(0.5)
+                  : Colors.transparent,
+              width: 1,
+            ),
           ),
           child: Icon(
             icon,
-            size: 14,
+            size: 16,
             color: isSelected
                 ? AppTheme.primaryBlue
-                : AppTheme.primaryBlue.withOpacity(0.65),
+                : AppTheme.textSecondary.withOpacity(0.7),
           ),
         ),
       ),
@@ -108,24 +115,33 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
   }
 
   Widget _buildCopyButton() {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => _copyToClipboard(context),
-        borderRadius: BorderRadius.circular(6),
-        child: Container(
-          padding: EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: AppTheme.backgroundGradientEnd.withOpacity(0.5),
-            borderRadius: BorderRadius.circular(6),
+    return StatefulBuilder(
+      builder: (context, setLocalState) {
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              _copyToClipboard(context);
+            },
+            onHighlightChanged: (isHighlighted) {
+              setLocalState(() {});
+            },
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Color(0xFF1E2530),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.content_copy_rounded,
+                size: 16,
+                color: AppTheme.textSecondary.withOpacity(0.7),
+              ),
+            ),
           ),
-          child: Icon(
-            Icons.content_copy_rounded,
-            size: 14,
-            color: AppTheme.textTertiary.withOpacity(0.6),
-          ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -143,17 +159,17 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
             ),
           );
         },
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
         child: Container(
-          padding: EdgeInsets.all(6),
+          padding: EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: AppTheme.backgroundGradientEnd.withOpacity(0.5),
-            borderRadius: BorderRadius.circular(6),
+            color: Color(0xFF1E2530),
+            borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
             Icons.refresh_rounded,
-            size: 14,
-            color: AppTheme.textTertiary.withOpacity(0.6),
+            size: 16,
+            color: AppTheme.textSecondary.withOpacity(0.7),
           ),
         ),
       ),

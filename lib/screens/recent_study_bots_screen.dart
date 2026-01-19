@@ -77,22 +77,14 @@ class _RecentStudyBotsScreenState extends State<RecentStudyBotsScreen> {
         setState(() {
           _bots.removeAt(index);
         });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Bot deleted successfully'),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
+        // Silent delete - no notification shown
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error deleting bot: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppTheme.primaryBlue,
             duration: const Duration(seconds: 2),
           ),
         );
@@ -360,7 +352,12 @@ class _RecentStudyBotsScreenState extends State<RecentStudyBotsScreen> {
           background: Container(
             margin: EdgeInsets.only(bottom: AppTheme.spaceMd),
             decoration: BoxDecoration(
-              color: Colors.red,
+              gradient: LinearGradient(
+                colors: [
+                  AppTheme.primaryBlue.withOpacity(0.1),
+                  AppTheme.primaryBlue.withOpacity(0.8),
+                ],
+              ),
               borderRadius: BorderRadius.circular(AppTheme.radiusMd),
             ),
             alignment: Alignment.centerRight,
@@ -373,47 +370,6 @@ class _RecentStudyBotsScreenState extends State<RecentStudyBotsScreen> {
           ),
           onDismissed: (direction) {
             _deleteBot(index, bot['bot_id'] as String? ?? '');
-          },
-          confirmDismiss: (direction) async {
-            return await showDialog(
-              context: context,
-              builder: (context) => AlertDialog(
-                backgroundColor: AppTheme.surfaceCard,
-                title: Text(
-                  'Delete Bot?',
-                  style: AppTheme.headlineSmall.copyWith(
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-                content: Text(
-                  'Are you sure you want to delete "${bot['name'] ?? 'Unnamed Bot'}"? This action cannot be undone.',
-                  style: AppTheme.bodyMedium.copyWith(
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    child: Text(
-                      'Cancel',
-                      style: AppTheme.bodyMedium.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    child: Text(
-                      'Delete',
-                      style: AppTheme.bodyMedium.copyWith(
-                        color: Colors.red,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
           },
           child: _buildBotCard(bot, index),
         );
