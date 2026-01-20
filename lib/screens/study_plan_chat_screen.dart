@@ -206,8 +206,11 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   StudyBotState? _botState;
   List<StudyBotMessage> _messages = [];
   final TextEditingController _inputController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _isLoading = false;
   bool _showToc = false;
+  bool _showScrollToBottom = false;
 
   // Bot instructions from database
   Map<String, dynamic>? _botInstructions;
@@ -237,6 +240,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     _flowController = StudyBotFlowController();
     _tutorService = TutorEngagementService();
     _progressService = ProgressTrackingService();
+    
+    // Add scroll listener for scroll-to-bottom button
+    _scrollController.addListener(_onScroll);
 
     // Initialize bot instructions from parameters
     _botInstructions = widget.systemInstructions;
@@ -252,6 +258,35 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
 
     if (_isPhase2) {
       _initPhase2();
+    }
+  }
+  
+  @override
+  void dispose() {
+    _inputController.dispose();
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+  
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.offset;
+    final shouldShow = maxScroll - currentScroll > 200;
+    if (shouldShow != _showScrollToBottom) {
+      setState(() => _showScrollToBottom = shouldShow);
+    }
+  }
+  
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      HapticFeedback.lightImpact();
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
     }
   }
 
@@ -618,12 +653,16 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
           final profileApplied = body['learnerProfileApplied'] ?? false;
           final moodApplied = body['moodApplied'] ?? false;
           final moduleCompleted = body['moduleCompleted'] ?? false;
+          final conceptCompleted = body['conceptCompleted'] ?? false;
+          final triggerQuiz = body['triggerQuiz'] ?? false;
 
           print('[ChatScreen] ✅ Backend processing info:');
           print('[ChatScreen]    - Instructions from: $instructionSource');
           print('[ChatScreen]    - Learner profile applied: $profileApplied');
           print('[ChatScreen]    - Mood applied: $moodApplied');
+          print('[ChatScreen]    - Concept completed: $conceptCompleted');
           print('[ChatScreen]    - Module completed: $moduleCompleted');
+          print('[ChatScreen]    - Trigger quiz: $triggerQuiz');
 
           setState(() {
             _botCurrentState = newState;
@@ -637,6 +676,11 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
           // Show celebration if module was completed
           if (moduleCompleted) {
             _showModuleCompletionCelebration(progress);
+          }
+          
+          // Trigger quiz if backend signals it
+          if (triggerQuiz) {
+            _showQuizPopup();
           }
 
           // If backend returned a generated study plan, save it and show in hamburger
@@ -1006,9 +1050,17 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   }
 
   Widget _buildPhase2ChatScreen() {
-    return Scaffold(
-      backgroundColor: PremiumColors.darkBg,
-      appBar: AppBar(
+    return GestureDetector(
+      // Swipe from left to open hamburger menu
+      onHorizontalDragEnd: (details) {
+        if (details.primaryVelocity != null && details.primaryVelocity! > 300) {
+          _scaffoldKey.currentState?.openDrawer();
+        }
+      },
+      child: Scaffold(
+        key: _scaffoldKey,
+        backgroundColor: PremiumColors.darkBg,
+        appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: null,
@@ -1052,7 +1104,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
           if (_botCurrentState == 'learning' ||
               _botCurrentState == 'plan_review')
             Padding(
-              padding: EdgeInsets.only(right: AppTheme.spaceMd),
+              padding: EdgeInsets.only(right: 8),
               child: Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -1071,7 +1123,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                   icon: Icon(
                     Icons.bookmark,
                     color: PremiumColors.accentGradient1,
-                    size: 24,
+                    size: 22,
                   ),
                   tooltip: 'View Study Plan',
                   onPressed: () {
@@ -1083,6 +1135,68 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                 ),
               ),
             ),
+          // 3-Dot Menu
+          PopupMenuButton<String>(
+            icon: Icon(Icons.more_vert, color: Colors.white70),
+            color: PremiumColors.cardBg,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: PremiumColors.accentGradient1.withOpacity(0.2),
+              ),
+            ),
+            onSelected: (value) {
+              HapticFeedback.selectionClick();
+              switch (value) {
+                case 'main_ai':
+                  Navigator.pushNamed(context, '/online-ai');
+                  break;
+                case 'chat_history':
+                  Navigator.pushNamed(context, '/chat-history');
+                  break;
+                case 'change_mode':
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Mode switching coming soon!'),
+                      backgroundColor: PremiumColors.accentGradient1,
+                    ),
+                  );
+                  break;
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'main_ai',
+                child: Row(
+                  children: [
+                    Icon(Icons.smart_toy, color: PremiumColors.accentGradient1, size: 20),
+                    SizedBox(width: 12),
+                    Text('Go to Main AI', style: TextStyle(color: Colors.white)),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'chat_history',
+                child: Row(
+                  children: [
+                    Icon(Icons.history, color: PremiumColors.accentGradient1, size: 20),
+                    SizedBox(width: 12),
+                    Text('Chat History', style: TextStyle(color: Colors.white)),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'change_mode',
+                child: Row(
+                  children: [
+                    Icon(Icons.swap_horiz, color: Colors.white54, size: 20),
+                    SizedBox(width: 12),
+                    Text('Change Mode', style: TextStyle(color: Colors.white54)),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ],
       ),
       drawer: _buildDrawer(),
@@ -1186,36 +1300,78 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
               if (_showToc && _botState?.tableOfContents != null)
                 _buildTableOfContentsWidget(),
 
-              // Chat Messages with Premium Bubbles
+              // Chat Messages with Premium Bubbles and Scroll-to-Bottom
               Expanded(
-                child: ListView.builder(
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  itemCount: _messages.length + (_isLoading ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    // Show typing indicator at the end when loading
-                    if (_isLoading && index == _messages.length) {
-                      return PremiumTypingIndicator(
-                        botName: widget.botName,
-                        showAvatar: true,
-                      );
-                    }
-                    
-                    final msg = _messages[index];
-                    final isBot = msg.senderType == 'bot';
-                    final isLastMessage = index == _messages.length - 1;
-                    
-                    return PremiumMessageBubble(
-                      message: msg.text,
-                      isBot: isBot,
-                      timestamp: msg.timestamp,
-                      botName: widget.botName,
-                      showAvatar: isBot,
-                      animate: isLastMessage,
-                      onLongPress: () {
-                        HapticFeedback.mediumImpact();
+                child: Stack(
+                  children: [
+                    ListView.builder(
+                      controller: _scrollController,
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      itemCount: _messages.length + (_isLoading ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        // Show typing indicator at the end when loading
+                        if (_isLoading && index == _messages.length) {
+                          return PremiumTypingIndicator(
+                            botName: widget.botName,
+                            showAvatar: true,
+                          );
+                        }
+                        
+                        final msg = _messages[index];
+                        final isBot = msg.senderType == 'bot';
+                        final isLastMessage = index == _messages.length - 1;
+                        
+                        return PremiumMessageBubble(
+                          message: msg.text,
+                          isBot: isBot,
+                          timestamp: msg.timestamp,
+                          botName: widget.botName,
+                          showAvatar: isBot,
+                          animate: isLastMessage,
+                          onLongPress: () {
+                            HapticFeedback.mediumImpact();
+                          },
+                        );
                       },
-                    );
-                  },
+                    ),
+                    // Scroll-to-bottom floating button
+                    if (_showScrollToBottom)
+                      Positioned(
+                        right: 16,
+                        bottom: 16,
+                        child: AnimatedOpacity(
+                          opacity: _showScrollToBottom ? 1.0 : 0.0,
+                          duration: Duration(milliseconds: 200),
+                          child: GestureDetector(
+                            onTap: _scrollToBottom,
+                            child: Container(
+                              padding: EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    PremiumColors.accentGradient2,
+                                    PremiumColors.accentGradient1,
+                                  ],
+                                ),
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: PremiumColors.accentGradient2.withOpacity(0.4),
+                                    blurRadius: 12,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
+                              ),
+                              child: Icon(
+                                Icons.keyboard_arrow_down,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
 
@@ -1228,6 +1384,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

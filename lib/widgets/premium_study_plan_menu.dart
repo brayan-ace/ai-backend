@@ -159,56 +159,61 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            PremiumColors.accentGradient2,
-                            PremiumColors.accentGradient1,
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              PremiumColors.accentGradient2,
+                              PremiumColors.accentGradient1,
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: PremiumColors.accentGradient2.withOpacity(0.4),
+                              blurRadius: 12,
+                              spreadRadius: 2,
+                            ),
                           ],
                         ),
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: PremiumColors.accentGradient2.withOpacity(0.4),
-                            blurRadius: 12,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                      child: Icon(
-                        Icons.auto_stories,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                    ),
-                    SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Study Plan',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: -0.5,
-                          ),
+                        child: Icon(
+                          Icons.auto_stories,
+                          color: Colors.white,
+                          size: 22,
                         ),
-                        if (widget.planVersion != null)
-                          Text(
-                            'Version ${widget.planVersion}',
-                            style: TextStyle(
-                              color: Colors.white54,
-                              fontSize: 12,
+                      ),
+                      SizedBox(width: 10),
+                      Flexible(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Study Plan',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: -0.5,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                      ],
-                    ),
-                  ],
+                            if (widget.planVersion != null)
+                              Text(
+                                'Version ${widget.planVersion}',
+                                style: TextStyle(
+                                  color: Colors.white54,
+                                  fontSize: 11,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 Container(
                   decoration: BoxDecoration(
@@ -359,18 +364,21 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
   }) {
     return Row(
       children: [
-        Icon(icon, color: iconColor, size: 16),
-        SizedBox(width: 8),
-        Text(
-          label,
-          style: TextStyle(color: Colors.white54, fontSize: 12),
+        Icon(icon, color: iconColor, size: 14),
+        SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            label,
+            style: TextStyle(color: Colors.white54, fontSize: 11),
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
-        Spacer(),
+        SizedBox(width: 4),
         Text(
           value,
           style: TextStyle(
             color: Colors.white,
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -557,13 +565,14 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                             ),
                           ),
                           SizedBox(height: 4),
-                          Row(
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
                             children: [
                               _buildTag(
                                 toc.estimatedTime,
                                 Icons.access_time,
                               ),
-                              SizedBox(width: 8),
                               _buildTag(
                                 toc.difficultyLevel,
                                 Icons.signal_cellular_alt,

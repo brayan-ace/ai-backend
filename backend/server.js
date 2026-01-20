@@ -23,7 +23,9 @@ async function ensureDatabaseTables() {
         current_phase VARCHAR(50) NOT NULL DEFAULT 'greeting',
         active_study_plan JSONB NOT NULL DEFAULT '{"modules": []}'::jsonb,
         current_module_index INTEGER NOT NULL DEFAULT 0,
+        current_concept_index INTEGER NOT NULL DEFAULT 0,
         completed_modules JSONB NOT NULL DEFAULT '[]'::jsonb,
+        completed_concepts JSONB NOT NULL DEFAULT '[]'::jsonb,
         last_user_confirmation TEXT,
         learning_preferences JSONB NOT NULL DEFAULT '{}'::jsonb,
         response_mode VARCHAR(50) NOT NULL DEFAULT 'normal',
@@ -46,6 +48,15 @@ async function ensureDatabaseTables() {
       );
     `);
     console.log("[DB] conversation_memory table ensured");
+    
+    // Add concept tracking columns to bot_progress if they don't exist
+    try {
+      await pool.query(`ALTER TABLE bot_progress ADD COLUMN IF NOT EXISTS current_concept_index INTEGER DEFAULT 0`);
+      await pool.query(`ALTER TABLE bot_progress ADD COLUMN IF NOT EXISTS completed_concepts JSONB DEFAULT '[]'::jsonb`);
+      console.log("[DB] Concept tracking columns added to bot_progress");
+    } catch (alterErr) {
+      // Columns may already exist, that's fine
+    }
   } catch (err) {
     console.error("[DB] Failed to ensure tables:", err.message);
   }
@@ -1358,14 +1369,16 @@ app.post("/api/chat-enhanced", async (req, res) => {
       console.log("[Chat-Enhanced] Instructions enhanced with mood context");
     }
 
-    // STEP 4.5: Fetch and include active study plan context
+    // STEP 4.5: Fetch and include active study plan context with CONCEPT-LEVEL tracking
     let studyPlanContext = "";
     let currentPlanVersion = 1;
     let currentModuleIndex = 0;
+    let currentConceptIndex = 0;
     let completedModulesCount = 0;
+    let completedConcepts = [];
     try {
       const planResult = await pool.query(
-        `SELECT study_plan, plan_version, current_module, completed_modules 
+        `SELECT study_plan, plan_version, current_module, current_concept_index, completed_modules, completed_concepts 
          FROM bot_progress WHERE bot_id = $1 AND user_id = $2 LIMIT 1`,
         [botId, userId],
       );
@@ -1374,7 +1387,9 @@ app.post("/api/chat-enhanced", async (req, res) => {
         const plan = row.study_plan;
         currentPlanVersion = row.plan_version || 1;
         currentModuleIndex = row.current_module || 0;
+        currentConceptIndex = row.current_concept_index || 0;
         const completedModules = row.completed_modules || [];
+        completedConcepts = row.completed_concepts || [];
         completedModulesCount = completedModules.length;
 
         console.log("[Chat-Enhanced] 📚 Study plan found in DB:", plan ? `${plan.modules?.length || 0} modules` : "null");
@@ -1396,15 +1411,34 @@ app.post("/api/chat-enhanced", async (req, res) => {
 
           const currentModule = plan.modules[currentModuleIndex];
           const keyTopics = currentModule?.key_topics || currentModule?.subtopics || [];
+          
+          // Build concept-level tracking for the current module
+          const conceptsWithStatus = keyTopics.map((topic, idx) => {
+            const conceptKey = `m${currentModuleIndex}_c${idx}`;
+            const isCompleted = completedConcepts.includes(conceptKey);
+            const isCurrent = idx === currentConceptIndex && !isCompleted;
+            const status = isCompleted ? "✅" : isCurrent ? "📍" : "⏳";
+            return `   ${status} ${idx + 1}. ${topic}`;
+          }).join("\n");
+          
+          const currentConceptName = keyTopics[currentConceptIndex] || "Introduction";
+          const completedConceptsInModule = keyTopics.filter((_, idx) => 
+            completedConcepts.includes(`m${currentModuleIndex}_c${idx}`)
+          ).length;
+          
           const currentModuleDetails = currentModule 
             ? `
 ═══════════════════════════════════════════════════════════
 📚 CURRENT MODULE: "${currentModule.title || currentModule.module_name}"
 ═══════════════════════════════════════════════════════════
 Objective: ${currentModule.objective || currentModule.description || "N/A"}
-Key Topics to Cover: ${keyTopics.join(" → ") || "N/A"}
 Difficulty: ${currentModule.difficulty || "Medium"}
-Estimated Time: ${currentModule.estimated_effort || "30 minutes"}`
+Estimated Time: ${currentModule.estimated_effort || "30 minutes"}
+
+📋 CONCEPTS IN THIS MODULE (${completedConceptsInModule}/${keyTopics.length} completed):
+${conceptsWithStatus}
+
+🎯 CURRENT CONCEPT TO TEACH: "${currentConceptName}" (Concept ${currentConceptIndex + 1} of ${keyTopics.length})`
             : "";
 
           studyPlanContext = `
@@ -1420,51 +1454,51 @@ ${currentModuleDetails}
 🎓 PREMIUM TEACHING METHODOLOGY - FOLLOW STRICTLY
 ═══════════════════════════════════════════════════════════
 
-**STEP-BY-STEP LEARNING APPROACH:**
-1. Focus ONLY on the current module - never jump ahead
-2. Break down each topic into small, digestible chunks (1-2 concepts per message)
-3. Use the Socratic method - ask questions to check understanding
-4. Include real-world anecdotes and relatable examples
-5. Use analogies that connect to everyday life
+**🚨 CRITICAL CONCEPT PROGRESSION RULES:**
+1. ONLY teach the CURRENT CONCEPT marked with 📍 above
+2. When user says "I understand", "yes", "got it", "move on", "next" - this means they understood
+3. After user confirms understanding, you MUST:
+   - Include [CONCEPT_COMPLETE] in your response to mark it done
+   - Immediately move to the NEXT concept (do NOT re-explain the same concept)
+4. NEVER re-explain a concept marked ✅ unless user explicitly asks "explain X again"
+5. If ALL concepts in a module are ✅, include [MODULE_COMPLETE] and ask about quiz
 
-**INTERACTIVE LEARNING FLOW:**
-- After explaining a concept, ask: "Does this make sense?" or "Can you see how this works?"
-- Wait for user confirmation before moving to the next concept
-- If user seems confused, rephrase using simpler terms or different analogies
-- Celebrate small wins: "Great! You've got it! 🎉"
+**CONCEPT TEACHING FLOW:**
+1. Introduce the current concept with a hook
+2. Explain with examples and analogies (2-3 paragraphs max)
+3. Ask: "Does this make sense?" or similar
+4. When user confirms → Include [CONCEPT_COMPLETE] → Move to next concept
+
+**UNDERSTANDING DETECTION - THESE PHRASES MEAN "I UNDERSTAND, MOVE ON":**
+- "I understand" / "I get it" / "Got it" / "Makes sense"
+- "Yes" / "Yeah" / "Yep" / "Sure" / "Okay"
+- "Move on" / "Next" / "Continue" / "Let's proceed"
+- "That's clear" / "I see" / "Understood"
+→ When you see ANY of these, include [CONCEPT_COMPLETE] and teach the NEXT concept
+
+**MODULE COMPLETION:**
+When ALL concepts in the module are marked ✅:
+- Congratulate the user warmly 🎉
+- Summarize what they learned
+- Ask: "Would you like to take a quick quiz now or continue to the next module?"
+- Include [MODULE_COMPLETE] in your response
+
+**QUIZ TRIGGER:**
+If user says "now", "quiz", "test me", "yes" after module completion:
+- Include [TRIGGER_QUIZ] in your response
+- The system will generate a quiz based on completed concepts
 
 **PACING RULES:**
-- Never overwhelm with walls of text
 - Maximum 3-4 short paragraphs per response
-- One key concept at a time
+- One concept at a time
 - Use bullet points for clarity
-- Include breathing room between ideas
-
-**ENGAGEMENT TECHNIQUES:**
-- Start with a hook or interesting fact
-- Use "Imagine..." or "Think of it like..." for analogies
-- Ask "Have you ever...?" to connect to their experience
-- Use emojis sparingly for warmth: 💡 🎯 ✨ 🧠
-
-**MODULE COMPLETION DETECTION:**
-When the user indicates understanding of ALL key topics in the current module:
-- Phrases like: "I understand", "Got it", "Makes sense", "I'm ready for the next"
-- Summarize what they learned
-- Congratulate them warmly
-- Ask: "Ready to move on to the next module?"
-- IMPORTANT: Signal module completion with [MODULE_COMPLETE] in your response
-
-**PROGRESS CHECKPOINTS:**
-- After covering each key topic, do a quick check-in
-- Use mini-quizzes: "Quick check: What's the main purpose of...?"
-- Provide encouraging feedback
+- Include emojis sparingly: 💡 🎯 ✨ 🧠
 
 **NEVER DO:**
+- Re-explain completed concepts (marked ✅)
+- Stay on the same concept after user confirms understanding
 - Skip ahead to future modules
-- Dump all information at once
-- Use jargon without explanation
-- Move on without confirming understanding
-- Invent topics not in the study plan`;
+- Dump all information at once`;
 
           enhancedInstructions = `${enhancedInstructions}${studyPlanContext}`;
           console.log("[Chat-Enhanced] Instructions enhanced with premium teaching methodology (v" + currentPlanVersion + ", " + progressPercent + "% complete)");
@@ -1624,11 +1658,71 @@ Always prioritize clarity and professional formatting.`;
       aiResponse.substring(0, 200).replace(/\n/g, "␤"),
     );
 
-    // STEP 7: Detect module completion and update progress
+    // STEP 7: Detect concept/module completion signals and update progress
+    let conceptCompleted = false;
     let moduleCompleted = false;
+    let triggerQuiz = false;
     let newProgressPercentage = 0;
     let updatedCurrentModule = currentModuleIndex;
+    let updatedCurrentConcept = currentConceptIndex;
+    
     try {
+      // Check if AI signaled concept completion
+      if (aiResponse.includes("[CONCEPT_COMPLETE]")) {
+        conceptCompleted = true;
+        aiResponse = aiResponse.replace(/\[CONCEPT_COMPLETE\]/g, "").trim();
+        console.log("[Chat-Enhanced] ✅ Concept completion detected!");
+        
+        const progressResult = await pool.query(
+          `SELECT study_plan, current_module, current_concept_index, completed_concepts 
+           FROM bot_progress WHERE bot_id = $1 AND user_id = $2 LIMIT 1`,
+          [botId, userId],
+        );
+        
+        if (progressResult.rows.length > 0) {
+          const row = progressResult.rows[0];
+          const plan = row.study_plan;
+          let currentMod = row.current_module || 0;
+          let currentConcept = row.current_concept_index || 0;
+          let completedConceptsList = row.completed_concepts || [];
+          
+          if (plan && plan.modules && plan.modules.length > 0) {
+            const currentModule = plan.modules[currentMod];
+            const keyTopics = currentModule?.key_topics || currentModule?.subtopics || [];
+            const conceptKey = `m${currentMod}_c${currentConcept}`;
+            
+            // Mark current concept as completed
+            if (!completedConceptsList.includes(conceptKey)) {
+              completedConceptsList.push(conceptKey);
+            }
+            
+            // Move to next concept
+            if (currentConcept < keyTopics.length - 1) {
+              currentConcept = currentConcept + 1;
+            }
+            
+            updatedCurrentConcept = currentConcept;
+            
+            // Update database with new concept index
+            await pool.query(
+              `UPDATE bot_progress 
+               SET current_concept_index = $1, completed_concepts = $2, last_updated = NOW()
+               WHERE bot_id = $3 AND user_id = $4`,
+              [currentConcept, JSON.stringify(completedConceptsList), botId, userId],
+            );
+            
+            console.log(`[Chat-Enhanced] 📚 Concept ${currentConcept + 1}/${keyTopics.length} in Module ${currentMod + 1}`);
+          }
+        }
+      }
+      
+      // Check if AI signaled quiz trigger
+      if (aiResponse.includes("[TRIGGER_QUIZ]")) {
+        triggerQuiz = true;
+        aiResponse = aiResponse.replace(/\[TRIGGER_QUIZ\]/g, "").trim();
+        console.log("[Chat-Enhanced] 📝 Quiz trigger detected!");
+      }
+      
       // Check if AI signaled module completion
       if (aiResponse.includes("[MODULE_COMPLETE]")) {
         moduleCompleted = true;
@@ -1661,11 +1755,12 @@ Always prioritize clarity and professional formatting.`;
             
             newProgressPercentage = Math.round((completedMods.length / totalModules) * 100);
             updatedCurrentModule = currentMod;
+            updatedCurrentConcept = 0; // Reset concept index for new module
             
-            // Update database
+            // Update database - reset concept index to 0 for new module
             await pool.query(
               `UPDATE bot_progress 
-               SET current_module = $1, completed_modules = $2, progress_percentage = $3, last_updated = NOW()
+               SET current_module = $1, completed_modules = $2, progress_percentage = $3, current_concept_index = 0, last_updated = NOW()
                WHERE bot_id = $4 AND user_id = $5`,
               [currentMod, JSON.stringify(completedMods), newProgressPercentage, botId, userId],
             );
@@ -1736,9 +1831,12 @@ Always prioritize clarity and professional formatting.`;
       progress: { 
         percentage: moduleCompleted ? newProgressPercentage : (completedModulesCount > 0 ? Math.round((completedModulesCount / (completedModulesCount + 1)) * 100) : 0),
         currentModule: updatedCurrentModule,
+        currentConcept: updatedCurrentConcept,
         completedModules: completedModulesCount + (moduleCompleted ? 1 : 0),
       },
+      conceptCompleted: conceptCompleted,
       moduleCompleted: moduleCompleted,
+      triggerQuiz: triggerQuiz,
       instructionSource: instructionSource,
       learnerProfileApplied: !!learnerProfile,
       moodApplied: !!currentMood,
@@ -1783,7 +1881,7 @@ app.get("/api/bot-progress/:botId/:userId", async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT bot_state, progress_percentage, study_plan, plan_version, current_module, completed_modules 
+      `SELECT bot_state, progress_percentage, study_plan, plan_version, current_module, current_concept_index, completed_modules, completed_concepts 
        FROM bot_progress WHERE bot_id = $1 AND user_id = $2 LIMIT 1`,
       [botId, userId],
     );
@@ -1800,7 +1898,9 @@ app.get("/api/bot-progress/:botId/:userId", async (req, res) => {
       study_plan: row.study_plan || { modules: [] },
       plan_version: row.plan_version || 1,
       current_module: row.current_module || 0,
+      current_concept: row.current_concept_index || 0,
       completed_modules: row.completed_modules || [],
+      completed_concepts: row.completed_concepts || [],
       timestamp: new Date().toISOString(),
     });
   } catch (err) {
