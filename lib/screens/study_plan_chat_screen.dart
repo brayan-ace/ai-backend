@@ -8,6 +8,7 @@ import '../services/study_plan_service.dart';
 import '../services/study_bot_flow_controller.dart';
 import '../services/tutor_engagement_service.dart';
 import '../services/progress_tracking_service.dart';
+import '../services/study_bot_storage_service.dart';
 import '../utils/theme.dart';
 import 'study_plan_editor_screen.dart';
 import 'quiz_config_screen.dart';
@@ -232,6 +233,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     defaultValue: 'https://ai-backend-vf75.onrender.com',
   );
 
+  // Firebase storage service for conversation history
+  late final StudyBotStorageService _storageService;
+
   @override
   void initState() {
     super.initState();
@@ -239,6 +243,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     _flowController = StudyBotFlowController();
     _tutorService = TutorEngagementService();
     _progressService = ProgressTrackingService();
+    _storageService = StudyBotStorageService();
 
     // Add scroll listener for scroll-to-bottom button
     _scrollController.addListener(_onScroll);
@@ -306,46 +311,74 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         );
       }
 
-      // If resuming a bot, load chat history and progress from backend
+      // If resuming a bot, load chat history from Firebase and progress from backend
       if (widget.botId != null) {
         final currentUser = FirebaseAuth.instance.currentUser;
         final userId = currentUser?.uid ?? 'anonymous';
 
-        // Fetch chat history
+        // Initialize Firebase chat session
         try {
-          final historyUri = Uri.parse(
-            '$_backendUrl/api/chat-history/${widget.botId}/$userId',
+          await _storageService.getOrCreateBotChat(
+            botId: widget.botId!,
+            botName: widget.botName ?? 'Study Bot',
+            topic: widget.planName,
+            description: widget.planDescription,
           );
-          final historyRes = await http
-              .get(historyUri)
-              .timeout(const Duration(seconds: 15));
-
-          if (historyRes.statusCode == 200) {
-            final body = jsonDecode(historyRes.body);
-            final messages = (body['messages'] as List? ?? [])
-                .map(
-                  (m) => StudyBotMessage(
-                    id: DateTime.now().millisecondsSinceEpoch.toString(),
-                    senderType: m['senderType'] as String? ?? 'user',
-                    text: m['text'] as String? ?? '',
-                    timestamp: DateTime.parse(
-                      m['timestamp'] as String? ??
-                          DateTime.now().toIso8601String(),
-                    ),
-                  ),
-                )
-                .toList();
-
-            setState(() => _messages = messages);
-            print(
-              '[ChatScreen] Loaded ${messages.length} messages from backend',
-            );
-          }
+          print('[ChatScreen] 🔥 Firebase chat session initialized');
         } catch (e) {
-          print('[ChatScreen] Error loading chat history: $e');
+          print('[ChatScreen] ⚠️ Firebase init error (non-blocking): $e');
         }
 
-        // Fetch bot progress and state
+        // Load chat history from Firebase (primary source)
+        try {
+          final firebaseMessages = await _storageService.getMessages(widget.botId!);
+          if (firebaseMessages.isNotEmpty) {
+            final messages = firebaseMessages.map((m) => StudyBotMessage(
+              id: m['id'] as String? ?? DateTime.now().millisecondsSinceEpoch.toString(),
+              senderType: m['senderType'] as String? ?? (m['fromUser'] == true ? 'user' : 'bot'),
+              text: m['text'] as String? ?? '',
+              timestamp: (m['timestamp'] as dynamic)?.toDate() ?? DateTime.now(),
+            )).toList();
+
+            setState(() => _messages = messages);
+            print('[ChatScreen] 🔥 Loaded ${messages.length} messages from Firebase');
+          }
+        } catch (e) {
+          print('[ChatScreen] ⚠️ Firebase history load error: $e');
+          // Fallback to backend if Firebase fails
+          try {
+            final historyUri = Uri.parse(
+              '$_backendUrl/api/chat-history/${widget.botId}/$userId',
+            );
+            final historyRes = await http
+                .get(historyUri)
+                .timeout(const Duration(seconds: 15));
+
+            if (historyRes.statusCode == 200) {
+              final body = jsonDecode(historyRes.body);
+              final messages = (body['messages'] as List? ?? [])
+                  .map(
+                    (m) => StudyBotMessage(
+                      id: DateTime.now().millisecondsSinceEpoch.toString(),
+                      senderType: m['senderType'] as String? ?? 'user',
+                      text: m['text'] as String? ?? '',
+                      timestamp: DateTime.parse(
+                        m['timestamp'] as String? ??
+                            DateTime.now().toIso8601String(),
+                      ),
+                    ),
+                  )
+                  .toList();
+
+              setState(() => _messages = messages);
+              print('[ChatScreen] 📡 Loaded ${messages.length} messages from backend (fallback)');
+            }
+          } catch (backendErr) {
+            print('[ChatScreen] ❌ Backend history also failed: $backendErr');
+          }
+        }
+
+        // Fetch bot progress and state from backend
         try {
           final progressUri = Uri.parse(
             '$_backendUrl/api/bot-progress/${widget.botId}/$userId',
@@ -359,7 +392,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
             setState(() {
               _botCurrentState = body['bot_state'] as String? ?? 'intro';
               _progressPercentage =
-                  (body['progress'] as num?)?.toDouble() ?? 0.0;
+                  (body['progress']?['percentage'] as num?)?.toDouble() ?? 0.0;
               _studyPlan = body['study_plan'] as Map<String, dynamic>?;
             });
             print(
@@ -374,20 +407,18 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         }
       }
 
-      // Always create fresh session - no state caching
-      // This ensures we always fetch fresh greeting from backend AI
-      _botState = _flowController.createNewSession(botId: widget.botId!);
-      _messages = [];
+      // If no messages loaded, create fresh session and fetch greeting
+      if (_messages.isEmpty) {
+        _botState = _flowController.createNewSession(botId: widget.botId!);
 
-      // Fetch fresh system instructions from backend FIRST
-      // This ensures instructions are available when greeting is fetched
-      if (widget.botId != null) {
-        await _fetchFreshSystemInstructions(widget.botId!);
+        // Fetch fresh system instructions from backend FIRST
+        if (widget.botId != null) {
+          await _fetchFreshSystemInstructions(widget.botId!);
+        }
+
+        // Fetch initial greeting from backend
+        await _fetchInitialGreeting();
       }
-
-      // Always fetch initial greeting from backend - ALL responses come from AI
-      // The backend will use system instructions to generate personalized greeting
-      await _fetchInitialGreeting();
 
       setState(() {});
     } catch (e) {
@@ -493,6 +524,38 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     }
   }
 
+  /// Add study plan card to chat when plan is generated
+  Future<void> _addStudyPlanToChat(Map<String, dynamic> plan) async {
+    final modules = plan['modules'] as List? ?? [];
+    if (modules.isEmpty) return;
+    
+    // Build a formatted study plan message
+    final buffer = StringBuffer();
+    buffer.writeln('📚 **Your Study Plan is Ready!**\n');
+    buffer.writeln('I\'ve created a personalized study plan with **${modules.length} modules**:\n');
+    
+    for (int i = 0; i < modules.length; i++) {
+      final mod = modules[i] as Map<String, dynamic>;
+      final title = mod['title'] ?? mod['module_name'] ?? 'Module ${i + 1}';
+      final topics = mod['key_topics'] ?? mod['subtopics'] ?? [];
+      final topicCount = (topics as List).length;
+      buffer.writeln('**${i + 1}. $title** ($topicCount topics)');
+    }
+    
+    buffer.writeln('\n✨ *Tap the menu icon ☰ to view the full plan and track your progress!*');
+    
+    final message = StudyBotMessage(
+      id: 'plan_${DateTime.now().millisecondsSinceEpoch}',
+      senderType: 'bot',
+      text: buffer.toString(),
+      timestamp: DateTime.now(),
+    );
+
+    setState(() {
+      _messages.add(message);
+    });
+  }
+
   Future<void> _addBotMessage(String text) async {
     // Apply mood-aware response adaptation
     String adaptedText = _applyMoodAdaptation(text);
@@ -540,6 +603,20 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         _messages.add(message);
       });
 
+      // Save bot message to Firebase
+      if (widget.botId != null) {
+        try {
+          await _storageService.saveMessage(
+            botId: widget.botId!,
+            text: adaptedText,
+            fromUser: false,
+          );
+          print('[ChatScreen] 🔥 Bot message saved to Firebase');
+        } catch (e) {
+          print('[ChatScreen] ⚠️ Firebase save error (non-blocking): $e');
+        }
+      }
+
       if (_botState != null) {
         _botState = _botState!.copyWith(
           chatHistory: _messages.map((m) => m.toJson()).toList(),
@@ -556,6 +633,20 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       text: text,
       timestamp: DateTime.now(),
     );
+
+    // Save user message to Firebase
+    if (widget.botId != null) {
+      try {
+        await _storageService.saveMessage(
+          botId: widget.botId!,
+          text: text,
+          fromUser: true,
+        );
+        print('[ChatScreen] 🔥 User message saved to Firebase');
+      } catch (e) {
+        print('[ChatScreen] ⚠️ Firebase save error (non-blocking): $e');
+      }
+    }
 
     // Detect user mood from this message
     _currentMood = _tutorService.detectMood(text);
@@ -606,9 +697,23 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       final userId = currentUser?.uid ?? 'anonymous';
       print('[ChatScreen] User ID: $userId');
 
+      // Get conversation history from Firebase for AI context
+      List<Map<String, String>> conversationHistory = [];
+      if (widget.botId != null) {
+        try {
+          conversationHistory = await _storageService.getConversationHistoryForAI(
+            widget.botId!,
+            limit: 20,
+          );
+          print('[ChatScreen] 🔥 Loaded ${conversationHistory.length} messages for AI context');
+        } catch (e) {
+          print('[ChatScreen] ⚠️ Could not load Firebase history for AI: $e');
+        }
+      }
+
       final uri = Uri.parse('$_backendUrl/api/chat-enhanced');
 
-      // Build enhanced payload with learner profile and mood
+      // Build enhanced payload with learner profile, mood, and conversation history
       final payload = {
         'message': userMessage,
         'botId': widget.botId,
@@ -616,6 +721,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         'systemInstructions': _botInstructions,
         'learnerProfile': _learnerProfile?.toJson(),
         'currentMood': _currentMood?.toJson(),
+        'conversationHistory': conversationHistory,
       };
 
       final payloadStr = jsonEncode(payload);
@@ -682,16 +788,18 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
             _showQuizPopup();
           }
 
-          // If backend returned a generated study plan, save it and show in hamburger
+          // If backend returned a generated study plan, save it and show in hamburger AND chat
           if (body['showStudyPlan'] == true) {
             final planPayload = body['studyPlan'] ?? body['study_plan'];
             if (planPayload != null) {
-              setState(
-                () => _studyPlan = Map<String, dynamic>.from(planPayload),
-              );
+              final plan = Map<String, dynamic>.from(planPayload);
+              setState(() => _studyPlan = plan);
               print(
                 '[ChatScreen] 📚 Study plan received and set: ${_studyPlan?['modules']?.length ?? 0} modules',
               );
+              
+              // Add study plan card to chat
+              await _addStudyPlanToChat(plan);
             }
           }
 
