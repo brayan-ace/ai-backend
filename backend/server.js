@@ -1926,75 +1926,94 @@ app.get("/api/bot-progress/:botId/:userId", async (req, res) => {
 app.get("/api/user-bots/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
+    
+    if (!userId) {
+      return res.status(400).json({ error: "userId is required", bots: [] });
+    }
+    
     console.log("[user-bots] Fetching bots for user:", userId);
 
-    // First get basic bot info
-    const botsResult = await pool.query(
-      `SELECT sb.bot_id, sb.name, sb.description, sb.topic, sb.grade_level, sb.created_at
-       FROM study_bots sb
-       WHERE sb.user_id = $1 
-       ORDER BY sb.created_at DESC 
-       LIMIT 20`,
-      [userId],
-    );
+    // Simple query - just get basic bot info first
+    let botsResult;
+    try {
+      botsResult = await pool.query(
+        `SELECT bot_id, name, description, topic, grade_level, created_at
+         FROM study_bots
+         WHERE user_id = $1 
+         ORDER BY created_at DESC 
+         LIMIT 20`,
+        [userId],
+      );
+    } catch (dbErr) {
+      console.error("[user-bots] Database query failed:", dbErr.message);
+      return res.status(500).json({ 
+        error: "Database query failed", 
+        message: dbErr.message,
+        bots: [] 
+      });
+    }
 
     console.log("[user-bots] Found", botsResult.rows.length, "bots");
 
-    // Enrich each bot with progress and last message
-    const enrichedBots = await Promise.all(
-      botsResult.rows.map(async (bot) => {
-        let progress = { percentage: 0, state: 'intro' };
-        let lastMessage = null;
-        let lastMessageTime = null;
+    // If no bots, return empty array immediately
+    if (botsResult.rows.length === 0) {
+      return res.json({ status: "success", bots: [] });
+    }
 
-        // Get progress
-        try {
-          const progressResult = await pool.query(
-            `SELECT progress_percentage, bot_state FROM bot_progress 
-             WHERE bot_id = $1 AND user_id = $2 LIMIT 1`,
-            [bot.bot_id, userId]
-          );
-          if (progressResult.rows.length > 0) {
-            progress = {
-              percentage: progressResult.rows[0].progress_percentage || 0,
-              state: progressResult.rows[0].bot_state || 'intro'
-            };
-          }
-        } catch (e) {
-          console.warn("[user-bots] Progress fetch failed for", bot.bot_id);
+    // Enrich each bot with progress and last message (with error handling)
+    const enrichedBots = [];
+    
+    for (const bot of botsResult.rows) {
+      let progressPercentage = 0;
+      let botState = 'intro';
+      let lastMessage = null;
+      let lastMessageTime = null;
+
+      // Get progress (non-blocking)
+      try {
+        const progressResult = await pool.query(
+          `SELECT progress_percentage, bot_state FROM bot_progress 
+           WHERE bot_id = $1 AND user_id = $2 LIMIT 1`,
+          [bot.bot_id, userId]
+        );
+        if (progressResult.rows.length > 0) {
+          progressPercentage = progressResult.rows[0].progress_percentage || 0;
+          botState = progressResult.rows[0].bot_state || 'intro';
         }
+      } catch (e) {
+        console.warn("[user-bots] Progress fetch failed for", bot.bot_id, e.message);
+      }
 
-        // Get last message
-        try {
-          const msgResult = await pool.query(
-            `SELECT content, created_at FROM chat_messages 
-             WHERE bot_id = $1 AND user_id = $2 
-             ORDER BY created_at DESC LIMIT 1`,
-            [bot.bot_id, userId]
-          );
-          if (msgResult.rows.length > 0) {
-            const content = msgResult.rows[0].content || '';
-            lastMessage = content.length > 100 ? content.substring(0, 100) + '...' : content;
-            lastMessageTime = msgResult.rows[0].created_at;
-          }
-        } catch (e) {
-          console.warn("[user-bots] Last message fetch failed for", bot.bot_id);
+      // Get last message (non-blocking)
+      try {
+        const msgResult = await pool.query(
+          `SELECT content, created_at FROM chat_messages 
+           WHERE bot_id = $1 AND user_id = $2 
+           ORDER BY created_at DESC LIMIT 1`,
+          [bot.bot_id, userId]
+        );
+        if (msgResult.rows.length > 0) {
+          const content = msgResult.rows[0].content || '';
+          lastMessage = content.length > 100 ? content.substring(0, 100) + '...' : content;
+          lastMessageTime = msgResult.rows[0].created_at;
         }
+      } catch (e) {
+        console.warn("[user-bots] Last message fetch failed for", bot.bot_id, e.message);
+      }
 
-        return {
-          bot_id: bot.bot_id,
-          name: bot.name,
-          description: bot.description,
-          topic: bot.topic,
-          grade_level: bot.grade_level,
-          progress_percentage: progress.percentage,
-          bot_state: progress.state,
-          last_message: lastMessage,
-          last_message_time: lastMessageTime,
-          created_at: bot.created_at,
-        };
-      })
-    );
+      enrichedBots.push({
+        bot_id: bot.bot_id,
+        name: bot.name,
+        description: bot.description,
+        topic: bot.topic,
+        grade_level: bot.grade_level,
+        progress_percentage: progressPercentage,
+        bot_state: botState,
+        last_message: lastMessage,
+        last_message_time: lastMessageTime,
+        created_at: bot.created_at,
+      });
+    }
 
     return res.json({
       status: "success",
