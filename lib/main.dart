@@ -84,6 +84,7 @@ class MyApp extends StatelessWidget {
         '/auth': (_) => AuthScreen(),
         '/profile': (_) => ProfileScreen(),
         '/ai': (_) => const OnlineAiScreen(),
+        '/online-ai': (_) => const OnlineAiScreen(),
         '/offline': (_) => const MainTabs(initialIndex: 2),
         '/study': (_) => const StudyPlanScreen(),
         '/settings': (_) => const SettingsScreen(),
@@ -92,6 +93,7 @@ class MyApp extends StatelessWidget {
         '/notes': (_) => const NotesScreen(),
         '/chat-history': (_) => const ChatHistoryScreen(),
         '/recent-study-bots': (_) => const RecentStudyBotsScreen(),
+        '/bot-history': (_) => const RecentStudyBotsScreen(),
       },
     );
   }

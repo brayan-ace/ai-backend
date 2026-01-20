@@ -1773,55 +1773,38 @@ Always prioritize clarity and professional formatting.`;
       console.warn("[Chat-Enhanced] Progress update failed:", progressErr.message);
     }
 
-    // Persist AI greeting and update bot progress state to avoid repeats
+    // ALWAYS save bot response to chat_messages for conversation history
     try {
-      // If bot progress indicates intro or null, and AI likely sent an initial greeting, insert it and set waiting state
+      await pool.query(
+        `INSERT INTO chat_messages (bot_id, user_id, message_type, content) VALUES ($1, $2, $3, $4)`,
+        [botId, userId, "bot", aiResponse],
+      );
+      console.log("[Chat-Enhanced] 💬 Bot response saved to history");
+    } catch (saveErr) {
+      console.warn("[Chat-Enhanced] Failed to save bot response:", saveErr.message);
+    }
+
+    // Update bot progress state based on conversation flow
+    try {
       const lowerResp = (aiResponse || "").toLowerCase();
       const looksLikeGreeting =
         /hi[,! ]|hello[,! ]|i'm |i am /i.test(lowerResp) ||
         aiResponse.includes("How are you doing");
 
+      let newState = botProgressState;
       if (!botProgressState || botProgressState === "intro") {
-        // Save AI message into chat_messages if not already present
-        try {
-          // Check for duplicate content
-          const dup = await pool.query(
-            `SELECT id FROM chat_messages WHERE bot_id = $1 AND user_id = $2 AND content = $3 LIMIT 1`,
-            [botId, userId, aiResponse],
-          );
-          if (dup.rows.length === 0) {
-            await pool.query(
-              `INSERT INTO chat_messages (bot_id, user_id, message_type, content) VALUES ($1, $2, $3, $4)`,
-              [botId, userId, "bot", aiResponse],
-            );
-          }
-        } catch (insErr) {
-          console.warn(
-            "[Chat-Enhanced] Failed to save AI message:",
-            insErr.message,
-          );
-        }
-
-        // Update bot_progress state
-        try {
-          const newState = looksLikeGreeting ? "waiting_for_user" : "in_study";
-          await pool.query(
-            `UPDATE bot_progress SET bot_state = $1, last_updated = NOW() WHERE bot_id = $2 AND user_id = $3`,
-            [newState, botId, userId],
-          );
-          botProgressState = newState;
-        } catch (stErr) {
-          console.warn(
-            "[Chat-Enhanced] Failed to update bot_progress:",
-            stErr.message,
-          );
-        }
+        newState = looksLikeGreeting ? "waiting_for_user" : "in_study";
+      } else if (studyPlanContext && studyPlanContext.length > 0) {
+        newState = "learning";
       }
-    } catch (persistErr) {
-      console.warn(
-        "[Chat-Enhanced] Greeting persistence check failed:",
-        persistErr.message,
+
+      await pool.query(
+        `UPDATE bot_progress SET bot_state = $1, last_updated = NOW() WHERE bot_id = $2 AND user_id = $3`,
+        [newState, botId, userId],
       );
+      botProgressState = newState;
+    } catch (stErr) {
+      console.warn("[Chat-Enhanced] Failed to update bot_progress:", stErr.message);
     }
 
     return res.json({
@@ -1916,11 +1899,20 @@ app.get("/api/user-bots/:userId", async (req, res) => {
     const { userId } = req.params;
     console.log("[user-bots] Fetching bots for user:", userId);
 
+    // Fetch bots with last message using a subquery
     const result = await pool.query(
-      `SELECT bot_id, name, description, topic, grade_level
-       FROM study_bots 
-       WHERE user_id = $1 
-       ORDER BY bot_id DESC 
+      `SELECT sb.bot_id, sb.name, sb.description, sb.topic, sb.grade_level, sb.created_at,
+              bp.progress_percentage, bp.bot_state,
+              (SELECT content FROM chat_messages cm 
+               WHERE cm.bot_id = sb.bot_id AND cm.user_id = $1 
+               ORDER BY cm.created_at DESC LIMIT 1) as last_message,
+              (SELECT created_at FROM chat_messages cm 
+               WHERE cm.bot_id = sb.bot_id AND cm.user_id = $1 
+               ORDER BY cm.created_at DESC LIMIT 1) as last_message_time
+       FROM study_bots sb
+       LEFT JOIN bot_progress bp ON sb.bot_id = bp.bot_id AND bp.user_id = $1
+       WHERE sb.user_id = $1 
+       ORDER BY COALESCE(last_message_time, sb.created_at) DESC 
        LIMIT 20`,
       [userId],
     );
@@ -1934,6 +1926,11 @@ app.get("/api/user-bots/:userId", async (req, res) => {
         description: bot.description,
         topic: bot.topic,
         grade_level: bot.grade_level,
+        progress_percentage: bot.progress_percentage || 0,
+        bot_state: bot.bot_state || 'intro',
+        last_message: bot.last_message ? (bot.last_message.length > 100 ? bot.last_message.substring(0, 100) + '...' : bot.last_message) : null,
+        last_message_time: bot.last_message_time,
+        created_at: bot.created_at,
       })),
     });
   } catch (err) {

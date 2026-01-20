@@ -232,6 +232,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     defaultValue: 'https://ai-backend-vf75.onrender.com',
   );
 
+  @override
   void initState() {
     super.initState();
     _planService = StudyPlanService();
@@ -1151,6 +1152,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                   case 'main_ai':
                     Navigator.pushNamed(context, '/online-ai');
                     break;
+                  case 'bot_history':
+                    Navigator.pushNamed(context, '/bot-history');
+                    break;
                   case 'chat_history':
                     Navigator.pushNamed(context, '/chat-history');
                     break;
@@ -1177,6 +1181,23 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                       SizedBox(width: 12),
                       Text(
                         'Go to Main AI',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'bot_history',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.school,
+                        color: PremiumColors.accentGradient1,
+                        size: 20,
+                      ),
+                      SizedBox(width: 12),
+                      Text(
+                        'My Study Bots',
                         style: TextStyle(color: Colors.white),
                       ),
                     ],
@@ -1950,10 +1971,15 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
 
   /// Build drawer menu with navigation options
   Widget _buildDrawer() {
+    // Debug: Log study plan state
+    print('[ChatScreen] 🍔 Building drawer - _studyPlan: ${_studyPlan != null ? "EXISTS with ${(_studyPlan!['modules'] as List?)?.length ?? 0} modules" : "NULL"}');
+    
     // Use converted study plan or fallback to botState tableOfContents
     final tocItems = _studyPlan != null
         ? _convertStudyPlanToToc()
         : _botState?.tableOfContents ?? [];
+    
+    print('[ChatScreen] 🍔 tocItems count: ${tocItems.length}');
 
     return PremiumStudyPlanMenu(
       tableOfContents: tocItems.isNotEmpty ? tocItems : null,
@@ -2651,18 +2677,26 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       final uri = Uri.parse(
         '$_backendUrl/api/bot-progress/${widget.botId}/$userId',
       );
+      print('[ChatScreen] 📡 Loading study plan from: $uri');
       final response = await http.get(uri).timeout(const Duration(seconds: 15));
 
+      print('[ChatScreen] 📡 Response status: ${response.statusCode}');
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
+        final loadedPlan = body['study_plan'] as Map<String, dynamic>?;
+        final modules = loadedPlan?['modules'] as List?;
+        
+        print('[ChatScreen] 📡 study_plan in response: ${loadedPlan != null}');
+        print('[ChatScreen] 📡 modules count: ${modules?.length ?? 0}');
+        
         setState(() {
-          _studyPlan = body['study_plan'] as Map<String, dynamic>?;
+          _studyPlan = loadedPlan;
           _planVersion = body['plan_version'] as int? ?? 1;
           _progressPercentage =
               (body['progress']?['percentage'] as num?)?.toDouble() ?? 0.0;
           _botCurrentState = body['bot_state'] as String? ?? 'intro';
         });
-        print('[ChatScreen] Loaded study plan v$_planVersion');
+        print('[ChatScreen] ✅ Loaded study plan v$_planVersion with ${modules?.length ?? 0} modules');
         return true;
       } else if (response.statusCode == 404) {
         // No progress record yet - this is okay for new bots
@@ -2670,6 +2704,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         return false;
       } else {
         print('[ChatScreen] Failed to load study plan: ${response.statusCode}');
+        print('[ChatScreen] Response body: ${response.body}');
         return false;
       }
     } catch (e) {

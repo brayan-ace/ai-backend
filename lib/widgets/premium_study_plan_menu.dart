@@ -446,7 +446,7 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                   color: PremiumColors.accentGradient1.withOpacity(0.3),
                 ),
               ),
-              child: Row(
+              child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
@@ -454,14 +454,24 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                     color: PremiumColors.accentGradient1,
                     size: 20,
                   ),
-                  SizedBox(width: 8),
+                  SizedBox(height: 8),
                   Text(
-                    'Say "Create a study plan" to get started',
+                    'Say "Create a study plan"',
                     style: TextStyle(
                       color: PremiumColors.accentGradient1,
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
                     ),
+                    textAlign: TextAlign.center,
+                  ),
+                  Text(
+                    'to get started',
+                    style: TextStyle(
+                      color: PremiumColors.accentGradient1,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
                 ],
               ),

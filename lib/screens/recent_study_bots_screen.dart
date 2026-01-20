@@ -508,26 +508,64 @@ class _RecentStudyBotsScreenState extends State<RecentStudyBotsScreen> {
                     ),
                   ],
                 ),
-                // Description
-                if (bot['description'] != null &&
-                    (bot['description'] as String).isNotEmpty)
+                // Last Message Preview
+                if (bot['last_message'] != null &&
+                    (bot['last_message'] as String).isNotEmpty)
                   Padding(
                     padding: EdgeInsets.only(top: AppTheme.spaceSm, left: 50),
-                    child: Text(
-                      bot['description'] ?? '',
-                      style: AppTheme.bodySmall.copyWith(
-                        color: AppTheme.textSecondary.withOpacity(0.8),
-                        fontSize: 12,
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryBlue.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                      child: Text(
+                        bot['last_message'] ?? '',
+                        style: AppTheme.bodySmall.copyWith(
+                          color: AppTheme.textSecondary,
+                          fontSize: 11,
+                          fontStyle: FontStyle.italic,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ),
-                // Grade Level
+                // Progress and Grade Level Row
                 Padding(
                   padding: EdgeInsets.only(top: AppTheme.spaceSm, left: 50),
                   child: Row(
                     children: [
+                      // Progress indicator
+                      if (bot['progress_percentage'] != null && (bot['progress_percentage'] as num) > 0) ...[
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryBlue.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.trending_up,
+                                size: 12,
+                                color: AppTheme.primaryBlue,
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                '${(bot['progress_percentage'] as num).toInt()}%',
+                                style: AppTheme.bodySmall.copyWith(
+                                  color: AppTheme.primaryBlue,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                      ],
                       Icon(
                         Icons.school_outlined,
                         size: 13,
