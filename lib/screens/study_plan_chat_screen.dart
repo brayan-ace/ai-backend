@@ -12,8 +12,6 @@ import '../utils/theme.dart';
 import 'study_plan_editor_screen.dart';
 import 'quiz_config_screen.dart';
 import '../widgets/quiz_artifact_widget.dart';
-import '../widgets/study_plan_hamburger_menu.dart';
-import '../widgets/professional_message_widget.dart';
 import '../widgets/premium_study_plan_menu.dart';
 import '../widgets/premium_typing_indicator.dart';
 import '../widgets/premium_message_bubble.dart';
@@ -240,7 +238,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     _flowController = StudyBotFlowController();
     _tutorService = TutorEngagementService();
     _progressService = ProgressTrackingService();
-    
+
     // Add scroll listener for scroll-to-bottom button
     _scrollController.addListener(_onScroll);
 
@@ -260,7 +258,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       _initPhase2();
     }
   }
-  
+
   @override
   void dispose() {
     _inputController.dispose();
@@ -268,7 +266,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     _scrollController.dispose();
     super.dispose();
   }
-  
+
   void _onScroll() {
     if (!_scrollController.hasClients) return;
     final maxScroll = _scrollController.position.maxScrollExtent;
@@ -278,7 +276,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       setState(() => _showScrollToBottom = shouldShow);
     }
   }
-  
+
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
       HapticFeedback.lightImpact();
@@ -677,7 +675,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
           if (moduleCompleted) {
             _showModuleCompletionCelebration(progress);
           }
-          
+
           // Trigger quiz if backend signals it
           if (triggerQuiz) {
             _showQuizPopup();
@@ -690,7 +688,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
               setState(
                 () => _studyPlan = Map<String, dynamic>.from(planPayload),
               );
-              print('[ChatScreen] 📚 Study plan received and set: ${_studyPlan?['modules']?.length ?? 0} modules');
+              print(
+                '[ChatScreen] 📚 Study plan received and set: ${_studyPlan?['modules']?.length ?? 0} modules',
+              );
             }
           }
 
@@ -1061,291 +1061,212 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         key: _scaffoldKey,
         backgroundColor: PremiumColors.darkBg,
         appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: null,
-        title: ShaderMask(
-          shaderCallback: (bounds) => LinearGradient(
-            colors: [
-              PremiumColors.accentGradient2,
-              PremiumColors.accentGradient1,
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ).createShader(bounds),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                widget.botName ?? 'Study Bot',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-              if (_botCurrentState.isNotEmpty)
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: null,
+          title: ShaderMask(
+            shaderCallback: (bounds) => LinearGradient(
+              colors: [
+                PremiumColors.accentGradient2,
+                PremiumColors.accentGradient1,
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ).createShader(bounds),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
-                  _botCurrentState == 'intro'
-                      ? '✨ Ready to learn'
-                      : _botCurrentState == 'plan_review'
-                      ? '📋 Plan ready'
-                      : '🎓 Learning mode',
+                  widget.botName ?? 'Study Bot',
                   style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.white.withOpacity(0.8),
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
                   ),
                 ),
-            ],
-          ),
-        ),
-        actions: [
-          // Bookmark Icon - Study Plan Access
-          if (_botCurrentState == 'learning' ||
-              _botCurrentState == 'plan_review')
-            Padding(
-              padding: EdgeInsets.only(right: 8),
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      PremiumColors.accentGradient2.withOpacity(0.2),
-                      PremiumColors.accentGradient1.withOpacity(0.15),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: PremiumColors.accentGradient1.withOpacity(0.3),
-                    width: 1.5,
-                  ),
-                ),
-                child: IconButton(
-                  icon: Icon(
-                    Icons.bookmark,
-                    color: PremiumColors.accentGradient1,
-                    size: 22,
-                  ),
-                  tooltip: 'View Study Plan',
-                  onPressed: () {
-                    print(
-                      '[ChatScreen] 📖 Bookmark tapped - showing modules modal',
-                    );
-                    _showModulesModal();
-                  },
-                ),
-              ),
-            ),
-          // 3-Dot Menu
-          PopupMenuButton<String>(
-            icon: Icon(Icons.more_vert, color: Colors.white70),
-            color: PremiumColors.cardBg,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(
-                color: PremiumColors.accentGradient1.withOpacity(0.2),
-              ),
-            ),
-            onSelected: (value) {
-              HapticFeedback.selectionClick();
-              switch (value) {
-                case 'main_ai':
-                  Navigator.pushNamed(context, '/online-ai');
-                  break;
-                case 'chat_history':
-                  Navigator.pushNamed(context, '/chat-history');
-                  break;
-                case 'change_mode':
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Mode switching coming soon!'),
-                      backgroundColor: PremiumColors.accentGradient1,
+                if (_botCurrentState.isNotEmpty)
+                  Text(
+                    _botCurrentState == 'intro'
+                        ? '✨ Ready to learn'
+                        : _botCurrentState == 'plan_review'
+                        ? '📋 Plan ready'
+                        : '🎓 Learning mode',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.white.withOpacity(0.8),
                     ),
-                  );
-                  break;
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'main_ai',
-                child: Row(
-                  children: [
-                    Icon(Icons.smart_toy, color: PremiumColors.accentGradient1, size: 20),
-                    SizedBox(width: 12),
-                    Text('Go to Main AI', style: TextStyle(color: Colors.white)),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'chat_history',
-                child: Row(
-                  children: [
-                    Icon(Icons.history, color: PremiumColors.accentGradient1, size: 20),
-                    SizedBox(width: 12),
-                    Text('Chat History', style: TextStyle(color: Colors.white)),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'change_mode',
-                child: Row(
-                  children: [
-                    Icon(Icons.swap_horiz, color: Colors.white54, size: 20),
-                    SizedBox(width: 12),
-                    Text('Change Mode', style: TextStyle(color: Colors.white54)),
-                  ],
-                ),
-              ),
-            ],
+                  ),
+              ],
+            ),
           ),
-        ],
-      ),
-      drawer: _buildDrawer(),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              PremiumColors.darkBg,
-              PremiumColors.darkBg2.withOpacity(0.5),
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Enhanced Progress Bar with Concept Tracking
-              if (_botCurrentState == 'learning')
-                Container(
-                  padding: EdgeInsets.all(AppTheme.spaceMd),
+          actions: [
+            // Bookmark Icon - Study Plan Access
+            if (_botCurrentState == 'learning' ||
+                _botCurrentState == 'plan_review')
+              Padding(
+                padding: EdgeInsets.only(right: 8),
+                child: Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        PremiumColors.accentGradient1.withOpacity(0.08),
-                        PremiumColors.accentGradient2.withOpacity(0.05),
+                        PremiumColors.accentGradient2.withOpacity(0.2),
+                        PremiumColors.accentGradient1.withOpacity(0.15),
                       ],
                     ),
-                    border: Border(
-                      bottom: BorderSide(
-                        color: PremiumColors.accentGradient1.withOpacity(0.2),
-                        width: 1.5,
-                      ),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: PremiumColors.accentGradient1.withOpacity(0.3),
+                      width: 1.5,
                     ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: IconButton(
+                    icon: Icon(
+                      Icons.bookmark,
+                      color: PremiumColors.accentGradient1,
+                      size: 22,
+                    ),
+                    tooltip: 'View Study Plan',
+                    onPressed: () {
+                      print(
+                        '[ChatScreen] 📖 Bookmark tapped - showing modules modal',
+                      );
+                      _showModulesModal();
+                    },
+                  ),
+                ),
+              ),
+            // 3-Dot Menu
+            PopupMenuButton<String>(
+              icon: Icon(Icons.more_vert, color: Colors.white70),
+              color: PremiumColors.cardBg,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(
+                  color: PremiumColors.accentGradient1.withOpacity(0.2),
+                ),
+              ),
+              onSelected: (value) {
+                HapticFeedback.selectionClick();
+                switch (value) {
+                  case 'main_ai':
+                    Navigator.pushNamed(context, '/online-ai');
+                    break;
+                  case 'chat_history':
+                    Navigator.pushNamed(context, '/chat-history');
+                    break;
+                  case 'change_mode':
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Mode switching coming soon!'),
+                        backgroundColor: PremiumColors.accentGradient1,
+                      ),
+                    );
+                    break;
+                }
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'main_ai',
+                  child: Row(
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '🎯 Concepts Mastered',
-                            style: AppTheme.bodySmall.copyWith(
-                              color: Colors.white.withOpacity(0.8),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  PremiumColors.accentGradient2,
-                                  PremiumColors.accentGradient1,
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              '${_progressPercentage.toStringAsFixed(0)}%',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ],
+                      Icon(
+                        Icons.smart_toy,
+                        color: PremiumColors.accentGradient1,
+                        size: 20,
                       ),
-                      SizedBox(height: 12),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: LinearProgressIndicator(
-                          value: _progressPercentage / 100,
-                          minHeight: 6,
-                          backgroundColor: PremiumColors.accentGradient1
-                              .withOpacity(0.15),
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            PremiumColors.accentGradient1,
-                          ),
-                        ),
-                      ),
-                      SizedBox(height: 8),
+                      SizedBox(width: 12),
                       Text(
-                        '✨ Say "I understand" when you master a concept',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.6),
-                          fontStyle: FontStyle.italic,
-                          fontSize: 12,
-                        ),
+                        'Go to Main AI',
+                        style: TextStyle(color: Colors.white),
                       ),
                     ],
                   ),
                 ),
-
-              // Table of Contents (if visible)
-              if (_showToc && _botState?.tableOfContents != null)
-                _buildTableOfContentsWidget(),
-
-              // Chat Messages with Premium Bubbles and Scroll-to-Bottom
-              Expanded(
-                child: Stack(
-                  children: [
-                    ListView.builder(
-                      controller: _scrollController,
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                      itemCount: _messages.length + (_isLoading ? 1 : 0),
-                      itemBuilder: (context, index) {
-                        // Show typing indicator at the end when loading
-                        if (_isLoading && index == _messages.length) {
-                          return PremiumTypingIndicator(
-                            botName: widget.botName,
-                            showAvatar: true,
-                          );
-                        }
-                        
-                        final msg = _messages[index];
-                        final isBot = msg.senderType == 'bot';
-                        final isLastMessage = index == _messages.length - 1;
-                        
-                        return PremiumMessageBubble(
-                          message: msg.text,
-                          isBot: isBot,
-                          timestamp: msg.timestamp,
-                          botName: widget.botName,
-                          showAvatar: isBot,
-                          animate: isLastMessage,
-                          onLongPress: () {
-                            HapticFeedback.mediumImpact();
-                          },
-                        );
-                      },
+                PopupMenuItem(
+                  value: 'chat_history',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.history,
+                        color: PremiumColors.accentGradient1,
+                        size: 20,
+                      ),
+                      SizedBox(width: 12),
+                      Text(
+                        'Chat History',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'change_mode',
+                  child: Row(
+                    children: [
+                      Icon(Icons.swap_horiz, color: Colors.white54, size: 20),
+                      SizedBox(width: 12),
+                      Text(
+                        'Change Mode',
+                        style: TextStyle(color: Colors.white54),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        drawer: _buildDrawer(),
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                PremiumColors.darkBg,
+                PremiumColors.darkBg2.withOpacity(0.5),
+              ],
+            ),
+          ),
+          child: SafeArea(
+            child: Column(
+              children: [
+                // Enhanced Progress Bar with Concept Tracking
+                if (_botCurrentState == 'learning')
+                  Container(
+                    padding: EdgeInsets.all(AppTheme.spaceMd),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          PremiumColors.accentGradient1.withOpacity(0.08),
+                          PremiumColors.accentGradient2.withOpacity(0.05),
+                        ],
+                      ),
+                      border: Border(
+                        bottom: BorderSide(
+                          color: PremiumColors.accentGradient1.withOpacity(0.2),
+                          width: 1.5,
+                        ),
+                      ),
                     ),
-                    // Scroll-to-bottom floating button
-                    if (_showScrollToBottom)
-                      Positioned(
-                        right: 16,
-                        bottom: 16,
-                        child: AnimatedOpacity(
-                          opacity: _showScrollToBottom ? 1.0 : 0.0,
-                          duration: Duration(milliseconds: 200),
-                          child: GestureDetector(
-                            onTap: _scrollToBottom,
-                            child: Container(
-                              padding: EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '🎯 Concepts Mastered',
+                              style: AppTheme.bodySmall.copyWith(
+                                color: Colors.white.withOpacity(0.8),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: [
@@ -1353,38 +1274,135 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                                     PremiumColors.accentGradient1,
                                   ],
                                 ),
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: PremiumColors.accentGradient2.withOpacity(0.4),
-                                    blurRadius: 12,
-                                    spreadRadius: 2,
-                                  ),
-                                ],
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              child: Icon(
-                                Icons.keyboard_arrow_down,
-                                color: Colors.white,
-                                size: 24,
+                              child: Text(
+                                '${_progressPercentage.toStringAsFixed(0)}%',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 12),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: LinearProgressIndicator(
+                            value: _progressPercentage / 100,
+                            minHeight: 6,
+                            backgroundColor: PremiumColors.accentGradient1
+                                .withOpacity(0.15),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              PremiumColors.accentGradient1,
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          '✨ Say "I understand" when you master a concept',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.6),
+                            fontStyle: FontStyle.italic,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                // Table of Contents (if visible)
+                if (_showToc && _botState?.tableOfContents != null)
+                  _buildTableOfContentsWidget(),
+
+                // Chat Messages with Premium Bubbles and Scroll-to-Bottom
+                Expanded(
+                  child: Stack(
+                    children: [
+                      ListView.builder(
+                        controller: _scrollController,
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        itemCount: _messages.length + (_isLoading ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          // Show typing indicator at the end when loading
+                          if (_isLoading && index == _messages.length) {
+                            return PremiumTypingIndicator(
+                              botName: widget.botName,
+                              showAvatar: true,
+                            );
+                          }
+
+                          final msg = _messages[index];
+                          final isBot = msg.senderType == 'bot';
+                          final isLastMessage = index == _messages.length - 1;
+
+                          return PremiumMessageBubble(
+                            message: msg.text,
+                            isBot: isBot,
+                            timestamp: msg.timestamp,
+                            botName: widget.botName,
+                            showAvatar: isBot,
+                            animate: isLastMessage,
+                            onLongPress: () {
+                              HapticFeedback.mediumImpact();
+                            },
+                          );
+                        },
+                      ),
+                      // Scroll-to-bottom floating button
+                      if (_showScrollToBottom)
+                        Positioned(
+                          right: 16,
+                          bottom: 16,
+                          child: AnimatedOpacity(
+                            opacity: _showScrollToBottom ? 1.0 : 0.0,
+                            duration: Duration(milliseconds: 200),
+                            child: GestureDetector(
+                              onTap: _scrollToBottom,
+                              child: Container(
+                                padding: EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      PremiumColors.accentGradient2,
+                                      PremiumColors.accentGradient1,
+                                    ],
+                                  ),
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: PremiumColors.accentGradient2
+                                          .withOpacity(0.4),
+                                      blurRadius: 12,
+                                      spreadRadius: 2,
+                                    ),
+                                  ],
+                                ),
+                                child: Icon(
+                                  Icons.keyboard_arrow_down,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
 
-              // Quick Action Chips (show contextual suggestions)
-              if (!_isLoading && _messages.isNotEmpty)
-                _buildQuickActionChips(),
+                // Quick Action Chips (show contextual suggestions)
+                if (!_isLoading && _messages.isNotEmpty)
+                  _buildQuickActionChips(),
 
-              // Premium Input Area
-              _buildPremiumInputArea(),
-            ],
+                // Premium Input Area
+                _buildPremiumInputArea(),
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -1393,18 +1411,24 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   Widget _buildQuickActionChips() {
     final lastMessage = _messages.isNotEmpty ? _messages.last : null;
     final isBot = lastMessage?.senderType == 'bot';
-    
+
     // Contextual suggestions based on conversation state
     List<String> suggestions = [];
-    
+
     if (_botCurrentState == 'waiting_for_user' || _botCurrentState == 'intro') {
       suggestions = ['Yes, create my plan', 'Tell me more', 'What topics?'];
-    } else if (_botCurrentState == 'in_study' || _botCurrentState == 'learning') {
-      suggestions = ['I understand', 'Explain more', 'Give an example', 'Next topic'];
+    } else if (_botCurrentState == 'in_study' ||
+        _botCurrentState == 'learning') {
+      suggestions = [
+        'I understand',
+        'Explain more',
+        'Give an example',
+        'Next topic',
+      ];
     } else {
       suggestions = ['Continue', 'I understand', 'Tell me more'];
     }
-    
+
     return Container(
       padding: EdgeInsets.only(bottom: 8),
       child: SingleChildScrollView(
@@ -1584,11 +1608,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                           strokeWidth: 2,
                         ),
                       )
-                    : Icon(
-                        Icons.arrow_upward,
-                        color: Colors.white,
-                        size: 22,
-                      ),
+                    : Icon(Icons.arrow_upward, color: Colors.white, size: 22),
                 onPressed: _isLoading
                     ? null
                     : () {
@@ -1690,10 +1710,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
             child: Icon(icon, color: PremiumColors.accentGradient1, size: 28),
           ),
           SizedBox(height: 8),
-          Text(
-            label,
-            style: TextStyle(color: Colors.white70, fontSize: 12),
-          ),
+          Text(label, style: TextStyle(color: Colors.white70, fontSize: 12)),
         ],
       ),
     );
@@ -1908,18 +1925,24 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   /// Convert backend study plan to TableOfContentsItem list
   List<TableOfContentsItem> _convertStudyPlanToToc() {
     if (_studyPlan == null) return [];
-    
+
     final modules = _studyPlan!['modules'] as List? ?? [];
     return modules.asMap().entries.map((entry) {
       final idx = entry.key;
       final mod = entry.value as Map<String, dynamic>;
-      
+
       return TableOfContentsItem(
         moduleNumber: idx + 1,
         title: mod['title'] ?? mod['module_name'] ?? 'Module ${idx + 1}',
         description: mod['objective'] ?? mod['description'] ?? '',
-        subtopics: List<String>.from(mod['key_topics'] ?? mod['subtopics'] ?? mod['learning_objectives'] ?? []),
-        estimatedTime: mod['estimated_effort'] ?? mod['duration'] ?? '30 minutes',
+        subtopics: List<String>.from(
+          mod['key_topics'] ??
+              mod['subtopics'] ??
+              mod['learning_objectives'] ??
+              [],
+        ),
+        estimatedTime:
+            mod['estimated_effort'] ?? mod['duration'] ?? '30 minutes',
         difficultyLevel: mod['difficulty'] ?? 'Medium',
       );
     }).toList();
@@ -1928,10 +1951,10 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   /// Build drawer menu with navigation options
   Widget _buildDrawer() {
     // Use converted study plan or fallback to botState tableOfContents
-    final tocItems = _studyPlan != null 
-        ? _convertStudyPlanToToc() 
+    final tocItems = _studyPlan != null
+        ? _convertStudyPlanToToc()
         : _botState?.tableOfContents ?? [];
-    
+
     return PremiumStudyPlanMenu(
       tableOfContents: tocItems.isNotEmpty ? tocItems : null,
       currentModule: _botState?.currentModule ?? 0,
@@ -2413,13 +2436,15 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
           ),
         );
       }
-      
+
       final loaded = await _loadStudyPlan();
       if (!loaded || _studyPlan == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('No study plan available yet. Ask your tutor to create one!'),
+              content: Text(
+                'No study plan available yet. Ask your tutor to create one!',
+              ),
               backgroundColor: Colors.orange,
               duration: Duration(seconds: 3),
             ),
@@ -2461,14 +2486,14 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     bool apply = true,
   }) async {
     // Store backup of current plan in case save fails
-    final backupPlan = _studyPlan != null 
-        ? Map<String, dynamic>.from(_studyPlan!) 
+    final backupPlan = _studyPlan != null
+        ? Map<String, dynamic>.from(_studyPlan!)
         : null;
     final backupVersion = _planVersion;
 
     try {
       // Validate plan structure before saving
-      if (updatedPlan['modules'] == null || 
+      if (updatedPlan['modules'] == null ||
           !(updatedPlan['modules'] is List) ||
           (updatedPlan['modules'] as List).isEmpty) {
         if (mounted) {
@@ -2487,7 +2512,8 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       for (int i = 0; i < (updatedPlan['modules'] as List).length; i++) {
         final mod = updatedPlan['modules'][i] as Map<String, dynamic>;
         if ((mod['title'] == null || mod['title'].toString().isEmpty) &&
-            (mod['module_name'] == null || mod['module_name'].toString().isEmpty)) {
+            (mod['module_name'] == null ||
+                mod['module_name'].toString().isEmpty)) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -2522,7 +2548,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
         final newVersion = body['plan_version'] as int? ?? (_planVersion + 1);
-        
+
         setState(() {
           _planVersion = newVersion;
         });
@@ -2530,35 +2556,40 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('✅ Study plan saved (v$newVersion)! AI will adapt to your changes.'),
+              content: Text(
+                '✅ Study plan saved (v$newVersion)! AI will adapt to your changes.',
+              ),
               backgroundColor: Colors.green,
               duration: Duration(seconds: 3),
             ),
           );
         }
         print('[ChatScreen] Plan applied successfully, version: $newVersion');
-        
+
         // Notify AI about plan update
-        await _addBotMessage("Got it — I've updated our study route. We'll continue with the revised plan.");
-        
+        await _addBotMessage(
+          "Got it — I've updated our study route. We'll continue with the revised plan.",
+        );
       } else if (response.statusCode == 400 || response.statusCode == 404) {
         // Fallback to update endpoint if apply not available
         final fallbackUri = Uri.parse('$_backendUrl/api/update-study-plan');
-        final fallbackResp = await http.post(
-          fallbackUri,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'botId': widget.botId,
-            'userId': userId,
-            'updatedPlan': updatedPlan,
-            'apply': apply,
-          }),
-        ).timeout(const Duration(seconds: 30));
+        final fallbackResp = await http
+            .post(
+              fallbackUri,
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({
+                'botId': widget.botId,
+                'userId': userId,
+                'updatedPlan': updatedPlan,
+                'apply': apply,
+              }),
+            )
+            .timeout(const Duration(seconds: 30));
 
         if (fallbackResp.statusCode == 200) {
           final body = jsonDecode(fallbackResp.body);
           final newVersion = body['plan_version'] as int? ?? (_planVersion + 1);
-          
+
           setState(() {
             _planVersion = newVersion;
           });
@@ -2579,7 +2610,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       }
     } catch (e) {
       print('[ChatScreen] Error saving plan: $e');
-      
+
       // Restore backup on failure - don't lose local edits
       if (backupPlan != null) {
         setState(() {
@@ -2587,12 +2618,14 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
           _planVersion = backupVersion;
         });
       }
-      
+
       if (mounted) {
         // Show retry option
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('❌ Failed to save plan. Your changes are preserved locally.'),
+            content: Text(
+              '❌ Failed to save plan. Your changes are preserved locally.',
+            ),
             backgroundColor: Colors.red,
             duration: Duration(seconds: 5),
             action: SnackBarAction(
@@ -2625,7 +2658,8 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         setState(() {
           _studyPlan = body['study_plan'] as Map<String, dynamic>?;
           _planVersion = body['plan_version'] as int? ?? 1;
-          _progressPercentage = (body['progress']?['percentage'] as num?)?.toDouble() ?? 0.0;
+          _progressPercentage =
+              (body['progress']?['percentage'] as num?)?.toDouble() ?? 0.0;
           _botCurrentState = body['bot_state'] as String? ?? 'intro';
         });
         print('[ChatScreen] Loaded study plan v$_planVersion');
@@ -2663,7 +2697,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     final percentage = progress?['percentage'] ?? 0;
     final currentModule = (progress?['currentModule'] ?? 0) + 1;
     final completedCount = progress?['completedModules'] ?? 1;
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -2676,10 +2710,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  PremiumColors.cardBg,
-                  PremiumColors.darkBg2,
-                ],
+                colors: [PremiumColors.cardBg, PremiumColors.darkBg2],
               ),
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
@@ -2718,14 +2749,11 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                     ],
                   ),
                   child: Center(
-                    child: Text(
-                      '🎉',
-                      style: TextStyle(fontSize: 40),
-                    ),
+                    child: Text('🎉', style: TextStyle(fontSize: 40)),
                   ),
                 ),
                 SizedBox(height: 20),
-                
+
                 // Title
                 Text(
                   'Module Complete!',
@@ -2736,18 +2764,15 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                   ),
                 ),
                 SizedBox(height: 8),
-                
+
                 // Subtitle
                 Text(
                   'Great job! You\'ve mastered this module.',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.white70,
-                  ),
+                  style: TextStyle(fontSize: 14, color: Colors.white70),
                   textAlign: TextAlign.center,
                 ),
                 SizedBox(height: 24),
-                
+
                 // Progress indicator
                 Container(
                   padding: EdgeInsets.all(16),
@@ -2799,7 +2824,8 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                               borderRadius: BorderRadius.circular(4),
                               boxShadow: [
                                 BoxShadow(
-                                  color: PremiumColors.accentGradient1.withOpacity(0.5),
+                                  color: PremiumColors.accentGradient1
+                                      .withOpacity(0.5),
                                   blurRadius: 6,
                                 ),
                               ],
@@ -2810,16 +2836,13 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                       SizedBox(height: 12),
                       Text(
                         '$completedCount modules completed',
-                        style: TextStyle(
-                          color: Colors.white54,
-                          fontSize: 11,
-                        ),
+                        style: TextStyle(color: Colors.white54, fontSize: 11),
                       ),
                     ],
                   ),
                 ),
                 SizedBox(height: 24),
-                
+
                 // Continue button
                 SizedBox(
                   width: double.infinity,
@@ -3238,11 +3261,5 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         lowerMessage.contains('again') ||
         lowerMessage.contains('huh') ||
         lowerMessage.contains('what');
-  }
-
-  @override
-  void dispose() {
-    _inputController.dispose();
-    super.dispose();
   }
 }
