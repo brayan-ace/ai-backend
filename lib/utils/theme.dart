@@ -285,30 +285,30 @@ class AppTheme {
       primary: primaryBlueDark,
       secondary: primaryBlue,
       tertiary: accentBlue,
-      surface: Color(0xFFF5F7FA),
-      background: Color(0xFFFFFFFF),
+      surface: Color(0xFFFFFFFF), // White surfaces
+      background: Color(0xFFFFFFFF), // White background
       error: error,
       onPrimary: Colors.white,
       onSecondary: Colors.white,
-      onSurface: Color(0xFF1A1D2E),
-      onBackground: Color(0xFF1A1D2E),
+      onSurface: Color(0xFFFFFFFF), // White text on surfaces
+      onBackground: Color(0xFFFFFFFF), // White text on background
       onError: Colors.white,
     ),
-    scaffoldBackgroundColor: Color(0xFFF5F7FA),
+    scaffoldBackgroundColor: Color(0xFFFFFFFF), // White scaffold
     textTheme: TextTheme(
-      displayLarge: displayLarge.copyWith(color: Color(0xFF1A1D2E)),
-      displayMedium: displayMedium.copyWith(color: Color(0xFF1A1D2E)),
-      headlineLarge: headlineLarge.copyWith(color: Color(0xFF1A1D2E)),
-      headlineMedium: headlineMedium.copyWith(color: Color(0xFF1A1D2E)),
-      bodyLarge: bodyLarge.copyWith(color: Color(0xFF4A5568)),
-      bodyMedium: bodyMedium.copyWith(color: Color(0xFF4A5568)),
-      bodySmall: bodySmall.copyWith(color: Color(0xFF718096)),
-      labelLarge: labelLarge.copyWith(color: Color(0xFF1A1D2E)),
-      labelMedium: labelMedium.copyWith(color: Color(0xFF4A5568)),
+      displayLarge: displayLarge.copyWith(color: Color(0xFFFFFFFF)), // White text
+      displayMedium: displayMedium.copyWith(color: Color(0xFFFFFFFF)), // White text
+      headlineLarge: headlineLarge.copyWith(color: Color(0xFFFFFFFF)), // White text
+      headlineMedium: headlineMedium.copyWith(color: Color(0xFFFFFFFF)), // White text
+      bodyLarge: bodyLarge.copyWith(color: Color(0xFFFFFFFF)), // White text
+      bodyMedium: bodyMedium.copyWith(color: Color(0xFFFFFFFF)), // White text
+      bodySmall: bodySmall.copyWith(color: Color(0xFFFFFFFF)), // White text
+      labelLarge: labelLarge.copyWith(color: Color(0xFFFFFFFF)), // White text
+      labelMedium: labelMedium.copyWith(color: Color(0xFFFFFFFF)), // White text
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: Colors.white,
+      fillColor: Color(0xFFF5F7FA), // Light input background
       contentPadding: EdgeInsets.symmetric(
         horizontal: spaceMd,
         vertical: spaceMd,
@@ -345,7 +345,7 @@ class AppTheme {
     ),
     cardTheme: CardThemeData(
       elevation: 0,
-      color: Colors.white,
+      color: Color(0xFFFFFFFF), // White cards
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(radiusLg),
       ),

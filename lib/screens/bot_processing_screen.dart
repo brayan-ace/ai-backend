@@ -9,8 +9,8 @@ import 'study_plan_chat_screen.dart';
 class PremiumColors {
   static const Color darkBg = Color(0xFF0a0a0a); // Pure black
   static const Color darkBg2 = Color(0xFF1a1a2e); // Deep blue-black
-  static const Color accentGradient1 = Color(0xFF6366f1); // Indigo
-  static const Color accentGradient2 = Color(0xFF8b5cf6); // Purple
+  static const Color accentGradient1 = Color(0xFF2196F3); // Blue
+  static const Color accentGradient2 = Color(0xFF1976D2); // Darker blue
   static const Color accentGradient3 = Color(0xFF3b82f6); // Blue
   static const Color cardBg = Color(0xFF111827); // Very dark gray
   static const Color focusBorder = Color(0xFF4f46e5); // Focus blue
@@ -240,7 +240,8 @@ class _BotProcessingScreenState extends State<BotProcessingScreen> {
                       padding: EdgeInsets.all(24),
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
-                          minHeight: constraints.maxHeight - 48, // Account for padding
+                          minHeight:
+                              constraints.maxHeight - 48, // Account for padding
                         ),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,

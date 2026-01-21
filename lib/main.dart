@@ -11,6 +11,10 @@ import 'screens/main_tabs.dart';
 import 'screens/online_ai_screen.dart';
 import 'screens/study_plan_screen_phase1.dart';
 import 'screens/settings_screen.dart';
+import 'screens/settings_screen_new.dart';
+import 'screens/profile_settings_screen.dart';
+import 'screens/capabilities_screen.dart';
+import 'screens/placeholder_screen.dart';
 import 'screens/api_test_screen.dart';
 import 'screens/notes_screen.dart';
 import 'screens/chat_history_screen.dart';
@@ -87,7 +91,14 @@ class MyApp extends StatelessWidget {
         '/online-ai': (_) => const OnlineAiScreen(),
         '/offline': (_) => const MainTabs(initialIndex: 2),
         '/study': (_) => const StudyPlanScreen(),
-        '/settings': (_) => const SettingsScreen(),
+        '/settings': (_) => const SettingsScreenNew(),
+        '/settings-old': (_) => const SettingsScreen(),
+        '/profile-settings': (_) => const ProfileSettingsScreen(),
+        '/capabilities': (_) => const CapabilitiesScreen(),
+        '/billing': (_) => const PlaceholderScreen(title: 'Billing', message: 'Billing features coming soon'),
+        '/permissions': (_) => const PlaceholderScreen(title: 'Permissions', message: 'Permissions will be configurable here soon'),
+        '/speech-language': (_) => const PlaceholderScreen(title: 'Speech Language', message: 'Speech language settings coming soon'),
+        '/privacy': (_) => const PlaceholderScreen(title: 'Privacy', message: 'Privacy settings coming soon'),
         '/home': (_) => const HomeScreen(),
         '/api-test': (_) => const ApiTestScreen(),
         '/notes': (_) => const NotesScreen(),

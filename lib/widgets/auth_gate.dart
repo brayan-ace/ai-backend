@@ -5,6 +5,7 @@ import '../screens/welcome_screen.dart';
 import '../screens/email_verification_screen.dart';
 import '../screens/main_tabs.dart';
 import '../utils/theme.dart';
+import '../widgets/new_app_icon.dart';
 
 /// AuthGate - Centralized authentication state management
 /// 
@@ -159,44 +160,7 @@ class _AuthGateState extends State<AuthGate> with SingleTickerProviderStateMixin
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Animated logo
-            TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0.8, end: 1.0),
-              duration: const Duration(milliseconds: 800),
-              curve: Curves.easeOutBack,
-              builder: (context, scale, child) {
-                return Transform.scale(
-                  scale: scale,
-                  child: child,
-                );
-              },
-              child: Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: AppTheme.primaryGradient,
-                  ),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.primaryBlue.withOpacity(0.4),
-                      blurRadius: 30,
-                      spreadRadius: 5,
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.psychology_rounded,
-                  size: 60,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-            const SizedBox(height: 32),
-            // App name with fade in
+            // App name with fade in (no icon)
             TweenAnimationBuilder<double>(
               tween: Tween(begin: 0.0, end: 1.0),
               duration: const Duration(milliseconds: 600),
