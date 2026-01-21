@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import '../utils/theme.dart';
 import '../utils/theme_provider.dart';
+import '../services/onboarding_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -330,6 +331,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _buildDivider(),
                   _tile(
                     context,
+                    icon: Icons.restart_alt,
+                    title: 'Reset Onboarding',
+                    subtitle: 'Show welcome tutorial again',
+                    gradient: [Colors.purple, Colors.pink],
+                    onTap: () => _resetOnboarding(),
+                  ),
+                  _buildDivider(),
+                  _tile(
+                    context,
                     icon: Icons.notifications,
                     title: 'Notifications',
                     subtitle: _notificationsEnabled ? 'Enabled' : 'Disabled',
@@ -592,6 +602,70 @@ class _SettingsScreenState extends State<SettingsScreen> {
         );
       },
     );
+  }
+
+  void _resetOnboarding() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: AppTheme.surfaceElevated,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.restart_alt, color: AppTheme.primaryBlue),
+              SizedBox(width: AppTheme.spaceSm),
+              Text(
+                'Reset Onboarding',
+                style: AppTheme.headlineMedium.copyWith(
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            'This will show the welcome tutorial again the next time you open the app. Continue?',
+            style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(
+                'Cancel',
+                style: AppTheme.labelLarge.copyWith(
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryBlue,
+                foregroundColor: Colors.black,
+              ),
+              child: Text('Reset'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      await OnboardingService.resetOnboarding();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Onboarding tutorial will show again next time you open the app',
+            ),
+            backgroundColor: AppTheme.success,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   void _showDataManagementDialog() {

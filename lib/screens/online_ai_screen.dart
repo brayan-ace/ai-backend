@@ -2944,479 +2944,498 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
     return Stack(
       children: [
         Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppTheme.backgroundGradientStart,
-            AppTheme.backgroundGradientEnd,
-          ],
-        ),
-      ),
-      child: Scaffold(
-        key: _scaffoldKey,
-        backgroundColor: Colors.transparent,
-        extendBodyBehindAppBar: true,
-        drawerEnableOpenDragGesture: true,
-        drawer: _buildDrawer(),
-        appBar: PreferredSize(
-          preferredSize: Size.fromHeight(60),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  AppTheme.backgroundDeep.withOpacity(0.95),
-                  AppTheme.backgroundDeep.withOpacity(0.9),
-                ],
-              ),
-              border: Border(
-                bottom: BorderSide(
-                  color: AppTheme.surfaceElevated.withOpacity(0.1),
-                  width: 0.5,
-                ),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 8,
-                  offset: Offset(0, 2),
-                ),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppTheme.backgroundGradientStart,
+                AppTheme.backgroundGradientEnd,
               ],
             ),
-            child: AppBar(
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              leading: Container(
-                margin: EdgeInsets.only(left: 16),
+            // Add any additional widgets or logic here
+          ),
+          child: Scaffold(
+            key: _scaffoldKey,
+            backgroundColor: Colors.transparent,
+            extendBodyBehindAppBar: true,
+            drawerEnableOpenDragGesture: true,
+            drawer: _buildDrawer(),
+            appBar: PreferredSize(
+              preferredSize: Size.fromHeight(60),
+              child: Container(
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppTheme.surfaceCard.withOpacity(0.8),
-                  border: Border.all(
-                    color: AppTheme.surfaceElevated.withOpacity(0.2),
-                    width: 1,
-                  ),
-                ),
-                child: IconButton(
-                  key: OnboardingConfig.hamburgerMenuKey,
-                  icon: Icon(Icons.menu, color: AppTheme.textPrimary, size: 20),
-                  onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-                  padding: EdgeInsets.all(8),
-                  constraints: BoxConstraints(),
-                ),
-              ),
-              title: InkWell(
-                onTap: _showModelSelector,
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.surfaceCard.withOpacity(0.6),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: AppTheme.surfaceElevated.withOpacity(0.3),
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      ShaderMask(
-                        shaderCallback: (bounds) => LinearGradient(
-                          colors: AppTheme.primaryGradient,
-                        ).createShader(bounds),
-                        child: Text(
-                          _selectedModel,
-                          style: AppTheme.headlineSmall.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: 6),
-                      Icon(
-                        Icons.keyboard_arrow_down,
-                        color: AppTheme.textSecondary,
-                        size: 18,
-                      ),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      AppTheme.backgroundDeep.withOpacity(0.95),
+                      AppTheme.backgroundDeep.withOpacity(0.9),
                     ],
                   ),
+                  border: Border(
+                    bottom: BorderSide(
+                      color: AppTheme.surfaceElevated.withOpacity(0.1),
+                      width: 0.5,
+                    ),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
                 ),
-              ),
-              centerTitle: true,
-              actions: [
-                Container(
-                  margin: EdgeInsets.only(right: 16),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppTheme.surfaceCard.withOpacity(0.8),
-                    border: Border.all(
-                      color: AppTheme.surfaceElevated.withOpacity(0.2),
-                      width: 1,
-                    ),
-                  ),
-                  child: IconButton(
-                    icon: Icon(
-                      _responseMode == 'detailed'
-                          ? Icons.menu_book
-                          : Icons.flash_on,
-                      color: AppTheme.textPrimary,
-                      size: 20,
-                    ),
-                    tooltip: _responseMode == 'detailed'
-                        ? 'Detailed mode'
-                        : 'Normal mode',
-                    onPressed: () => setState(
-                      () => _responseMode = _responseMode == 'detailed'
-                          ? 'normal'
-                          : 'detailed',
-                    ),
-                    padding: EdgeInsets.all(8),
-                    constraints: BoxConstraints(),
-                  ),
-                ),
-                Container(
-                  margin: EdgeInsets.only(right: 16),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppTheme.surfaceCard.withOpacity(0.8),
-                    border: Border.all(
-                      color: AppTheme.surfaceElevated.withOpacity(0.2),
-                      width: 1,
-                    ),
-                  ),
-                  child: IconButton(
-                    icon: Icon(
-                      Icons.more_vert,
-                      color: AppTheme.textPrimary,
-                      size: 20,
-                    ),
-                    onPressed: _openMenu,
-                    padding: EdgeInsets.all(8),
-                    constraints: BoxConstraints(),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        body: GestureDetector(
-          onHorizontalDragEnd: (details) {
-            if (details.primaryVelocity! < -300) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const NotesScreen()),
-              );
-            } else if (details.primaryVelocity! > 300) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ChatHistoryScreen()),
-              );
-            }
-          },
-          onTap: () {
-            // Handle single tap if needed
-          },
-          onDoubleTap: () {
-            _toggleFullScreen();
-          },
-          child: SafeArea(
-            bottom: false,
-            child: Column(
-              children: [
-                Expanded(
-                  child: Stack(
-                    children: [
-                      _showGreeting && _messages.isEmpty
-                          ? _buildGreetingUI()
-                          : ListView.builder(
-                              controller: _messageScrollController,
-                              padding: EdgeInsets.fromLTRB(
-                                20,
-                                20,
-                                20,
-                                _isFullScreen
-                                    ? 20
-                                    : 120, // Adjust padding based on full-screen mode
-                              ),
-                              itemCount: _messages.length,
-                              itemBuilder: (context, i) {
-                                final m = _messages[i];
-
-                                if (m.isTyping) {
-                                  return Padding(
-                                    padding: EdgeInsets.only(bottom: 24),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.start,
-                                      children: [
-                                        TypingIndicator(
-                                          message:
-                                              _currentStatusMessage.isNotEmpty
-                                              ? _currentStatusMessage
-                                              : 'Generating response...',
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                }
-
-                                if (m.isStreaming) {
-                                  return Padding(
-                                    padding: EdgeInsets.only(bottom: 24),
-                                    child: Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Expanded(
-                                          child: AiMessageBubble(
-                                            text: m.text,
-                                            fromUser: m.fromUser,
-                                            imagePath: m.imagePath,
-                                            gradientColors:
-                                                AppTheme.surfaceGradient,
-                                            detailedByDefault:
-                                                _responseMode == 'detailed',
-                                          ),
-                                        ),
-                                        Padding(
-                                          padding: EdgeInsets.only(
-                                            left: 8,
-                                            top: 16,
-                                          ),
-                                          child: TypingIndicator(),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                }
-
-                                return Padding(
-                                  padding: EdgeInsets.only(bottom: 24),
-                                  child: AiMessageBubble(
-                                    text: m.text,
-                                    fromUser: m.fromUser,
-                                    imagePath: m.imagePath,
-                                    gradientColors: m.fromUser
-                                        ? AppTheme.primaryGradient
-                                        : AppTheme.surfaceGradient,
-                                    detailedByDefault:
-                                        _responseMode == 'detailed',
-                                  ),
-                                );
-                              },
-                            ),
-                      _buildScrollButton(),
-                    ],
-                  ),
-                ),
-
-                // Input area - hide in full screen mode
-                if (!_isFullScreen)
-                  Container(
+                child: AppBar(
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  leading: Container(
+                    margin: EdgeInsets.only(left: 16),
                     decoration: BoxDecoration(
-                      color: AppTheme.backgroundDeep,
-                      border: Border(
-                        top: BorderSide(
-                          color: AppTheme.surfaceElevated.withOpacity(0.1),
-                          width: 0.5,
-                        ),
+                      shape: BoxShape.circle,
+                      color: AppTheme.surfaceCard.withOpacity(0.8),
+                      border: Border.all(
+                        color: AppTheme.surfaceElevated.withOpacity(0.2),
+                        width: 1,
                       ),
                     ),
-                    padding: EdgeInsets.fromLTRB(
-                      16,
-                      16,
-                      16,
-                      16 + MediaQuery.of(context).viewInsets.bottom,
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (_selectedImage != null)
-                          Container(
-                            margin: EdgeInsets.only(bottom: 16),
-                            padding: EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: AppTheme.surfaceCard,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: AppTheme.surfaceElevated.withOpacity(
-                                  0.3,
-                                ),
-                                width: 1,
-                              ),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Image.file(
-                                    _selectedImage!,
-                                    height: 60,
-                                    width: 60,
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                                SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        _selectedFileName ?? 'Image selected',
-                                        style: AppTheme.bodyMedium.copyWith(
-                                          color: AppTheme.textPrimary,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      SizedBox(height: 4),
-                                      Text(
-                                        'Attached to message',
-                                        style: AppTheme.bodySmall.copyWith(
-                                          color: AppTheme.textTertiary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: Icon(
-                                    Icons.close,
-                                    color: AppTheme.textTertiary,
-                                    size: 20,
-                                  ),
-                                  onPressed: () {
-                                    setState(() {
-                                      _selectedImage = null;
-                                      _selectedFileName = null;
-                                    });
-                                  },
-                                  padding: EdgeInsets.all(4),
-                                  constraints: BoxConstraints(),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                        // Main input container - ChatGPT style
-                        Container(
-                          constraints: BoxConstraints(
-                            minHeight: 56,
-                            maxHeight: 120,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppTheme.surfaceCard,
-                            borderRadius: BorderRadius.circular(28),
-                            border: Border.all(
-                              color: AppTheme.surfaceElevated.withOpacity(0.2),
-                              width: 1,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.08),
-                                blurRadius: 12,
-                                offset: Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              // Attachment button
-                              Container(
-                                margin: EdgeInsets.only(left: 8, bottom: 8),
-                                child: IconButton(
-                                  icon: Icon(
-                                    Icons.add,
-                                    color: AppTheme.textSecondary,
-                                    size: 22,
-                                  ),
-                                  onPressed: _showInputOptionsBottomSheet,
-                                  padding: EdgeInsets.all(8),
-                                  constraints: BoxConstraints(
-                                    minWidth: 40,
-                                    minHeight: 40,
-                                  ),
-                                ),
-                              ),
-
-                              // Text input
-                              Expanded(
-                                child: TextField(
-                                  key: OnboardingConfig.chatInputKey,
-                                  controller: _controller,
-                                  textInputAction: TextInputAction.newline,
-                                  maxLines: null,
-                                  keyboardType: TextInputType.multiline,
-                                  style: AppTheme.bodyLarge.copyWith(
-                                    color: AppTheme.textPrimary,
-                                    fontSize: 16,
-                                    height: 1.4,
-                                  ),
-                                  onChanged: (value) {
-                                    setState(() {});
-                                  },
-                                  decoration: InputDecoration(
-                                    hintText: 'Message $_selectedModel...',
-                                    hintStyle: AppTheme.bodyMedium.copyWith(
-                                      color: AppTheme.textTertiary,
-                                      fontSize: 16,
-                                    ),
-                                    border: InputBorder.none,
-                                    enabledBorder: InputBorder.none,
-                                    focusedBorder: InputBorder.none,
-                                    filled: false,
-                                    isDense: true,
-                                    contentPadding: EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 16,
-                                    ),
-                                  ),
-                                ),
-                              ),
-
-                              // Voice button
-                              Container(
-                                margin: EdgeInsets.only(bottom: 8),
-                                child: IconButton(
-                                  icon: Icon(
-                                    Icons.mic_none,
-                                    color: AppTheme.textSecondary,
-                                    size: 22,
-                                  ),
-                                  onPressed: _toggleListening,
-                                  padding: EdgeInsets.all(8),
-                                  constraints: BoxConstraints(
-                                    minWidth: 40,
-                                    minHeight: 40,
-                                  ),
-                                ),
-                              ),
-
-                              // Send button
-                              Container(
-                                margin: EdgeInsets.only(right: 8, bottom: 8),
-                                child: _buildSendButton(),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                    child: IconButton(
+                      key: OnboardingConfig.hamburgerMenuKey,
+                      icon: Icon(
+                        Icons.menu,
+                        color: AppTheme.textPrimary,
+                        size: 20,
+                      ),
+                      onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                      padding: EdgeInsets.all(8),
+                      constraints: BoxConstraints(),
                     ),
                   ),
-              ],
+                  title: InkWell(
+                    onTap: _showModelSelector,
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceCard.withOpacity(0.6),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: AppTheme.surfaceElevated.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ShaderMask(
+                            shaderCallback: (bounds) => LinearGradient(
+                              colors: AppTheme.primaryGradient,
+                            ).createShader(bounds),
+                            child: Text(
+                              _selectedModel,
+                              style: AppTheme.headlineSmall.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 6),
+                          Icon(
+                            Icons.keyboard_arrow_down,
+                            color: AppTheme.textSecondary,
+                            size: 18,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  centerTitle: true,
+                  actions: [
+                    Container(
+                      margin: EdgeInsets.only(right: 16),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppTheme.surfaceCard.withOpacity(0.8),
+                        border: Border.all(
+                          color: AppTheme.surfaceElevated.withOpacity(0.2),
+                          width: 1,
+                        ),
+                      ),
+                      child: IconButton(
+                        icon: Icon(
+                          _responseMode == 'detailed'
+                              ? Icons.menu_book
+                              : Icons.flash_on,
+                          color: AppTheme.textPrimary,
+                          size: 20,
+                        ),
+                        tooltip: _responseMode == 'detailed'
+                            ? 'Detailed mode'
+                            : 'Normal mode',
+                        onPressed: () => setState(
+                          () => _responseMode = _responseMode == 'detailed'
+                              ? 'normal'
+                              : 'detailed',
+                        ),
+                        padding: EdgeInsets.all(8),
+                        constraints: BoxConstraints(),
+                      ),
+                    ),
+                    Container(
+                      margin: EdgeInsets.only(right: 16),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppTheme.surfaceCard.withOpacity(0.8),
+                        border: Border.all(
+                          color: AppTheme.surfaceElevated.withOpacity(0.2),
+                          width: 1,
+                        ),
+                      ),
+                      child: IconButton(
+                        icon: Icon(
+                          Icons.more_vert,
+                          color: AppTheme.textPrimary,
+                          size: 20,
+                        ),
+                        onPressed: _openMenu,
+                        padding: EdgeInsets.all(8),
+                        constraints: BoxConstraints(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            body: GestureDetector(
+              onHorizontalDragEnd: (details) {
+                if (details.primaryVelocity! < -300) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const NotesScreen()),
+                  );
+                } else if (details.primaryVelocity! > 300) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ChatHistoryScreen(),
+                    ),
+                  );
+                }
+              },
+              onTap: () {
+                // Handle single tap if needed
+              },
+              onDoubleTap: () {
+                _toggleFullScreen();
+              },
+              child: SafeArea(
+                bottom: false,
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: Stack(
+                        children: [
+                          _showGreeting && _messages.isEmpty
+                              ? _buildGreetingUI()
+                              : ListView.builder(
+                                  controller: _messageScrollController,
+                                  padding: EdgeInsets.fromLTRB(
+                                    20,
+                                    20,
+                                    20,
+                                    _isFullScreen
+                                        ? 20
+                                        : 120, // Adjust padding based on full-screen mode
+                                  ),
+                                  itemCount: _messages.length,
+                                  itemBuilder: (context, i) {
+                                    final m = _messages[i];
+
+                                    if (m.isTyping) {
+                                      return Padding(
+                                        padding: EdgeInsets.only(bottom: 24),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.start,
+                                          children: [
+                                            TypingIndicator(
+                                              message:
+                                                  _currentStatusMessage
+                                                      .isNotEmpty
+                                                  ? _currentStatusMessage
+                                                  : 'Generating response...',
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }
+
+                                    if (m.isStreaming) {
+                                      return Padding(
+                                        padding: EdgeInsets.only(bottom: 24),
+                                        child: Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Expanded(
+                                              child: AiMessageBubble(
+                                                text: m.text,
+                                                fromUser: m.fromUser,
+                                                imagePath: m.imagePath,
+                                                gradientColors:
+                                                    AppTheme.surfaceGradient,
+                                                detailedByDefault:
+                                                    _responseMode == 'detailed',
+                                              ),
+                                            ),
+                                            Padding(
+                                              padding: EdgeInsets.only(
+                                                left: 8,
+                                                top: 16,
+                                              ),
+                                              child: TypingIndicator(),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }
+
+                                    return Padding(
+                                      padding: EdgeInsets.only(bottom: 24),
+                                      child: AiMessageBubble(
+                                        text: m.text,
+                                        fromUser: m.fromUser,
+                                        imagePath: m.imagePath,
+                                        gradientColors: m.fromUser
+                                            ? AppTheme.primaryGradient
+                                            : AppTheme.surfaceGradient,
+                                        detailedByDefault:
+                                            _responseMode == 'detailed',
+                                      ),
+                                    );
+                                  },
+                                ),
+                          _buildScrollButton(),
+                        ],
+                      ),
+                    ),
+
+                    // Input area - hide in full screen mode
+                    if (!_isFullScreen)
+                      Container(
+                        decoration: BoxDecoration(
+                          color: AppTheme.backgroundDeep,
+                          border: Border(
+                            top: BorderSide(
+                              color: AppTheme.surfaceElevated.withOpacity(0.1),
+                              width: 0.5,
+                            ),
+                          ),
+                        ),
+                        padding: EdgeInsets.fromLTRB(
+                          16,
+                          16,
+                          16,
+                          16 + MediaQuery.of(context).viewInsets.bottom,
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_selectedImage != null)
+                              Container(
+                                margin: EdgeInsets.only(bottom: 16),
+                                padding: EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.surfaceCard,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: AppTheme.surfaceElevated.withOpacity(
+                                      0.3,
+                                    ),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Image.file(
+                                        _selectedImage!,
+                                        height: 60,
+                                        width: 60,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                    SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            _selectedFileName ??
+                                                'Image selected',
+                                            style: AppTheme.bodyMedium.copyWith(
+                                              color: AppTheme.textPrimary,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          SizedBox(height: 4),
+                                          Text(
+                                            'Attached to message',
+                                            style: AppTheme.bodySmall.copyWith(
+                                              color: AppTheme.textTertiary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: Icon(
+                                        Icons.close,
+                                        color: AppTheme.textTertiary,
+                                        size: 20,
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          _selectedImage = null;
+                                          _selectedFileName = null;
+                                        });
+                                      },
+                                      padding: EdgeInsets.all(4),
+                                      constraints: BoxConstraints(),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                            // Main input container - ChatGPT style
+                            Container(
+                              constraints: BoxConstraints(
+                                minHeight: 56,
+                                maxHeight: 120,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppTheme.surfaceCard,
+                                borderRadius: BorderRadius.circular(28),
+                                border: Border.all(
+                                  color: AppTheme.surfaceElevated.withOpacity(
+                                    0.2,
+                                  ),
+                                  width: 1,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.08),
+                                    blurRadius: 12,
+                                    offset: Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  // Attachment button
+                                  Container(
+                                    margin: EdgeInsets.only(left: 8, bottom: 8),
+                                    child: IconButton(
+                                      icon: Icon(
+                                        Icons.add,
+                                        color: AppTheme.textSecondary,
+                                        size: 22,
+                                      ),
+                                      onPressed: _showInputOptionsBottomSheet,
+                                      padding: EdgeInsets.all(8),
+                                      constraints: BoxConstraints(
+                                        minWidth: 40,
+                                        minHeight: 40,
+                                      ),
+                                    ),
+                                  ),
+
+                                  // Text input
+                                  Expanded(
+                                    child: TextField(
+                                      key: OnboardingConfig.chatInputKey,
+                                      controller: _controller,
+                                      textInputAction: TextInputAction.newline,
+                                      maxLines: null,
+                                      keyboardType: TextInputType.multiline,
+                                      style: AppTheme.bodyLarge.copyWith(
+                                        color: AppTheme.textPrimary,
+                                        fontSize: 16,
+                                        height: 1.4,
+                                      ),
+                                      onChanged: (value) {
+                                        setState(() {});
+                                      },
+                                      decoration: InputDecoration(
+                                        hintText: 'Message $_selectedModel...',
+                                        hintStyle: AppTheme.bodyMedium.copyWith(
+                                          color: AppTheme.textTertiary,
+                                          fontSize: 16,
+                                        ),
+                                        border: InputBorder.none,
+                                        enabledBorder: InputBorder.none,
+                                        focusedBorder: InputBorder.none,
+                                        filled: false,
+                                        isDense: true,
+                                        contentPadding: EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 16,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+
+                                  // Voice button
+                                  Container(
+                                    margin: EdgeInsets.only(bottom: 8),
+                                    child: IconButton(
+                                      icon: Icon(
+                                        Icons.mic_none,
+                                        color: AppTheme.textSecondary,
+                                        size: 22,
+                                      ),
+                                      onPressed: _toggleListening,
+                                      padding: EdgeInsets.all(8),
+                                      constraints: BoxConstraints(
+                                        minWidth: 40,
+                                        minHeight: 40,
+                                      ),
+                                    ),
+                                  ),
+
+                                  // Send button
+                                  Container(
+                                    margin: EdgeInsets.only(
+                                      right: 8,
+                                      bottom: 8,
+                                    ),
+                                    child: _buildSendButton(),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
-      ),
+      ],
     );
   }
 
@@ -3597,13 +3616,6 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
           constraints: BoxConstraints(),
         ),
       ),
-        ),
-        if (_showOnboarding)
-          OnboardingOverlay(
-            onComplete: _onOnboardingComplete,
-            onSkip: _onOnboardingSkip,
-          ),
-      ],
     );
   }
 
