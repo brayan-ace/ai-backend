@@ -10,6 +10,8 @@ import '../services/study_bot_flow_controller.dart';
 import '../services/tutor_engagement_service.dart';
 import '../services/progress_tracking_service.dart';
 import '../services/study_bot_storage_service.dart';
+import '../services/analytics_service.dart';
+import '../services/gamification_service.dart';
 import '../utils/theme.dart';
 import 'study_plan_editor_screen.dart';
 import 'quiz_config_screen.dart';
@@ -198,6 +200,8 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   late StudyBotFlowController _flowController;
   late TutorEngagementService _tutorService;
   late ProgressTrackingService _progressService;
+  final AnalyticsService _analyticsService = AnalyticsService();
+  final GamificationService _gamificationService = GamificationService();
 
   bool _isPhase1 = false;
   bool _isPhase2 = false;
@@ -211,6 +215,11 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   bool _isLoading = false;
   bool _showToc = false;
   bool _showScrollToBottom = false;
+
+  // Analytics tracking
+  DateTime? _sessionStartTime;
+  List<String> _conceptsLearned = [];
+  int _sessionMessageCount = 0;
 
   // Bot instructions from database
   Map<String, dynamic>? _botInstructions;
@@ -250,6 +259,10 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     _progressService = ProgressTrackingService();
     _storageService = StudyBotStorageService();
 
+    // Start analytics session tracking
+    _sessionStartTime = DateTime.now();
+    _analyticsService.initialize();
+
     // Add scroll listener for scroll-to-bottom button
     _scrollController.addListener(_onScroll);
 
@@ -272,6 +285,21 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
 
   @override
   void dispose() {
+    // End analytics session
+    if (_sessionStartTime != null) {
+      final sessionDuration = DateTime.now().difference(_sessionStartTime!).inSeconds;
+      _analyticsService.endSession();
+      
+      // Update gamification streak
+      _gamificationService.updateStreak();
+      
+      // Check achievements
+      _gamificationService.checkAchievements(
+        conceptsLearned: _conceptsLearned.length,
+        studyTimeMinutes: sessionDuration ~/ 60,
+      );
+    }
+    
     _inputController.dispose();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
@@ -905,6 +933,11 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
           // Show celebration if module was completed
           if (moduleCompleted) {
             _showModuleCompletionCelebration(progress);
+          }
+
+          // Track concept completion for analytics
+          if (conceptCompleted) {
+            await _trackConceptCompletion(aiResponse);
           }
 
           // Trigger quiz if backend signals it
@@ -2756,27 +2789,8 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       Navigator.pop(context);
     }
 
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => StudyPlanEditorScreen(
-          studyPlan: _studyPlan!,
-          onSave: (updatedPlan) async {
-            await _savePlanChanges(updatedPlan, userId);
-          },
-        ),
-      ),
-    );
-
-    // Reload plan after editor closes to sync any changes
-    if (result != null || mounted) {
-      await _loadStudyPlan();
-    }
-  }
-
-  Future<void> _savePlanChanges(
-    Map<String, dynamic> updatedPlan,
-    String userId, {
+    // Track concept completion for analytics
+  Future<void> _trackConceptCompletion(String aiResponse) async {
     bool apply = true,
   }) async {
     // Store backup of current plan in case save fails
@@ -3563,8 +3577,96 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     return lowerMessage.contains('confused') ||
         lowerMessage.contains('not sure') ||
         lowerMessage.contains('explain') ||
-        lowerMessage.contains('again') ||
-        lowerMessage.contains('huh') ||
-        lowerMessage.contains('what');
+        lowerMessage.contains('help') ||
+        lowerMessage.contains('what do you mean') ||
+        lowerMessage.contains('don\'t understand');
+  }
+
+  /// Track concept completion for analytics
+  Future<void> _trackConceptCompletion(String aiResponse) async {
+    try {
+      // Extract concept from AI response (simplified)
+      final concept = _extractConceptFromResponse(aiResponse);
+      if (concept.isNotEmpty && !_conceptsLearned.contains(concept)) {
+        _conceptsLearned.add(concept);
+
+        // Track with analytics service
+        await _analyticsService.trackConceptLearned(
+          concept,
+          'Study Module',
+          DateTime.now().difference(_sessionStartTime!).inSeconds,
+        );
+
+        // Award XP for concept learning
+        await _gamificationService.awardXP(25, reason: 'Concept learned: $concept');
+
+        // Check achievements
+        await _gamificationService.checkAchievements(
+          conceptsLearned: _conceptsLearned.length,
+        );
+
+        print('[ChatScreen] 🧠 Concept tracked: $concept');
+      }
+    } catch (e) {
+      print('[ChatScreen] Error tracking concept: $e');
+    }
+  }
+
+  /// Extract concept from AI response (simplified implementation)
+  String _extractConceptFromResponse(String response) {
+    // Look for key concepts in the response
+    final conceptPatterns = [
+      RegExp(r'You\'ve mastered (.+?)\.'), // You've mastered [concept].
+      RegExp(r'Great job understanding (.+?)\.'), // Great job understanding [concept].
+      RegExp(r'You now understand (.+?)\.'), // You now understand [concept].
+      RegExp(r'concept of (.+?) is'), // concept of [concept] is
+    ];
+
+    for (final pattern in conceptPatterns) {
+      final match = pattern.firstMatch(response);
+      if (match != null) {
+        return match.group(1)?.trim() ?? '';
+      }
+    }
+
+    // Fallback: look for capitalized terms
+    final words = response.split(' ');
+    for (final word in words) {
+      if (word.length > 3 && word[0] == word[0].toUpperCase() && word[0] != word[0].toLowerCase()) {
+        return word.replaceAll(RegExp(r'[^\w]'), '');
+      }
+    }
+
+    return '';
+  }
+
+  /// Track quiz completion for analytics
+  Future<void> _trackQuizCompletion(int correctAnswers, int totalQuestions, String? category) async {
+    try {
+      final accuracy = correctAnswers / totalQuestions;
+
+      // Track with analytics service
+      await _analyticsService.trackQuizCompletion({
+        'correct_answers': correctAnswers,
+        'total_questions': totalQuestions,
+        'accuracy': accuracy,
+        'category': category ?? 'General',
+        'timestamp': DateTime.now().toIso8601String(),
+      });
+
+      // Award XP based on performance
+      final xpAwarded = (accuracy * 50).round();
+      await _gamificationService.awardXP(xpAwarded, reason: 'Quiz completion');
+
+      // Check achievements
+      await _gamificationService.checkAchievements(
+        quizzesCompleted: 1,
+        quizAccuracy: accuracy,
+      );
+
+      print('[ChatScreen] 📝 Quiz tracked: $correctAnswers/$totalQuestions (${(accuracy * 100).toInt()}%)');
+    } catch (e) {
+      print('[ChatScreen] Error tracking quiz: $e');
+    }
   }
 }

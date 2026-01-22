@@ -26,7 +26,10 @@ import 'screens/api_test_screen.dart';
 import 'screens/chat_history_screen.dart';
 import 'screens/recent_study_bots_screen.dart';
 import 'screens/notification_settings_screen.dart';
+import 'screens/analytics_dashboard_screen.dart';
 import 'services/push_notification_service.dart';
+import 'services/analytics_service.dart';
+import 'services/gamification_service.dart';
 import 'utils/globals.dart';
 import 'utils/theme.dart';
 
@@ -54,12 +57,14 @@ void main() async {
     print('Firebase initialization skipped or failed: $e');
   }
   
-  // Initialize premium push notification service
+  // Initialize premium services
   try {
     await PushNotificationService().initialize();
-    print('[Main] ✅ Premium push notifications initialized');
+    await AnalyticsService().initialize();
+    await GamificationService().initialize();
+    print('[Main] ✅ Premium services initialized');
   } catch (e) {
-    print('[Main] ⚠️ Push notifications initialization failed: $e');
+    print('[Main] ⚠️ Premium services initialization failed: $e');
   }
   
   runApp(
@@ -111,6 +116,7 @@ class MyApp extends StatelessWidget {
         '/profile-settings': (_) => const ProfileSettingsScreen(),
         '/capabilities': (_) => const CapabilitiesScreen(),
         '/notification-settings': (_) => const NotificationSettingsScreen(),
+        '/analytics': (_) => const AnalyticsDashboardScreen(),
         '/billing': (_) => const PlaceholderScreen(title: 'Billing', message: 'Billing features coming soon'),
         '/permissions': (_) => const PlaceholderScreen(title: 'Permissions', message: 'Permissions will be configurable here soon'),
         '/speech-language': (_) => const PlaceholderScreen(title: 'Speech Language', message: 'Speech language settings coming soon'),

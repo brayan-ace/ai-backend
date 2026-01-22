@@ -249,6 +249,14 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                   _buildDivider(),
                   _tile(
                     context,
+                    icon: Icons.analytics,
+                    title: 'Analytics Dashboard',
+                    subtitle: 'View learning analytics and insights',
+                    onTap: () => Navigator.pushNamed(context, '/analytics'),
+                  ),
+                  _buildDivider(),
+                  _tile(
+                    context,
                     icon: Icons.notifications_active,
                     title: 'Notification Settings',
                     subtitle: 'Manage push notifications',
