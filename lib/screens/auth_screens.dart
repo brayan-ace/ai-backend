@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import '../services/auth_services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../utils/globals.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../utils/theme.dart';
-import 'verify_email_screen.dart';
+import '../services/auth_services.dart';
+import '../widgets/social_media_icons.dart';
 
 class AuthScreen extends StatefulWidget {
   final VoidCallback? onAuthenticated;
@@ -26,6 +26,166 @@ class _AuthScreenState extends State<AuthScreen> {
   void _showError(String msg) {
     scaffoldMessengerKey.currentState?.showSnackBar(
       SnackBar(content: Text(msg)),
+    );
+  }
+
+  /// Show forgot password dialog
+  void _showForgotPasswordDialog() {
+    final TextEditingController emailController = TextEditingController();
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              backgroundColor: AppTheme.surfaceCard,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Row(
+                children: [
+                  Icon(
+                    Icons.lock_reset,
+                    color: AppTheme.primaryBlue,
+                    size: 24,
+                  ),
+                  SizedBox(width: 12),
+                  Text(
+                    'Reset Password',
+                    style: AppTheme.headlineSmall.copyWith(
+                      color: AppTheme.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Enter your email address and we\'ll send you a link to reset your password.',
+                    style: AppTheme.bodyMedium.copyWith(
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                  SizedBox(height: AppTheme.spaceMd),
+                  TextFormField(
+                    controller: emailController,
+                    decoration: InputDecoration(
+                      labelText: 'Email Address',
+                      prefixIcon: Icon(Icons.email_outlined, color: AppTheme.primaryBlue),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: AppTheme.surfaceElevated),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: AppTheme.primaryBlue),
+                      ),
+                    ),
+                    keyboardType: TextInputType.emailAddress,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter your email';
+                      }
+                      if (!value.contains('@')) {
+                        return 'Please enter a valid email';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(
+                    'Cancel',
+                    style: AppTheme.bodyMedium.copyWith(
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: isLoading ? null : () async {
+                    if (emailController.text.isEmpty) {
+                      _showError('Please enter your email address');
+                      return;
+                    }
+
+                    setState(() => isLoading = true);
+                    Navigator.of(context).pop();
+
+                    try {
+                      await FirebaseAuth.instance.sendPasswordResetEmail(
+                        email: emailController.text.trim(),
+                      );
+
+                      if (mounted) {
+                        _showSuccessMessage(
+                          'Password reset email sent! Check your inbox.',
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        _showError('Failed to send reset email: ${e.toString()}');
+                      }
+                    } finally {
+                      if (mounted) {
+                        setState(() => isLoading = false);
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryBlue,
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: isLoading
+                      ? SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : Text(
+                          'Send Reset Email',
+                          style: AppTheme.bodyMedium.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Show success message
+  void _showSuccessMessage(String message) {
+    scaffoldMessengerKey.currentState?.showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.white, size: 20),
+            SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: AppTheme.success,
+        duration: Duration(seconds: 4),
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 
@@ -233,12 +393,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         ),
                         const SizedBox(height: AppTheme.spaceMd),
                         TextButton(
-                          onPressed: () {
-                            // TODO: Implement forgot password functionality
-                            _showError(
-                              'Forgot password functionality not yet implemented.',
-                            );
-                          },
+                          onPressed: _showForgotPasswordDialog,
                           style: TextButton.styleFrom(
                             foregroundColor: AppTheme.primaryBlue,
                           ),

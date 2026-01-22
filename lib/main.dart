@@ -1,35 +1,41 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/data/latest.dart' as tz;
 
-import 'screens/auth_screens.dart';
-import 'screens/profile_screen.dart';
-import 'screens/home_screen.dart';
-import 'screens/main_tabs.dart';
+import 'theme_provider.dart';
+import 'screens/auth_gate.dart';
 import 'screens/online_ai_screen.dart';
-import 'screens/study_plan_screen_phase1.dart';
-import 'screens/settings_screen.dart';
-import 'screens/settings_screen_new.dart';
-import 'screens/profile_settings_screen.dart';
-import 'screens/capabilities_screen.dart';
-import 'screens/placeholder_screen.dart';
-import 'screens/api_test_screen.dart';
+import 'screens/offline_ai_screen.dart';
 import 'screens/notes_screen.dart';
-import 'screens/chat_history_screen.dart';
+import 'screens/main_tabs.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/signup_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/profile_screen.dart';
+import 'screens/settings_screen_new.dart';
+import 'screens/settings_screen.dart';
+import 'screens/profile_settings_screen.dart';
+import 'screens/capabilities_screen.dart';
+import 'screens/placeholder_screen.dart';
+import 'screens/home_screen.dart';
+import 'screens/api_test_screen.dart';
+import 'screens/chat_history_screen.dart';
 import 'screens/recent_study_bots_screen.dart';
-import 'widgets/auth_gate.dart';
-import 'services/user_profile_service.dart';
+import 'screens/notification_settings_screen.dart';
+import 'services/push_notification_service.dart';
 import 'utils/globals.dart';
 import 'utils/theme.dart';
-import 'utils/theme_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize timezone data
+  tz.initializeTimeZones();
+  
   // On web, FirebaseOptions are required when calling initializeApp.
   // If options are not provided, initialization will throw; catch and continue
   // so the app can run in environments where web options are not configured.
@@ -47,6 +53,15 @@ void main() async {
     // ignore: avoid_print
     print('Firebase initialization skipped or failed: $e');
   }
+  
+  // Initialize premium push notification service
+  try {
+    await PushNotificationService().initialize();
+    print('[Main] ✅ Premium push notifications initialized');
+  } catch (e) {
+    print('[Main] ⚠️ Push notifications initialization failed: $e');
+  }
+  
   runApp(
     ChangeNotifierProvider(
       create: (_) => ThemeProvider(),
@@ -95,6 +110,7 @@ class MyApp extends StatelessWidget {
         '/settings-old': (_) => const SettingsScreen(),
         '/profile-settings': (_) => const ProfileSettingsScreen(),
         '/capabilities': (_) => const CapabilitiesScreen(),
+        '/notification-settings': (_) => const NotificationSettingsScreen(),
         '/billing': (_) => const PlaceholderScreen(title: 'Billing', message: 'Billing features coming soon'),
         '/permissions': (_) => const PlaceholderScreen(title: 'Permissions', message: 'Permissions will be configurable here soon'),
         '/speech-language': (_) => const PlaceholderScreen(title: 'Speech Language', message: 'Speech language settings coming soon'),

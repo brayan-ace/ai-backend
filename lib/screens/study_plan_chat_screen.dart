@@ -2177,28 +2177,42 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
 
   /// Convert backend study plan to TableOfContentsItem list
   List<TableOfContentsItem> _convertStudyPlanToToc() {
-    if (_studyPlan == null) return [];
+    if (_studyPlan == null) {
+      print('[ChatScreen] 🔄 _convertStudyPlanToToc: _studyPlan is NULL');
+      return [];
+    }
 
     final modules = _studyPlan!['modules'] as List? ?? [];
-    return modules.asMap().entries.map((entry) {
+    print('[ChatScreen] 🔄 Converting ${modules.length} modules to TOC items');
+    
+    final tocItems = modules.asMap().entries.map((entry) {
       final idx = entry.key;
       final mod = entry.value as Map<String, dynamic>;
+      
+      final title = mod['title'] ?? mod['module_name'] ?? 'Module ${idx + 1}';
+      final description = mod['objective'] ?? mod['description'] ?? '';
+      final keyTopics = List<String>.from(
+        mod['key_topics'] ??
+            mod['subtopics'] ??
+            mod['learning_objectives'] ??
+            [],
+      );
+      
+      print('[ChatScreen] 🔄 Module $idx: $title');
+      print('[ChatScreen] 🔄   - Topics: ${keyTopics.take(2).toList()}...');
 
       return TableOfContentsItem(
         moduleNumber: idx + 1,
-        title: mod['title'] ?? mod['module_name'] ?? 'Module ${idx + 1}',
-        description: mod['objective'] ?? mod['description'] ?? '',
-        subtopics: List<String>.from(
-          mod['key_topics'] ??
-              mod['subtopics'] ??
-              mod['learning_objectives'] ??
-              [],
-        ),
-        estimatedTime:
-            mod['estimated_effort'] ?? mod['duration'] ?? '30 minutes',
+        title: title,
+        description: description,
+        subtopics: keyTopics,
+        estimatedTime: mod['estimated_effort'] ?? mod['estimated_time'] ?? '30 minutes',
         difficultyLevel: mod['difficulty'] ?? 'Medium',
       );
     }).toList();
+
+    print('[ChatScreen] 🔄 Successfully converted ${tocItems.length} modules to TOC');
+    return tocItems;
   }
 
   /// Build drawer menu with navigation options
@@ -2208,12 +2222,32 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       '[ChatScreen] 🍔 Building drawer - _studyPlan: ${_studyPlan != null ? "EXISTS with ${(_studyPlan!['modules'] as List?)?.length ?? 0} modules" : "NULL"}',
     );
 
+    // Ensure study plan is loaded when drawer opens
+    if (_studyPlan == null && widget.botId != null) {
+      print('[ChatScreen] 🍔 Study plan not loaded, loading now...');
+      _loadStudyPlan().then((loaded) {
+        if (loaded && mounted) {
+          setState(() {}); // Rebuild drawer with loaded plan
+        }
+      });
+    }
+
     // Use converted study plan or fallback to botState tableOfContents
     final tocItems = _studyPlan != null
         ? _convertStudyPlanToToc()
         : _botState?.tableOfContents ?? [];
 
     print('[ChatScreen] 🍔 tocItems count: ${tocItems.length}');
+    print('[ChatScreen] 🍔 currentModule: ${_botState?.currentModule ?? 0}');
+    print('[ChatScreen] 🍔 completedModules: ${_botState?.completedModules ?? []}');
+    print('[ChatScreen] 🍔 progressPercentage: $_progressPercentage%');
+
+    // Enhanced debug: Show first few subtopics
+    if (tocItems.isNotEmpty) {
+      final firstItem = tocItems.first;
+      print('[ChatScreen] 🍔 First module: ${firstItem.title}');
+      print('[ChatScreen] 🍔 First module subtopics: ${firstItem.subtopics.take(3).toList()}');
+    }
 
     return PremiumStudyPlanMenu(
       tableOfContents: tocItems.isNotEmpty ? tocItems : null,

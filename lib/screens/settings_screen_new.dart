@@ -5,9 +5,7 @@ import '../utils/theme.dart';
 import '../utils/theme_provider.dart';
 import '../services/settings_service.dart';
 import '../services/user_profile_service.dart';
-import 'profile_settings_screen.dart';
-import 'capabilities_screen.dart';
-import 'placeholder_screen.dart';
+import '../services/onboarding_service.dart';
 import '../widgets/social_media_icons.dart';
 
 class SettingsScreenNew extends StatefulWidget {
@@ -34,10 +32,10 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
   Future<void> _loadSettings() async {
     await _settingsService.init();
     await _userProfileService.init();
-    
+
     final colorMode = await _settingsService.getColorMode();
     final username = await _userProfileService.getDisplayName();
-    
+
     setState(() {
       _colorMode = colorMode;
       _username = username;
@@ -49,14 +47,18 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
     await themeProvider.setThemeMode(mode);
     await _settingsService.setColorMode(mode);
     setState(() => _colorMode = mode);
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Color mode updated to ${mode == 'dark' ? 'dark' : 'light'}'),
-        backgroundColor: AppTheme.primaryBlue,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Color mode updated to ${mode == 'dark' ? 'dark' : 'light'}',
+          ),
+          backgroundColor: AppTheme.primaryBlue,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   Widget _sectionHeader(String text) => Padding(
@@ -98,7 +100,7 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
           boxShadow: gradient != null
               ? [
                   BoxShadow(
-                    color: gradient[0].withOpacity(0.3),
+                    color: gradient[0].withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: Offset(0, 2),
                   ),
@@ -135,7 +137,7 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
         gradient: LinearGradient(colors: AppTheme.surfaceGradient),
         borderRadius: BorderRadius.circular(AppTheme.radiusLg),
         border: Border.all(
-          color: AppTheme.surfaceElevated.withOpacity(0.5),
+          color: AppTheme.surfaceElevated.withValues(alpha: 0.5),
           width: 1,
         ),
         boxShadow: AppTheme.cardShadow,
@@ -148,7 +150,7 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
     return Divider(
       height: 1,
       thickness: 1,
-      color: AppTheme.surfaceElevated.withOpacity(0.3),
+      color: AppTheme.surfaceElevated.withValues(alpha: 0.3),
       indent: AppTheme.spaceMd,
       endIndent: AppTheme.spaceMd,
     );
@@ -178,7 +180,7 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
               gradient: LinearGradient(colors: AppTheme.glassGradient),
               border: Border(
                 bottom: BorderSide(
-                  color: AppTheme.surfaceElevated.withOpacity(0.3),
+                  color: AppTheme.surfaceElevated.withValues(alpha: 0.3),
                   width: 0.5,
                 ),
               ),
@@ -212,7 +214,8 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     title: 'Profile',
                     subtitle: 'Username: $_username',
                     gradient: AppTheme.accentGradient,
-                    onTap: () => Navigator.pushNamed(context, '/profile-settings'),
+                    onTap: () =>
+                        Navigator.pushNamed(context, '/profile-settings'),
                   ),
                 ],
               ),
@@ -240,9 +243,26 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     context,
                     icon: Icons.settings_suggest,
                     title: 'Capabilities',
-                    subtitle: 'Configure AI features',
-                    gradient: AppTheme.accentGradient,
+                    subtitle: 'App features and abilities',
                     onTap: () => Navigator.pushNamed(context, '/capabilities'),
+                  ),
+                  _buildDivider(),
+                  _tile(
+                    context,
+                    icon: Icons.notifications_active,
+                    title: 'Notification Settings',
+                    subtitle: 'Manage push notifications',
+                    onTap: () => Navigator.pushNamed(context, '/notification-settings'),
+                  ),
+                  _buildDivider(),
+                  _tile(
+                    context,
+                    icon: Icons.school_outlined,
+                    title: 'Show Onboarding',
+                    subtitle: 'View app walkthrough',
+                    onTap: () {
+                      _showOnboardingConfirmation();
+                    },
                   ),
                 ],
               ),
@@ -271,9 +291,14 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     title: 'Color Mode',
                     subtitle: _colorMode == 'dark' ? 'Dark' : 'Light',
                     trailing: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(colors: AppTheme.primaryGradient),
+                        gradient: LinearGradient(
+                          colors: AppTheme.primaryGradient,
+                        ),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -298,7 +323,8 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     icon: Icons.record_voice_over,
                     title: 'Speech Language',
                     subtitle: 'Voice settings',
-                    onTap: () => Navigator.pushNamed(context, '/speech-language'),
+                    onTap: () =>
+                        Navigator.pushNamed(context, '/speech-language'),
                   ),
                 ],
               ),
@@ -328,7 +354,9 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     title: 'WhatsApp Community',
                     subtitle: 'Join our WhatsApp community',
                     trailing: SocialMediaIcon(platform: 'whatsapp', size: 32),
-                    onTap: () => _launchUrl('https://chat.whatsapp.com/BSwumdCdeLF7txFxw3jGdW'),
+                    onTap: () => _launchUrl(
+                      'https://chat.whatsapp.com/BSwumdCdeLF7txFxw3jGdW',
+                    ),
                   ),
                   _buildDivider(),
                   _tile(
@@ -337,7 +365,9 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     title: 'Facebook Page',
                     subtitle: 'Follow us on Facebook',
                     trailing: SocialMediaIcon(platform: 'facebook', size: 32),
-                    onTap: () => _launchUrl('https://www.facebook.com/share/17untMVSDD/'),
+                    onTap: () => _launchUrl(
+                      'https://www.facebook.com/share/17untMVSDD/',
+                    ),
                   ),
                   _buildDivider(),
                   _tile(
@@ -346,7 +376,9 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     title: 'Instagram Profile',
                     subtitle: 'Follow us on Instagram',
                     trailing: SocialMediaIcon(platform: 'instagram', size: 32),
-                    onTap: () => _launchUrl('https://www.instagram.com/nexasmartai?igsh=YTJ1eGlneGxtZ2Zn'),
+                    onTap: () => _launchUrl(
+                      'https://www.instagram.com/nexasmartai?igsh=YTJ1eGlneGxtZ2Zn',
+                    ),
                   ),
                   _buildDivider(),
                   _tile(
@@ -355,7 +387,9 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     title: 'TikTok Page',
                     subtitle: 'Follow us on TikTok',
                     trailing: SocialMediaIcon(platform: 'tiktok', size: 32),
-                    onTap: () => _launchUrl('https://www.tiktok.com/@nexa.2035?_r=1&_t=ZM-93F28qgfiV2'),
+                    onTap: () => _launchUrl(
+                      'https://www.tiktok.com/@nexa.2035?_r=1&_t=ZM-93F28qgfiV2',
+                    ),
                   ),
                 ],
               ),
@@ -444,10 +478,7 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
     try {
       final uri = Uri.parse(url);
       if (await canLaunchUrl(uri)) {
-        await launchUrl(
-          uri, 
-          mode: LaunchMode.externalApplication,
-        );
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -470,5 +501,76 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
         );
       }
     }
+  }
+
+  void _showOnboardingConfirmation() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: AppTheme.surfaceCard,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.school_outlined, color: AppTheme.warning, size: 24),
+              SizedBox(width: 12),
+              Text(
+                'Show Onboarding Guide',
+                style: AppTheme.headlineSmall.copyWith(
+                  color: AppTheme.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            'This will reset your onboarding progress and show you the app introduction guide again. Would you like to continue?',
+            style: AppTheme.bodyLarge.copyWith(color: AppTheme.textSecondary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Cancel',
+                style: AppTheme.bodyLarge.copyWith(
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                await OnboardingService.resetOnboarding();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Onboarding reset! Go to the main screen to see the guide.',
+                      ),
+                      backgroundColor: AppTheme.success,
+                      behavior: SnackBarBehavior.floating,
+                      duration: Duration(seconds: 3),
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.warning,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: Text(
+                'Show Guide',
+                style: AppTheme.bodyLarge.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 }

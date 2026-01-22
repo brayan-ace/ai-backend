@@ -12,7 +12,6 @@ import '../utils/theme.dart';
 import '../utils/greeting_utils.dart';
 import '../widgets/ai_message_bubble.dart';
 import '../widgets/typing_indicator.dart';
-import '../widgets/greeting_icon.dart';
 import '../widgets/voice_input_dialog.dart';
 import '../services/gemini_services.dart';
 import '../services/api_service.dart';
@@ -209,7 +208,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                         width: 36,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: AppTheme.textTertiary.withOpacity(0.4),
+                          color: AppTheme.textTertiary.withValues(alpha: 0.4),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -276,7 +275,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                       SizedBox(height: 28),
 
                       Divider(
-                        color: AppTheme.surfaceElevated.withOpacity(0.3),
+                        color: AppTheme.surfaceElevated.withValues(alpha: 0.3),
                         height: 1,
                         thickness: 1,
                       ),
@@ -319,9 +318,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                     });
                                   });
                                 },
-                                activeColor: AppTheme.primaryBlue,
+                                activeThumbColor: AppTheme.primaryBlue,
                                 activeTrackColor: AppTheme.primaryBlue
-                                    .withOpacity(0.5),
+                                    .withValues(alpha: 0.5),
                               ),
                             ],
                           ),
@@ -329,7 +328,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                       ),
 
                       Divider(
-                        color: AppTheme.surfaceElevated.withOpacity(0.3),
+                        color: AppTheme.surfaceElevated.withValues(alpha: 0.3),
                         height: 1,
                         thickness: 1,
                       ),
@@ -405,7 +404,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
           color: AppTheme.surfaceCard,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: AppTheme.surfaceElevated.withOpacity(0.5),
+            color: AppTheme.surfaceElevated.withValues(alpha: 0.5),
             width: 1,
           ),
         ),
@@ -449,7 +448,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                   width: 36,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: AppTheme.textTertiary.withOpacity(0.4),
+                    color: AppTheme.textTertiary.withValues(alpha: 0.4),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -593,7 +592,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
               topRight: Radius.circular(AppTheme.radiusXl),
             ),
             border: Border.all(
-              color: AppTheme.surfaceElevated.withOpacity(0.3),
+              color: AppTheme.surfaceElevated.withValues(alpha: 0.3),
               width: 1,
             ),
           ),
@@ -607,7 +606,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: AppTheme.textTertiary.withOpacity(0.3),
+                      color: AppTheme.textTertiary.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -678,14 +677,14 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: isSelected
-                ? gradient.map((c) => c.withOpacity(0.2)).toList()
+                ? gradient.map((c) => c.withValues(alpha: 0.2)).toList()
                 : AppTheme.glassGradient,
           ),
           borderRadius: BorderRadius.circular(AppTheme.radiusMd),
           border: Border.all(
             color: isSelected
                 ? gradient[0]
-                : AppTheme.surfaceElevated.withOpacity(0.5),
+                : AppTheme.surfaceElevated.withValues(alpha: 0.5),
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -699,7 +698,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                 boxShadow: isSelected
                     ? [
                         BoxShadow(
-                          color: gradient[0].withOpacity(0.4),
+                          color: gradient[0].withValues(alpha: 0.4),
                           blurRadius: 12,
                           offset: Offset(0, 4),
                         ),
@@ -900,9 +899,10 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
         _logAndAddAiMessage(reply.toString());
 
         if (raw['identityOffered'] == true) {
-          final consent = await showDialog<bool>(
-            context: context,
-            builder: (ctx) => AlertDialog(
+          if (mounted) {
+            final consent = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
               title: Text('Show founder?'),
               content: Text('Would you like to know my founder or my builder?'),
               actions: [
@@ -929,6 +929,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
             _logAndAddAiMessage(reply2.toString());
           }
         }
+        }
 
         handledLocally = true;
       } catch (e) {
@@ -938,8 +939,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
 
     if (handledLocally) {
       setState(() {
-        if (_messages.isNotEmpty && _messages.last.isTyping)
+        if (_messages.isNotEmpty && _messages.last.isTyping) {
           _messages.removeLast();
+        }
       });
       return;
     }
@@ -3434,36 +3436,12 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
               ),
             ),
           ),
-        ),
+          if (_showOnboarding) OnboardingOverlay(
+            steps: OnboardingConfig.getSteps(),
+            onComplete: _onOnboardingComplete,
+            onSkip: _onOnboardingSkip,
+          ),
       ],
-    );
-  }
-
-  // Add a visual indicator for full-screen mode
-  Widget _buildFullScreenIndicator() {
-    if (!_isFullScreen) return SizedBox.shrink();
-
-    return Positioned(
-      top: 80,
-      right: 16,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.7),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.fullscreen, color: Colors.white, size: 16),
-            SizedBox(width: 4),
-            Text(
-              'Full Screen',
-              style: TextStyle(color: Colors.white, fontSize: 12),
-            ),
-          ],
-        ),
-      ),
     );
   }
 

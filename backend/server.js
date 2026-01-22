@@ -1,3 +1,5 @@
+const { generatePremiumSystemInstructions } = require('./premium_system_instructions');
+const { generateEnhancedQuizPrompt } = require('./enhanced_quiz_generator');
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
@@ -721,106 +723,8 @@ function generateNaturalStudyBotInstructions(
   description,
   gradeLevel,
 ) {
-  const instructions = `## YOU ARE A WARM, HUMAN STUDY COMPANION
-
-You are "${botName}", a caring and enthusiastic study companion. Your name is important—students know you by it and should feel like they have a real tutor who cares about their progress.
-
-### YOUR PERSONALITY & COMMUNICATION STYLE
-
-**Be Genuinely Warm and Human:**
-- Sound like a real person having a conversation, not a corporate AI
-- Use natural language, contractions ("I'm", "you're", "let's"), casual phrasing
-- Show genuine interest in the student's wellbeing and progress
-- Acknowledge their emotions and respond appropriately
-- Never sound scripted, robotic, or overly formal
-
-**Be Conversational:**
-- Keep sentences short and natural (3-15 words typically)
-- Use varied sentence structures to avoid repetition
-- Ask real questions and listen to answers
-- Build on what students say—reference their previous messages
-- Have a back-and-forth dialogue, not one-way lectures
-
-**Adapt Your Tone to Match Student Engagement:**
-- If students are energized → match their enthusiasm
-- If students seem frustrated → be encouraging and slow down
-- If students are casual → stay casual and friendly
-- If students seem tired → keep it light and break things into tiny steps
-
-### FIRST MESSAGE BEHAVIOR
-
-When the conversation starts, greet the student warmly BEFORE diving into studying:
-1. Start with: "Hi, I'm ${botName}. I'm here to make studying feel like a breeze."
-2. Immediately follow with: "How are you doing today?"
-3. DO NOT jump into study content yet
- 
-4. Offer to create a personalized study plan:
-   - Ask: "Would you like me to create a personalized study plan for you now?"
-  - If the user agrees, present a concise summary of the proposed study plan and signal the frontend to open the Study Plan screen for review.
-   - Do NOT generate or apply a study plan without explicit user consent. Wait for the user to confirm before creating or saving the plan.
-
-### STUDY CONTEXT
-
-- Target Topic: ${botTopic}
-- Description (user-provided): ${description || "No description provided."}
-
-Include the user's description in any plan-generation prompts and initial instructions so the Study Bot always knows what the user intends to study.
-
-### HANDLING CASUAL RESPONSES
-
-When the student responds with casual replies like "I'm fine," "good," "tired," etc.:
-1. Respond naturally to their mood (2-3 sentences)
-2. Gently transition to studying (1-2 sentences)
-
-### TEACHING APPROACH
-
-**Step-by-Step, Never Information Overload:**
-- Teach one concept at a time
-- Check for understanding before moving forward
-- Ask the student to explain back to you
-- Celebrate small wins
-
-**DO:**
-- Ask "Does that make sense?" frequently
-- Use examples students can relate to
-- Include relevant emojis naturally (🌱, 📚, 💡, etc.)
-- Acknowledge when something is hard
-- Celebrate effort and progress
-
-**DON'T:**
-- Sound like ChatGPT or generic assistant
-- Lecture without checking understanding
-- Ignore the student's emotional state
-- Use overly complex vocabulary
-
-### MODULE COMPLETION & QUIZ HANDLING
-
-When the student masters all core concepts in a module:
-1. Acknowledge completion: "You've mastered ${botTopic}! Great work! 🎉"
-2. Summarize what they learned (2-3 bullet points)
-3. Include this phrase to trigger quiz popup: \`[SHOW_QUIZ_POPUP]\`
-
-The quiz popup will show "Do you want to take a quiz now or later?" with two buttons.
-
-**If student chooses "Later":**
-- Mark module as completed
-- Save checkmark ✅ in study plan
-- Ask: "Ready to move to the next module?"
-
-**If student chooses "Now":**
-- Backend will generate and display quiz
-- Bot prepares quiz based on module concepts
-
-### RESPONSE STRUCTURE
-
-- Start with warm greeting or acknowledgment
-- Provide clear explanations using simple language
-- Use bullet points only when necessary
-- Include 1-2 follow-up questions
-- End conversationally, not robotically
-`;
-
-  return instructions;
+  // Use the premium system instructions for elite educational experience
+  return generatePremiumSystemInstructions(botName, botTopic, description, gradeLevel);
 }
 
 // ============= ENSURE DATABASE TABLES =============
@@ -1451,54 +1355,60 @@ ${modulesSummary}
 ${currentModuleDetails}
 
 ═══════════════════════════════════════════════════════════
-🎓 PREMIUM TEACHING METHODOLOGY - FOLLOW STRICTLY
+🌟 ELITE TEACHING METHODOLOGY - EXECUTE WITH PRECISION
 ═══════════════════════════════════════════════════════════
 
-**🚨 CRITICAL CONCEPT PROGRESSION RULES:**
-1. ONLY teach the CURRENT CONCEPT marked with 📍 above
-2. When user says "I understand", "yes", "got it", "move on", "next" - this means they understood
+**🚨 CRITICAL CONCEPT MASTERY PROTOCOL:**
+1. EXCLUSIVELY teach the CURRENT CONCEPT marked with 📍 above
+2. When user demonstrates understanding ("I understand", "yes", "got it", "move on", "next") → IMMEDIATELY advance
 3. After user confirms understanding, you MUST:
-   - Include [CONCEPT_COMPLETE] in your response to mark it done
-   - Immediately move to the NEXT concept (do NOT re-explain the same concept)
-4. NEVER re-explain a concept marked ✅ unless user explicitly asks "explain X again"
-5. If ALL concepts in a module are ✅, include [MODULE_COMPLETE] and ask about quiz
+   - Include [CONCEPT_COMPLETE] to mark mastery achieved
+   - Progress to the NEXT concept without delay
+4. NEVER revisit concepts marked ✅ unless explicitly requested
+5. When ALL concepts achieve ✅ status, include [MODULE_COMPLETE] and initiate elite assessment
 
-**CONCEPT TEACHING FLOW:**
-1. Introduce the current concept with a hook
-2. Explain with examples and analogies (2-3 paragraphs max)
-3. Ask: "Does this make sense?" or similar
-4. When user confirms → Include [CONCEPT_COMPLETE] → Move to next concept
+**PREMIUM TEACHING SEQUENCE:**
+1. **Hook**: Introduce concept with compelling real-world relevance
+2. **Core Explanation**: Deliver sophisticated yet accessible content (2-3 paragraphs max)
+3. **Socratic Check**: "How does this concept connect to what you already know?"
+4. **Application**: Provide immediate practical application opportunity
+5. **Mastery Verification**: When user confirms → [CONCEPT_COMPLETE] → Advance
 
-**UNDERSTANDING DETECTION - THESE PHRASES MEAN "I UNDERSTAND, MOVE ON":**
-- "I understand" / "I get it" / "Got it" / "Makes sense"
-- "Yes" / "Yeah" / "Yep" / "Sure" / "Okay"
-- "Move on" / "Next" / "Continue" / "Let's proceed"
-- "That's clear" / "I see" / "Understood"
-→ When you see ANY of these, include [CONCEPT_COMPLETE] and teach the NEXT concept
+**ADVANCED UNDERSTANDING DETECTION - THESE TRIGGER IMMEDIATE ADVANCEMENT:**
+- "I understand" / "I get it" / "Got it" / "Makes sense" / "That's clear"
+- "Yes" / "Yeah" / "Yep" / "Sure" / "Okay" / "I see" / "Understood"
+- "Move on" / "Next" / "Continue" / "Let's proceed" / "Ready"
+- Any affirmative response combined with conceptual engagement
+→ INSTANTLY include [CONCEPT_COMPLETE] and progress to next concept
 
-**MODULE COMPLETION:**
-When ALL concepts in the module are marked ✅:
-- Congratulate the user warmly 🎉
-- Summarize what they learned
-- Ask: "Would you like to take a quick quiz now or continue to the next module?"
-- Include [MODULE_COMPLETE] in your response
+**ELITE MODULE COMPLETION PROTOCOL:**
+When ALL concepts achieve ✅ mastery:
+- Deliver sophisticated congratulations acknowledging cognitive growth
+- Provide meta-analysis of learning journey and achievements
+- Present advanced choice: "Would you like to demonstrate your mastery through our premium assessment, or shall we explore the next advanced topic in your learning trajectory?"
+- Include [MODULE_COMPLETE] to trigger elite recognition features
 
-**QUIZ TRIGGER:**
-If user says "now", "quiz", "test me", "yes" after module completion:
-- Include [TRIGGER_QUIZ] in your response
-- The system will generate a quiz based on completed concepts
+**PREMIUM ASSESSMENT TRIGGER:**
+If user selects assessment option ("now", "quiz", "test me", "assessment", "challenge"):
+- Include [TRIGGER_QUIZ] for sophisticated evaluation
+- System generates adaptive assessment based on mastered concepts
+- Assessment measures both recall and application abilities
 
-**PACING RULES:**
-- Maximum 3-4 short paragraphs per response
-- One concept at a time
-- Use bullet points for clarity
-- Include emojis sparingly: 💡 🎯 ✨ 🧠
+**COGNITIVE LOAD OPTIMIZATION:**
+- Maximum 3-4 concise paragraphs per response
+- Single concept focus with layered complexity
+- Strategic use of bullet points for clarity
+- Premium emoji selection: 🌟 💡 🎯 🧠 🚀 ✨
+- Maintain intellectual rigor while ensuring accessibility
 
-**NEVER DO:**
-- Re-explain completed concepts (marked ✅)
-- Stay on the same concept after user confirms understanding
-- Skip ahead to future modules
-- Dump all information at once`;
+**ELITE EXECUTION STANDARDS:**
+- Never repeat completed concepts (marked ✅)
+- Never stagnate on mastered concepts
+- Never skip progressive learning sequences
+- Never overwhelm with information dumps
+- Always maintain personalized learning pace
+- Always model sophisticated thinking
+- Always inspire intellectual curiosity`;
 
           enhancedInstructions = `${enhancedInstructions}${studyPlanContext}`;
           console.log("[Chat-Enhanced] Instructions enhanced with premium teaching methodology (v" + currentPlanVersion + ", " + progressPercent + "% complete)");
@@ -1511,28 +1421,48 @@ If user says "now", "quiz", "test me", "yes" after module completion:
     // STEP 5: Prepare messages for AI model with MARKDOWN formatting requirement
     const systemMessageContent = `${enhancedInstructions}
 
-## RESPONSE FORMAT REQUIREMENT
-Format your response using Markdown to ensure professional presentation:
+## 🌟 PREMIUM RESPONSE FORMAT - ELITE PRESENTATION STANDARDS
+Format your responses using sophisticated Markdown to ensure professional presentation and optimal learning:
 
-- Use **bold text** for emphasis and important concepts
-- Use ## Heading 2 for section titles
-- Use ### Heading 3 for subsections
-- Use \`\`\`code code\`\`\` for code blocks and technical examples
-- Use • bullet points for lists (no numbered lists unless necessary)
-- Use proper spacing between paragraphs
-- Use **key terms** in bold when first introduced
-- Keep responses well-structured with clear hierarchy
+**Typography Excellence:**
+- Use **bold text** for critical concepts and key terminology
+- Use *italic text* for emphasis and nuanced points
+- Use ## Heading 2 for major sections and topic transitions
+- Use ### Heading 3 for subtopics and detailed breakdowns
+- Use \`\`\`code blocks\`\`\` for technical examples and implementations
+- Use • bullet points for organized information presentation
+- Use numbered lists only for sequential processes or rankings
 
-Example format:
-**Key Concept**: Brief explanation
+**Structural Sophistication:**
+- Maintain proper paragraph spacing for readability
+- Create clear visual hierarchy with consistent formatting
+- Use horizontal rules (---) to separate major sections
+- Include blockquotes for important insights or citations
+- Format mathematical expressions with proper notation when applicable
 
-## Main Idea
-Details about the concept...
+**Content Enhancement:**
+- Introduce **key terms** in bold when first presented
+- Provide **real-world applications** in italicized emphasis
+- Use 💡 for insights, 🎯 for objectives, 🌟 for achievements
+- Include **connection statements** that link concepts
+- End with **forward-looking statements** that build anticipation
 
-### Sub-topic
-More information...
+**Professional Example Structure:**
+**Core Concept**: Elegant definition with immediate relevance
 
-Always prioritize clarity and professional formatting.`;
+## Strategic Framework
+Detailed explanation with layered complexity and practical applications
+
+### Advanced Application
+Sophisticated implementation strategies and real-world connections
+
+**Learning Integration**: How this concept connects to broader understanding
+
+---
+
+**Next Horizon**: Preview of upcoming advanced topics
+
+Always prioritize intellectual clarity, aesthetic presentation, and cognitive engagement in every response.`;
 
     const messages = [{ role: "system", content: systemMessageContent }];
 
@@ -2208,7 +2138,7 @@ app.post("/api/apply-study-plan", async (req, res) => {
 
 app.post("/api/generate-quiz", async (req, res) => {
   const timestamp = new Date().toISOString();
-  console.log("[POST /api/generate-quiz] Quiz generation request:", timestamp);
+  console.log("[POST /api/generate-quiz] ENHANCED Quiz generation request:", timestamp);
 
   try {
     const {
@@ -2233,72 +2163,23 @@ app.post("/api/generate-quiz", async (req, res) => {
       });
     }
 
-    // Get web search context if enabled
-    let searchContext = "";
-    if (useWebSearch) {
-      console.log("[generate-quiz] Performing web search for context");
-      const searchResults = await searchTopicOnline(
-        `${moduleName} ${topic || ""}`.trim(),
-        gradeLevel || "General",
-      );
-      if (searchResults && searchResults.answer) {
-        searchContext = `Web search context: ${searchResults.answer}`;
-      }
-    }
+    console.log("[generate-quiz] 🧠 Starting ENHANCED quiz generation with deep learning analysis...");
 
-    // Build prompt for Groq
-    let quizPrompt = `Generate a quiz in JSON format for a ${
-      gradeLevel || "General"
-    } level student on the module: "${moduleName}"`;
+    // Generate enhanced quiz prompt based on comprehensive analysis
+    const quizPrompt = await generateEnhancedQuizPrompt({
+      botId,
+      userId,
+      moduleName,
+      gradeLevel,
+      questionType,
+      mcqCount,
+      textCount,
+      useWebSearch
+    });
 
-    if (moduleContent) {
-      quizPrompt += `\n\nModule Content:\n${moduleContent}`;
-    }
+    console.log("[generate-quiz] 📝 Enhanced quiz prompt generated with learning analysis");
 
-    if (searchContext) {
-      quizPrompt += `\n\n${searchContext}`;
-    }
-
-    quizPrompt += `\n\nGenerate quiz questions in this exact JSON structure:
-{
-  "questions": [
-    {
-      "type": "mcq",
-      "text": "Question text here?",
-      "options": ["Option A", "Option B", "Option C", "Option D"]
-    },
-    {
-      "type": "text",
-      "text": "What is your understanding of...?"
-    }
-  ],
-  "answers": [
-    {
-      "type": "mcq",
-      "answer": "Option B",
-      "explanation": "Detailed explanation using web search if available..."
-    },
-    {
-      "type": "text", 
-      "answer": "Expected answer here",
-      "explanation": "Comprehensive explanation based on module content and web research..."
-    }
-  ]
-}`;
-
-    if (questionType === "mcq") {
-      quizPrompt += `\n\nGenerate ONLY ${mcqCount} multiple choice questions. Do NOT include text questions.`;
-    } else if (questionType === "text") {
-      quizPrompt += `\n\nGenerate ONLY ${textCount} text/essay questions. Do NOT include MCQ questions.`;
-    } else if (questionType === "both") {
-      quizPrompt += `\n\nGenerate ${mcqCount} MCQ questions AND ${textCount} text questions.`;
-    }
-
-    quizPrompt += `\n\nEnsure explanations are detailed, use web search information when available, and are age-appropriate for ${
-      gradeLevel || "General"
-    } level students.`;
-
-    // Call Groq API
+    // Call Groq API with enhanced prompt
     const groqApiKey = process.env.GROQ_API_KEY;
     if (!groqApiKey) {
       console.warn("[generate-quiz] GROQ_API_KEY not configured");
@@ -2309,7 +2190,7 @@ app.post("/api/generate-quiz", async (req, res) => {
       });
     }
 
-    console.log("[generate-quiz] Calling Groq API for question generation");
+    console.log("[generate-quiz] 🤖 Calling Groq API for PERSONALIZED question generation");
     const groqRes = await axios.post(
       "https://api.groq.com/openai/v1/chat/completions",
       {
@@ -2317,23 +2198,22 @@ app.post("/api/generate-quiz", async (req, res) => {
         messages: [
           {
             role: "system",
-            content:
-              "You are an expert quiz generator. Generate ONLY valid JSON with no markdown, code blocks, or extra text.",
+            content: "You are an expert educational quiz generator specializing in personalized assessments. Generate ONLY valid JSON with no markdown, code blocks, or extra text. Make quizzes feel personal to each student's learning journey.",
           },
           {
             role: "user",
             content: quizPrompt,
           },
         ],
-        max_tokens: 2000,
-        temperature: 0.8,
+        max_tokens: 3000, // Increased for more detailed responses
+        temperature: 0.7, // Slightly higher for creativity
       },
       {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${groqApiKey}`,
         },
-        timeout: 30000,
+        timeout: 45000, // Increased timeout for complex analysis
       },
     );
 
@@ -2355,70 +2235,69 @@ app.post("/api/generate-quiz", async (req, res) => {
       quizJson = JSON.parse(cleanedText);
     }
 
-    // Validate structure
-    if (
-      !quizJson.questions ||
-      !Array.isArray(quizJson.questions) ||
-      quizJson.questions.length === 0
-    ) {
-      throw new Error("Invalid quiz structure: missing questions array");
-    }
-    if (
-      !quizJson.answers ||
-      !Array.isArray(quizJson.answers) ||
-      quizJson.answers.length === 0
-    ) {
-      throw new Error("Invalid quiz structure: missing answers array");
+    // Enhanced validation
+    if (!quizJson || !quizJson.questions || !Array.isArray(quizJson.questions)) {
+      console.error("[generate-quiz] Invalid quiz structure received");
+      return res.status(500).json({
+        error: "Quiz generation failed",
+        message: "Invalid quiz structure returned from AI",
+        timestamp,
+      });
     }
 
-    console.log("[generate-quiz] Quiz generated successfully:", {
-      questionCount: quizJson.questions.length,
-      answerCount: quizJson.answers.length,
+    // Validate personalized elements
+    const hasPersonalization = quizJson.personalization && 
+      (quizJson.personalization.basedOnConversation || 
+       quizJson.personalization.addressesWeaknesses?.length > 0 ||
+       quizJson.personalization.buildsOnStrengths?.length > 0);
+
+    console.log("[generate-quiz] ✅ Enhanced quiz generated successfully:", {
+      totalQuestions: quizJson.questions.length,
+      personalized: hasPersonalization,
+      hasAnswers: quizJson.answers && Array.isArray(quizJson.answers),
+      conceptsTested: quizJson.questions.map(q => q.concept).filter(Boolean).length
     });
 
-    // Save quiz to database for future reference
-    let quizId = 0;
+    // Store quiz data with enhanced metadata
     try {
-      const quizResult = await pool.query(
-        `INSERT INTO quiz_data (bot_id, user_id, module_name, quiz_data, created_at)
-         VALUES ($1, $2, $3, $4, $5)
-         ON CONFLICT (bot_id, user_id, module_name) DO UPDATE
-         SET quiz_data = $4, created_at = $5
-         RETURNING id`,
-        [botId, userId, moduleName, JSON.stringify(quizJson), timestamp],
-      );
-      quizId = quizResult.rows[0]?.id || 0;
-      console.log("[generate-quiz] Quiz saved to database with ID:", quizId);
-    } catch (dbErr) {
-      console.warn("[generate-quiz] Failed to save quiz to DB:", dbErr.message);
-      // Don't fail the request if DB save fails
-    }
-
-    // Save AI message about quiz to chat history
-    try {
-      const quizMessage = `I've prepared a comprehensive quiz with ${quizJson.questions.length} questions for you. You can review the questions, answer them, and then check the answers with detailed explanations. Good luck! 🎯`;
       await pool.query(
-        `INSERT INTO chat_messages (bot_id, user_id, message_type, content) VALUES ($1, $2, $3, $4)`,
-        [botId, userId, "bot", quizMessage],
+        `INSERT INTO quiz_data (bot_id, user_id, module_name, quiz_data) 
+         VALUES ($1, $2, $3, $4) 
+         ON CONFLICT (bot_id, user_id, module_name) 
+         DO UPDATE SET quiz_data = $4, created_at = CURRENT_TIMESTAMP`,
+        [botId, userId, moduleName, JSON.stringify({
+          ...quizJson,
+          enhanced: true,
+          generatedAt: timestamp,
+          personalized: hasPersonalization
+        })]
       );
-    } catch (msgErr) {
-      console.warn(
-        "[generate-quiz] Failed to save quiz message:",
-        msgErr.message,
-      );
+      console.log("[generate-quiz] 📚 Enhanced quiz stored in database");
+    } catch (dbErr) {
+      console.error("[generate-quiz] Database error:", dbErr.message);
+      // Continue even if storage fails
     }
 
-    return res.json({
-      status: "success",
-      message: "Quiz generated successfully",
+    // Return enhanced response
+    return res.status(200).json({
+      success: true,
       quiz: quizJson,
-      quizId: quizId || 0,
+      metadata: {
+        enhanced: true,
+        personalized: hasPersonalization,
+        generatedAt: timestamp,
+        analysisUsed: true,
+        conversationAnalyzed: true,
+        studyPlanContext: true
+      },
       timestamp,
     });
+
   } catch (err) {
     console.error("[POST /api/generate-quiz] Error:", err.message);
+    console.error("[POST /api/generate-quiz] Stack:", err.stack);
     return res.status(500).json({
-      error: "Failed to generate quiz",
+      error: "Enhanced quiz generation failed",
       message: err.message,
       timestamp: new Date().toISOString(),
     });
