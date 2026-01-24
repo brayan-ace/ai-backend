@@ -118,6 +118,24 @@ class AnalyticsService {
     }
   }
 
+  /// Track quiz start
+  Future<void> trackQuizStart(Map<String, dynamic> quizData) async {
+    try {
+      await _firestore.collection('learning_events').add({
+        'session_id': _sessionData['session_id'],
+        'user_id': _sessionData['user_id'],
+        'event_type': 'quiz_started',
+        'quiz_data': {
+          'questions_count': quizData['questions']?.length ?? 0,
+          'topic': quizData['topic'] ?? 'Unknown',
+        },
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('[Analytics] Error tracking quiz start: $e');
+    }
+  }
+
   /// Track topic exploration
   Future<void> trackTopicExplored(String topic, String category) async {
     try {

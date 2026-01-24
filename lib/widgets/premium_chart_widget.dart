@@ -64,7 +64,7 @@ class _PremiumChartWidgetState extends State<PremiumChartWidget>
 
   Widget _buildLineChart() {
     if (widget.data.isEmpty) return _buildEmptyState();
-    
+
     return CustomPaint(
       size: Size.infinite,
       painter: LineChartPainter(
@@ -78,7 +78,7 @@ class _PremiumChartWidgetState extends State<PremiumChartWidget>
 
   Widget _buildBarChart() {
     if (widget.data.isEmpty) return _buildEmptyState();
-    
+
     return CustomPaint(
       size: Size.infinite,
       painter: BarChartPainter(
@@ -92,13 +92,10 @@ class _PremiumChartWidgetState extends State<PremiumChartWidget>
 
   Widget _buildPieChart() {
     if (widget.data.isEmpty) return _buildEmptyState();
-    
+
     return CustomPaint(
       size: Size.infinite,
-      painter: PieChartPainter(
-        data: widget.data,
-        animation: _animation,
-      ),
+      painter: PieChartPainter(data: widget.data, animation: _animation),
       child: Container(),
     );
   }
@@ -118,9 +115,7 @@ class _PremiumChartWidgetState extends State<PremiumChartWidget>
             SizedBox(height: AppTheme.spaceSm),
             Text(
               'No data available',
-              style: AppTheme.bodyMedium.copyWith(
-                color: AppTheme.textTertiary,
-              ),
+              style: AppTheme.bodyMedium.copyWith(color: AppTheme.textTertiary),
             ),
           ],
         ),
@@ -166,8 +161,8 @@ class LineChartPainter extends CustomPainter {
 
     // Find min and max values
     final values = data.map((d) => (d['value'] as num).toDouble()).toList();
-    final minValue = values.reduce(math.min);
-    final maxValue = values.reduce(math.max);
+    final minValue = values.isNotEmpty ? values.reduce(math.min) : 0.0;
+    final maxValue = values.isNotEmpty ? values.reduce(math.max) : 1.0;
     final valueRange = maxValue - minValue;
 
     // Draw grid lines
@@ -180,7 +175,9 @@ class LineChartPainter extends CustomPainter {
     final points = <Offset>[];
     for (int i = 0; i < data.length; i++) {
       final x = padding + (i / (data.length - 1)) * chartWidth;
-      final normalizedValue = (data[i]['value'] as double - minValue) / valueRange;
+      final normalizedValue =
+          ((data[i]['value'] as double) - minValue) /
+          (valueRange == 0 ? 1 : valueRange);
       final y = padding + chartHeight * (1 - normalizedValue * animation.value);
       points.add(Offset(x, y));
     }
@@ -192,14 +189,13 @@ class LineChartPainter extends CustomPainter {
           Offset(padding, size.height - padding),
           ...points,
           Offset(size.width - padding, size.height - padding),
-        ]);
+        ], false);
       canvas.drawPath(fillPath, fillPaint);
     }
 
     // Draw line
     if (points.length > 1) {
-      final path = Path()
-        ..addPolygon(points);
+      final path = Path()..addPolygon(points, false);
       canvas.drawPath(path, paint);
     }
 
@@ -259,7 +255,13 @@ class LineChartPainter extends CustomPainter {
     );
   }
 
-  void _drawLineChartLabels(Canvas canvas, Size size, double padding, double minValue, double maxValue) {
+  void _drawLineChartLabels(
+    Canvas canvas,
+    Size size,
+    double padding,
+    double minValue,
+    double maxValue,
+  ) {
     final textStyle = AppTheme.bodySmall.copyWith(
       color: AppTheme.textSecondary,
     );
@@ -269,10 +271,7 @@ class LineChartPainter extends CustomPainter {
       final value = minValue + (maxValue - minValue) * (1 - i / 5);
       final y = padding + (i / 5) * (size.height - 2 * padding);
       final textPainter = TextPainter(
-        text: TextSpan(
-          text: value.round().toString(),
-          style: textStyle,
-        ),
+        text: TextSpan(text: value.round().toString(), style: textStyle),
         textDirection: TextDirection.ltr,
       );
       textPainter.layout();
@@ -283,10 +282,7 @@ class LineChartPainter extends CustomPainter {
     for (int i = 0; i < data.length; i++) {
       final x = padding + (i / (data.length - 1)) * (size.width - 2 * padding);
       final textPainter = TextPainter(
-        text: TextSpan(
-          text: data[i]['day'] as String,
-          style: textStyle,
-        ),
+        text: TextSpan(text: data[i]['day'] as String, style: textStyle),
         textDirection: TextDirection.ltr,
       );
       textPainter.layout();
@@ -326,7 +322,10 @@ class BarChartPainter extends CustomPainter {
 
     // Draw bars
     for (int i = 0; i < data.length; i++) {
-      final barHeight = (data[i]['value'] as double / maxValue) * chartHeight * animation.value;
+      final barHeight =
+          ((data[i]['value'] as double) / (maxValue == 0 ? 1 : maxValue)) *
+          chartHeight *
+          animation.value;
       final x = padding + i * (barWidth + spacing) + spacing / 2;
       final y = size.height - padding - barHeight;
 
@@ -341,7 +340,9 @@ class BarChartPainter extends CustomPainter {
       );
 
       final barPaint = Paint()
-        ..shader = gradient.createShader(Rect.fromLTWH(x, y, barWidth, barHeight));
+        ..shader = gradient.createShader(
+          Rect.fromLTWH(x, y, barWidth, barHeight),
+        );
 
       // Draw rounded rectangle bar
       final rrect = RRect.fromRectAndRadius(
@@ -373,16 +374,17 @@ class BarChartPainter extends CustomPainter {
       final categoryPainter = TextPainter(
         text: TextSpan(
           text: categoryText,
-          style: AppTheme.bodySmall.copyWith(
-            color: AppTheme.textSecondary,
-          ),
+          style: AppTheme.bodySmall.copyWith(color: AppTheme.textSecondary),
         ),
         textDirection: TextDirection.ltr,
       );
       categoryPainter.layout();
       categoryPainter.paint(
         canvas,
-        Offset(x + (barWidth - categoryPainter.width) / 2, size.height - padding + 10),
+        Offset(
+          x + (barWidth - categoryPainter.width) / 2,
+          size.height - padding + 10,
+        ),
       );
     }
   }
@@ -395,10 +397,7 @@ class PieChartPainter extends CustomPainter {
   final List<Map<String, dynamic>> data;
   final Animation<double> animation;
 
-  PieChartPainter({
-    required this.data,
-    required this.animation,
-  });
+  PieChartPainter({required this.data, required this.animation});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -408,14 +407,16 @@ class PieChartPainter extends CustomPainter {
     final radius = math.min(size.width, size.height) / 3;
 
     // Calculate total value
-    final total = data
-        .map((d) => d['value'] as num)
-        .reduce((a, b) => a + b);
+    final total = data.map((d) => d['value'] as num).reduce((a, b) => a + b);
 
     double currentAngle = -math.pi / 2; // Start from top
 
     for (int i = 0; i < data.length; i++) {
-      final sweepAngle = (data[i]['value'] as double / total) * 2 * math.pi * animation.value;
+      final sweepAngle =
+          ((data[i]['value'] as double) / (total == 0 ? 1 : total)) *
+          2 *
+          math.pi *
+          animation.value;
       final color = data[i]['color'] as Color? ?? _getDefaultColor(i);
 
       // Draw pie slice
@@ -436,7 +437,9 @@ class PieChartPainter extends CustomPainter {
       final labelX = center.dx + math.cos(labelAngle) * (radius * 0.7);
       final labelY = center.dy + math.sin(labelAngle) * (radius * 0.7);
 
-      final percentage = ((data[i]['value'] as double / total) * 100).round();
+      final percentage =
+          (((data[i]['value'] as double) / (total == 0 ? 1 : total)) * 100)
+              .round();
       final textPainter = TextPainter(
         text: TextSpan(
           text: '$percentage%',

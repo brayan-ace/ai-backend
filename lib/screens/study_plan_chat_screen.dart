@@ -3,15 +3,15 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/study_bot_state.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/study_plan_service.dart';
 import '../services/study_bot_flow_controller.dart';
 import '../services/tutor_engagement_service.dart';
 import '../services/progress_tracking_service.dart';
 import '../services/study_bot_storage_service.dart';
-import '../services/analytics_service.dart';
 import '../services/gamification_service.dart';
+import '../services/analytics_service.dart';
 import '../utils/theme.dart';
 import 'study_plan_editor_screen.dart';
 import 'quiz_config_screen.dart';
@@ -24,8 +24,8 @@ import '../widgets/premium_message_bubble.dart';
 class PremiumColors {
   static const Color darkBg = Color(0xFF0a0a0a); // Pure black
   static const Color darkBg2 = Color(0xFF1a1a2e); // Deep blue-black
-  static const Color accentGradient1 = Color(0xFF2196F3); // Blue
-  static const Color accentGradient2 = Color(0xFF1976D2); // Darker blue
+  static const Color accentGradient1 = Color(0xFF6366f1); // Indigo
+  static const Color accentGradient2 = Color(0xFF8b5cf6); // Purple
   static const Color accentGradient3 = Color(0xFF3b82f6); // Blue
   static const Color cardBg = Color(0xFF111827); // Very dark gray
   static const Color focusBorder = Color(0xFF4f46e5); // Focus blue
@@ -200,8 +200,8 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   late StudyBotFlowController _flowController;
   late TutorEngagementService _tutorService;
   late ProgressTrackingService _progressService;
-  final AnalyticsService _analyticsService = AnalyticsService();
-  final GamificationService _gamificationService = GamificationService();
+  late GamificationService _gamificationService;
+  late AnalyticsService _analyticsService;
 
   bool _isPhase1 = false;
   bool _isPhase2 = false;
@@ -257,11 +257,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     _flowController = StudyBotFlowController();
     _tutorService = TutorEngagementService();
     _progressService = ProgressTrackingService();
+    _gamificationService = GamificationService();
+    _analyticsService = AnalyticsService();
     _storageService = StudyBotStorageService();
-
-    // Start analytics session tracking
-    _sessionStartTime = DateTime.now();
-    _analyticsService.initialize();
 
     // Add scroll listener for scroll-to-bottom button
     _scrollController.addListener(_onScroll);
@@ -285,21 +283,6 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
 
   @override
   void dispose() {
-    // End analytics session
-    if (_sessionStartTime != null) {
-      final sessionDuration = DateTime.now().difference(_sessionStartTime!).inSeconds;
-      _analyticsService.endSession();
-      
-      // Update gamification streak
-      _gamificationService.updateStreak();
-      
-      // Check achievements
-      _gamificationService.checkAchievements(
-        conceptsLearned: _conceptsLearned.length,
-        studyTimeMinutes: sessionDuration ~/ 60,
-      );
-    }
-    
     _inputController.dispose();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
@@ -349,82 +332,81 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         final currentUser = FirebaseAuth.instance.currentUser;
         final userId = currentUser?.uid ?? 'anonymous';
 
-        // Create/update bot in Firebase - EXACT same pattern as OnlineAiScreen.createChat
+        // Initialize Firebase chat session
         try {
-          final user = _auth.currentUser;
-          if (user != null) {
-            final botRef = _firestore
-                .collection('users')
-                .doc(user.uid)
-                .collection('study_bots')
-                .doc(widget.botId!);
-
-            final botDoc = await botRef.get();
-
-            if (!botDoc.exists) {
-              // Create new bot document
-              await botRef.set({
-                'name': widget.botName ?? 'Study Bot',
-                'topic': widget.planName ?? '',
-                'description': widget.planDescription ?? '',
-                'gradeLevel': '',
-                'systemInstructions': widget.systemInstructions,
-                'createdAt': FieldValue.serverTimestamp(),
-                'updatedAt': FieldValue.serverTimestamp(),
-                'messageCount': 0,
-                'progressPercentage': 0,
-                'currentModule': 0,
-                'botState': 'intro',
-                'lastMessage': null,
-                'lastMessageTime': null,
-              });
-              print('[ChatScreen] 🔥 Created new bot in Firebase');
-            } else {
-              // Update existing bot
-              await botRef.update({'updatedAt': FieldValue.serverTimestamp()});
-              print('[ChatScreen] 🔥 Updated existing bot in Firebase');
-            }
-          }
-        } catch (e) {
-          print(
-            '[ChatScreen] ⚠️ Firebase bot creation error (non-blocking): $e',
+          await _storageService.getOrCreateBotChat(
+            botId: widget.botId!,
+            botName: widget.botName ?? 'Study Bot',
+            topic: widget.planName,
+            description: widget.planDescription,
           );
+          print('[ChatScreen] 🔥 Firebase chat session initialized');
+        } catch (e) {
+          print('[ChatScreen] ⚠️ Firebase init error (non-blocking): $e');
         }
 
-        // Load chat history from Firebase - EXACT same pattern as OnlineAiScreen.getMessages
+        // Load chat history from Firebase (primary source)
         try {
-          final user = _auth.currentUser;
-          if (user != null) {
-            final messagesSnapshot = await _firestore
-                .collection('users')
-                .doc(user.uid)
-                .collection('study_bots')
-                .doc(widget.botId!)
-                .collection('messages')
-                .orderBy('timestamp', descending: false)
-                .get();
+          final firebaseMessages = await _storageService.getMessages(
+            widget.botId!,
+          );
+          if (firebaseMessages.isNotEmpty) {
+            final messages = firebaseMessages
+                .map(
+                  (m) => StudyBotMessage(
+                    id:
+                        m['id'] as String? ??
+                        DateTime.now().millisecondsSinceEpoch.toString(),
+                    senderType:
+                        m['senderType'] as String? ??
+                        (m['fromUser'] == true ? 'user' : 'bot'),
+                    text: m['text'] as String? ?? '',
+                    timestamp:
+                        (m['timestamp'] as dynamic)?.toDate() ?? DateTime.now(),
+                  ),
+                )
+                .toList();
 
-            if (messagesSnapshot.docs.isNotEmpty) {
-              final messages = messagesSnapshot.docs.map((doc) {
-                final data = doc.data();
-                return StudyBotMessage(
-                  id: doc.id,
-                  senderType: data['fromUser'] == true ? 'user' : 'bot',
-                  text: data['text'] as String? ?? '',
-                  timestamp:
-                      (data['timestamp'] as Timestamp?)?.toDate() ??
-                      DateTime.now(),
-                );
-              }).toList();
-
-              setState(() => _messages = messages);
-              print(
-                '[ChatScreen] 🔥 Loaded ${messages.length} messages from Firebase',
-              );
-            }
+            setState(() => _messages = messages);
+            print(
+              '[ChatScreen] 🔥 Loaded ${messages.length} messages from Firebase',
+            );
           }
         } catch (e) {
           print('[ChatScreen] ⚠️ Firebase history load error: $e');
+          // Fallback to backend if Firebase fails
+          try {
+            final historyUri = Uri.parse(
+              '$_backendUrl/api/chat-history/${widget.botId}/$userId',
+            );
+            final historyRes = await http
+                .get(historyUri)
+                .timeout(const Duration(seconds: 15));
+
+            if (historyRes.statusCode == 200) {
+              final body = jsonDecode(historyRes.body);
+              final messages = (body['messages'] as List? ?? [])
+                  .map(
+                    (m) => StudyBotMessage(
+                      id: DateTime.now().millisecondsSinceEpoch.toString(),
+                      senderType: m['senderType'] as String? ?? 'user',
+                      text: m['text'] as String? ?? '',
+                      timestamp: DateTime.parse(
+                        m['timestamp'] as String? ??
+                            DateTime.now().toIso8601String(),
+                      ),
+                    ),
+                  )
+                  .toList();
+
+              setState(() => _messages = messages);
+              print(
+                '[ChatScreen] 📡 Loaded ${messages.length} messages from backend (fallback)',
+              );
+            }
+          } catch (backendErr) {
+            print('[ChatScreen] ❌ Backend history also failed: $backendErr');
+          }
         }
 
         // Fetch bot progress and state from backend
@@ -656,41 +638,15 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         _messages.add(message);
       });
 
-      // Save bot message to Firebase - EXACT same pattern as OnlineAiScreen.saveMessage
+      // Save bot message to Firebase
       if (widget.botId != null) {
         try {
-          final user = _auth.currentUser;
-          if (user != null) {
-            // Add message to subcollection
-            await _firestore
-                .collection('users')
-                .doc(user.uid)
-                .collection('study_bots')
-                .doc(widget.botId!)
-                .collection('messages')
-                .add({
-                  'text': adaptedText,
-                  'fromUser': false,
-                  'timestamp': FieldValue.serverTimestamp(),
-                });
-
-            // Update bot metadata
-            await _firestore
-                .collection('users')
-                .doc(user.uid)
-                .collection('study_bots')
-                .doc(widget.botId!)
-                .update({
-                  'updatedAt': FieldValue.serverTimestamp(),
-                  'messageCount': FieldValue.increment(1),
-                  'lastMessage': adaptedText.length > 100
-                      ? '${adaptedText.substring(0, 100)}...'
-                      : adaptedText,
-                  'lastMessageTime': FieldValue.serverTimestamp(),
-                });
-
-            print('[ChatScreen] 🔥 Bot message saved to Firebase');
-          }
+          await _storageService.saveMessage(
+            botId: widget.botId!,
+            text: adaptedText,
+            fromUser: false,
+          );
+          print('[ChatScreen] 🔥 Bot message saved to Firebase');
         } catch (e) {
           print('[ChatScreen] ⚠️ Firebase save error (non-blocking): $e');
         }
@@ -713,41 +669,15 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       timestamp: DateTime.now(),
     );
 
-    // Save user message to Firebase - EXACT same pattern as OnlineAiScreen.saveMessage
+    // Save user message to Firebase
     if (widget.botId != null) {
       try {
-        final user = _auth.currentUser;
-        if (user != null) {
-          // Add message to subcollection
-          await _firestore
-              .collection('users')
-              .doc(user.uid)
-              .collection('study_bots')
-              .doc(widget.botId!)
-              .collection('messages')
-              .add({
-                'text': text,
-                'fromUser': true,
-                'timestamp': FieldValue.serverTimestamp(),
-              });
-
-          // Update bot metadata
-          await _firestore
-              .collection('users')
-              .doc(user.uid)
-              .collection('study_bots')
-              .doc(widget.botId!)
-              .update({
-                'updatedAt': FieldValue.serverTimestamp(),
-                'messageCount': FieldValue.increment(1),
-                'lastMessage': text.length > 100
-                    ? '${text.substring(0, 100)}...'
-                    : text,
-                'lastMessageTime': FieldValue.serverTimestamp(),
-              });
-
-          print('[ChatScreen] 🔥 User message saved to Firebase');
-        }
+        await _storageService.saveMessage(
+          botId: widget.botId!,
+          text: text,
+          fromUser: true,
+        );
+        print('[ChatScreen] 🔥 User message saved to Firebase');
       } catch (e) {
         print('[ChatScreen] ⚠️ Firebase save error (non-blocking): $e');
       }
@@ -802,33 +732,15 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       final userId = currentUser?.uid ?? 'anonymous';
       print('[ChatScreen] User ID: $userId');
 
-      // Get conversation history from Firebase for AI context - EXACT same pattern as OnlineAiScreen
+      // Get conversation history from Firebase for AI context
       List<Map<String, String>> conversationHistory = [];
       if (widget.botId != null) {
         try {
-          final user = _auth.currentUser;
-          if (user != null) {
-            final messagesSnapshot = await _firestore
-                .collection('users')
-                .doc(user.uid)
-                .collection('study_bots')
-                .doc(widget.botId!)
-                .collection('messages')
-                .orderBy('timestamp', descending: true)
-                .limit(20)
-                .get();
-
-            // Reverse to get chronological order
-            conversationHistory = messagesSnapshot.docs.reversed.map((doc) {
-              final data = doc.data();
-              final role = data['fromUser'] == true ? 'user' : 'assistant';
-              return {'role': role, 'content': data['text'] as String? ?? ''};
-            }).toList();
-
-            print(
-              '[ChatScreen] 🔥 Loaded ${conversationHistory.length} messages for AI context',
-            );
-          }
+          conversationHistory = await _storageService
+              .getConversationHistoryForAI(widget.botId!, limit: 20);
+          print(
+            '[ChatScreen] 🔥 Loaded ${conversationHistory.length} messages for AI context',
+          );
         } catch (e) {
           print('[ChatScreen] ⚠️ Could not load Firebase history for AI: $e');
         }
@@ -893,51 +805,17 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
           print('[ChatScreen]    - Trigger quiz: $triggerQuiz');
 
           setState(() {
-            // Update progress percentage and state
+            _botCurrentState = newState;
             if (progress != null) {
-              _progressPercentage =
-                  progress['percentage'] ?? _progressPercentage;
-              _botCurrentState = progress['state'] ?? _botCurrentState;
+              _progressPercentage = (progress['percentage'] ?? 0).toDouble();
+              print('[ChatScreen] 📊 Progress: $_progressPercentage%');
             }
             print('[ChatScreen] 📊 State updated: $_botCurrentState');
           });
 
-          // Update progress in Firebase - EXACT same pattern as OnlineAiScreen metadata updates
-          if (progress != null && widget.botId != null) {
-            try {
-              final user = _auth.currentUser;
-              if (user != null) {
-                await _firestore
-                    .collection('users')
-                    .doc(user.uid)
-                    .collection('study_bots')
-                    .doc(widget.botId!)
-                    .update({
-                      'progressPercentage': _progressPercentage,
-                      'botState': _botCurrentState,
-                      'updatedAt': FieldValue.serverTimestamp(),
-                    });
-                print(
-                  '[ChatScreen] 🔥 Progress updated in Firebase: $_progressPercentage%',
-                );
-              }
-            } catch (e) {
-              print('[ChatScreen] ⚠️ Firebase progress update error: $e');
-            }
-          }
-
-          if (progress != null) {
-            print('[ChatScreen] 📊 Progress: $_progressPercentage%');
-          }
-
           // Show celebration if module was completed
           if (moduleCompleted) {
             _showModuleCompletionCelebration(progress);
-          }
-
-          // Track concept completion for analytics
-          if (conceptCompleted) {
-            await _trackConceptCompletion(aiResponse);
           }
 
           // Trigger quiz if backend signals it
@@ -2210,42 +2088,28 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
 
   /// Convert backend study plan to TableOfContentsItem list
   List<TableOfContentsItem> _convertStudyPlanToToc() {
-    if (_studyPlan == null) {
-      print('[ChatScreen] 🔄 _convertStudyPlanToToc: _studyPlan is NULL');
-      return [];
-    }
+    if (_studyPlan == null) return [];
 
     final modules = _studyPlan!['modules'] as List? ?? [];
-    print('[ChatScreen] 🔄 Converting ${modules.length} modules to TOC items');
-    
-    final tocItems = modules.asMap().entries.map((entry) {
+    return modules.asMap().entries.map((entry) {
       final idx = entry.key;
       final mod = entry.value as Map<String, dynamic>;
-      
-      final title = mod['title'] ?? mod['module_name'] ?? 'Module ${idx + 1}';
-      final description = mod['objective'] ?? mod['description'] ?? '';
-      final keyTopics = List<String>.from(
-        mod['key_topics'] ??
-            mod['subtopics'] ??
-            mod['learning_objectives'] ??
-            [],
-      );
-      
-      print('[ChatScreen] 🔄 Module $idx: $title');
-      print('[ChatScreen] 🔄   - Topics: ${keyTopics.take(2).toList()}...');
 
       return TableOfContentsItem(
         moduleNumber: idx + 1,
-        title: title,
-        description: description,
-        subtopics: keyTopics,
-        estimatedTime: mod['estimated_effort'] ?? mod['estimated_time'] ?? '30 minutes',
+        title: mod['title'] ?? mod['module_name'] ?? 'Module ${idx + 1}',
+        description: mod['objective'] ?? mod['description'] ?? '',
+        subtopics: List<String>.from(
+          mod['key_topics'] ??
+              mod['subtopics'] ??
+              mod['learning_objectives'] ??
+              [],
+        ),
+        estimatedTime:
+            mod['estimated_effort'] ?? mod['duration'] ?? '30 minutes',
         difficultyLevel: mod['difficulty'] ?? 'Medium',
       );
     }).toList();
-
-    print('[ChatScreen] 🔄 Successfully converted ${tocItems.length} modules to TOC');
-    return tocItems;
   }
 
   /// Build drawer menu with navigation options
@@ -2255,32 +2119,12 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       '[ChatScreen] 🍔 Building drawer - _studyPlan: ${_studyPlan != null ? "EXISTS with ${(_studyPlan!['modules'] as List?)?.length ?? 0} modules" : "NULL"}',
     );
 
-    // Ensure study plan is loaded when drawer opens
-    if (_studyPlan == null && widget.botId != null) {
-      print('[ChatScreen] 🍔 Study plan not loaded, loading now...');
-      _loadStudyPlan().then((loaded) {
-        if (loaded && mounted) {
-          setState(() {}); // Rebuild drawer with loaded plan
-        }
-      });
-    }
-
     // Use converted study plan or fallback to botState tableOfContents
     final tocItems = _studyPlan != null
         ? _convertStudyPlanToToc()
         : _botState?.tableOfContents ?? [];
 
     print('[ChatScreen] 🍔 tocItems count: ${tocItems.length}');
-    print('[ChatScreen] 🍔 currentModule: ${_botState?.currentModule ?? 0}');
-    print('[ChatScreen] 🍔 completedModules: ${_botState?.completedModules ?? []}');
-    print('[ChatScreen] 🍔 progressPercentage: $_progressPercentage%');
-
-    // Enhanced debug: Show first few subtopics
-    if (tocItems.isNotEmpty) {
-      final firstItem = tocItems.first;
-      print('[ChatScreen] 🍔 First module: ${firstItem.title}');
-      print('[ChatScreen] 🍔 First module subtopics: ${firstItem.subtopics.take(3).toList()}');
-    }
 
     return PremiumStudyPlanMenu(
       tableOfContents: tocItems.isNotEmpty ? tocItems : null,
@@ -2789,8 +2633,27 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       Navigator.pop(context);
     }
 
-    // Track concept completion for analytics
-  Future<void> _trackConceptCompletion(String aiResponse) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => StudyPlanEditorScreen(
+          studyPlan: _studyPlan!,
+          onSave: (updatedPlan) async {
+            await _savePlanChanges(updatedPlan, userId);
+          },
+        ),
+      ),
+    );
+
+    // Reload plan after editor closes to sync any changes
+    if (result != null || mounted) {
+      await _loadStudyPlan();
+    }
+  }
+
+  Future<void> _savePlanChanges(
+    Map<String, dynamic> updatedPlan,
+    String userId, {
     bool apply = true,
   }) async {
     // Store backup of current plan in case save fails
@@ -3327,6 +3190,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
 
   /// Show quiz artifact dialog
   void _showQuizArtifact(Map<String, dynamic> quiz) {
+    // Track quiz start
+    _analyticsService.trackQuizStart(quiz);
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -3347,8 +3213,13 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                 ),
                 SizedBox(height: AppTheme.spaceMd),
                 ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     Navigator.of(context).pop();
+
+                    // Track quiz completion
+                    await _analyticsService.trackQuizCompletion(quiz);
+                    await _recordMilestone('Quiz completed', 'quiz_completion');
+
                     _sendMessageToBackend('I\'ve completed the quiz review.');
                   },
                   style: ElevatedButton.styleFrom(
@@ -3513,8 +3384,23 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         );
       });
 
+      // Award XP for learning milestones
+      int xpAmount = 10; // Base XP
+      if (type == 'concept_mastery') xpAmount = 25;
+      if (type == 'quiz_completion') xpAmount = 50;
+      if (type == 'module_completion') xpAmount = 100;
+
+      await _gamificationService.awardXP(xpAmount, reason: description);
+
+      // Track analytics
+      await _analyticsService.trackConceptLearned(
+        description,
+        'Module ${_botState?.currentModule ?? 1}',
+        300, // Assume 5 minutes spent
+      );
+
       print(
-        '[ChatScreen] Milestone recorded: $description, Progress: ${_progressPercentage.toStringAsFixed(1)}%',
+        '[ChatScreen] Milestone recorded: $description, Progress: ${_progressPercentage.toStringAsFixed(1)}%, XP: +$xpAmount',
       );
     } catch (e) {
       print('[ChatScreen] Error recording milestone: $e');
@@ -3577,96 +3463,8 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     return lowerMessage.contains('confused') ||
         lowerMessage.contains('not sure') ||
         lowerMessage.contains('explain') ||
-        lowerMessage.contains('help') ||
-        lowerMessage.contains('what do you mean') ||
-        lowerMessage.contains('don\'t understand');
-  }
-
-  /// Track concept completion for analytics
-  Future<void> _trackConceptCompletion(String aiResponse) async {
-    try {
-      // Extract concept from AI response (simplified)
-      final concept = _extractConceptFromResponse(aiResponse);
-      if (concept.isNotEmpty && !_conceptsLearned.contains(concept)) {
-        _conceptsLearned.add(concept);
-
-        // Track with analytics service
-        await _analyticsService.trackConceptLearned(
-          concept,
-          'Study Module',
-          DateTime.now().difference(_sessionStartTime!).inSeconds,
-        );
-
-        // Award XP for concept learning
-        await _gamificationService.awardXP(25, reason: 'Concept learned: $concept');
-
-        // Check achievements
-        await _gamificationService.checkAchievements(
-          conceptsLearned: _conceptsLearned.length,
-        );
-
-        print('[ChatScreen] 🧠 Concept tracked: $concept');
-      }
-    } catch (e) {
-      print('[ChatScreen] Error tracking concept: $e');
-    }
-  }
-
-  /// Extract concept from AI response (simplified implementation)
-  String _extractConceptFromResponse(String response) {
-    // Look for key concepts in the response
-    final conceptPatterns = [
-      RegExp(r'You\'ve mastered (.+?)\.'), // You've mastered [concept].
-      RegExp(r'Great job understanding (.+?)\.'), // Great job understanding [concept].
-      RegExp(r'You now understand (.+?)\.'), // You now understand [concept].
-      RegExp(r'concept of (.+?) is'), // concept of [concept] is
-    ];
-
-    for (final pattern in conceptPatterns) {
-      final match = pattern.firstMatch(response);
-      if (match != null) {
-        return match.group(1)?.trim() ?? '';
-      }
-    }
-
-    // Fallback: look for capitalized terms
-    final words = response.split(' ');
-    for (final word in words) {
-      if (word.length > 3 && word[0] == word[0].toUpperCase() && word[0] != word[0].toLowerCase()) {
-        return word.replaceAll(RegExp(r'[^\w]'), '');
-      }
-    }
-
-    return '';
-  }
-
-  /// Track quiz completion for analytics
-  Future<void> _trackQuizCompletion(int correctAnswers, int totalQuestions, String? category) async {
-    try {
-      final accuracy = correctAnswers / totalQuestions;
-
-      // Track with analytics service
-      await _analyticsService.trackQuizCompletion({
-        'correct_answers': correctAnswers,
-        'total_questions': totalQuestions,
-        'accuracy': accuracy,
-        'category': category ?? 'General',
-        'timestamp': DateTime.now().toIso8601String(),
-      });
-
-      // Award XP based on performance
-      final xpAwarded = (accuracy * 50).round();
-      await _gamificationService.awardXP(xpAwarded, reason: 'Quiz completion');
-
-      // Check achievements
-      await _gamificationService.checkAchievements(
-        quizzesCompleted: 1,
-        quizAccuracy: accuracy,
-      );
-
-      print('[ChatScreen] 📝 Quiz tracked: $correctAnswers/$totalQuestions (${(accuracy * 100).toInt()}%)');
-    } catch (e) {
-      print('[ChatScreen] Error tracking quiz: $e');
-    }
+        lowerMessage.contains('again') ||
+        lowerMessage.contains('huh') ||
+        lowerMessage.contains('what');
   }
 }

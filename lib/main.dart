@@ -1,15 +1,12 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
 
-import 'theme_provider.dart';
-import 'screens/auth_gate.dart';
+import 'utils/theme_provider.dart';
+import 'widgets/auth_gate.dart';
 import 'screens/online_ai_screen.dart';
-import 'screens/offline_ai_screen.dart';
 import 'screens/notes_screen.dart';
 import 'screens/main_tabs.dart';
 import 'screens/welcome_screen.dart';
@@ -27,6 +24,7 @@ import 'screens/chat_history_screen.dart';
 import 'screens/recent_study_bots_screen.dart';
 import 'screens/notification_settings_screen.dart';
 import 'screens/analytics_dashboard_screen.dart';
+import 'screens/study_plan_screen_phase1.dart';
 import 'services/push_notification_service.dart';
 import 'services/analytics_service.dart';
 import 'services/gamification_service.dart';
@@ -35,10 +33,10 @@ import 'utils/theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize timezone data
   tz.initializeTimeZones();
-  
+
   // On web, FirebaseOptions are required when calling initializeApp.
   // If options are not provided, initialization will throw; catch and continue
   // so the app can run in environments where web options are not configured.
@@ -56,7 +54,7 @@ void main() async {
     // ignore: avoid_print
     print('Firebase initialization skipped or failed: $e');
   }
-  
+
   // Initialize premium services
   try {
     await PushNotificationService().initialize();
@@ -66,7 +64,7 @@ void main() async {
   } catch (e) {
     print('[Main] ⚠️ Premium services initialization failed: $e');
   }
-  
+
   runApp(
     ChangeNotifierProvider(
       create: (_) => ThemeProvider(),
@@ -105,7 +103,6 @@ class MyApp extends StatelessWidget {
         '/signup': (_) => const SignUpScreen(),
         '/login': (_) => const LoginScreen(),
         '/main': (_) => const MainTabs(),
-        '/auth': (_) => AuthScreen(),
         '/profile': (_) => ProfileScreen(),
         '/ai': (_) => const OnlineAiScreen(),
         '/online-ai': (_) => const OnlineAiScreen(),
@@ -117,10 +114,22 @@ class MyApp extends StatelessWidget {
         '/capabilities': (_) => const CapabilitiesScreen(),
         '/notification-settings': (_) => const NotificationSettingsScreen(),
         '/analytics': (_) => const AnalyticsDashboardScreen(),
-        '/billing': (_) => const PlaceholderScreen(title: 'Billing', message: 'Billing features coming soon'),
-        '/permissions': (_) => const PlaceholderScreen(title: 'Permissions', message: 'Permissions will be configurable here soon'),
-        '/speech-language': (_) => const PlaceholderScreen(title: 'Speech Language', message: 'Speech language settings coming soon'),
-        '/privacy': (_) => const PlaceholderScreen(title: 'Privacy', message: 'Privacy settings coming soon'),
+        '/billing': (_) => const PlaceholderScreen(
+          title: 'Billing',
+          message: 'Billing features coming soon',
+        ),
+        '/permissions': (_) => const PlaceholderScreen(
+          title: 'Permissions',
+          message: 'Permissions will be configurable here soon',
+        ),
+        '/speech-language': (_) => const PlaceholderScreen(
+          title: 'Speech Language',
+          message: 'Speech language settings coming soon',
+        ),
+        '/privacy': (_) => const PlaceholderScreen(
+          title: 'Privacy',
+          message: 'Privacy settings coming soon',
+        ),
         '/home': (_) => const HomeScreen(),
         '/api-test': (_) => const ApiTestScreen(),
         '/notes': (_) => const NotesScreen(),

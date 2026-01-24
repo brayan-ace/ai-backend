@@ -1,5 +1,7 @@
-const { generatePremiumSystemInstructions } = require('./premium_system_instructions');
-const { generateEnhancedQuizPrompt } = require('./enhanced_quiz_generator');
+const {
+  generatePremiumSystemInstructions,
+} = require("./premium_system_instructions");
+const { generateEnhancedQuizPrompt } = require("./enhanced_quiz_generator");
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
@@ -50,11 +52,15 @@ async function ensureDatabaseTables() {
       );
     `);
     console.log("[DB] conversation_memory table ensured");
-    
+
     // Add concept tracking columns to bot_progress if they don't exist
     try {
-      await pool.query(`ALTER TABLE bot_progress ADD COLUMN IF NOT EXISTS current_concept_index INTEGER DEFAULT 0`);
-      await pool.query(`ALTER TABLE bot_progress ADD COLUMN IF NOT EXISTS completed_concepts JSONB DEFAULT '[]'::jsonb`);
+      await pool.query(
+        `ALTER TABLE bot_progress ADD COLUMN IF NOT EXISTS current_concept_index INTEGER DEFAULT 0`,
+      );
+      await pool.query(
+        `ALTER TABLE bot_progress ADD COLUMN IF NOT EXISTS completed_concepts JSONB DEFAULT '[]'::jsonb`,
+      );
       console.log("[DB] Concept tracking columns added to bot_progress");
     } catch (alterErr) {
       // Columns may already exist, that's fine
@@ -353,7 +359,9 @@ async function summarizeConversationForSearch(messages, currentQuery) {
       .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
       .join("\n");
 
-    console.log("[Search Context] Summarizing conversation for search context...");
+    console.log(
+      "[Search Context] Summarizing conversation for search context...",
+    );
 
     const response = await fetch(
       "https://api.groq.com/openai/v1/chat/completions",
@@ -391,20 +399,23 @@ Create an enhanced search query that incorporates relevant conversation context:
           temperature: 0.3,
         }),
         timeout: 15000,
-      }
+      },
     );
 
     if (!response.ok) {
-      console.warn("[Search Context] Failed to summarize, using original query");
+      console.warn(
+        "[Search Context] Failed to summarize, using original query",
+      );
       return currentQuery;
     }
 
     const result = await response.json();
-    const enhancedQuery = result.choices?.[0]?.message?.content?.trim() || currentQuery;
-    
+    const enhancedQuery =
+      result.choices?.[0]?.message?.content?.trim() || currentQuery;
+
     console.log("[Search Context] Original query:", currentQuery);
     console.log("[Search Context] Enhanced query:", enhancedQuery);
-    
+
     return enhancedQuery;
   } catch (err) {
     console.warn("[Search Context] Summarization error:", err.message);
@@ -454,7 +465,11 @@ async function searchTopicOnline(topic, gradeLevel) {
   }
 }
 
-async function enhanceSearchResultsWithAI(query, searchResults, conversationMessages = []) {
+async function enhanceSearchResultsWithAI(
+  query,
+  searchResults,
+  conversationMessages = [],
+) {
   try {
     const groqApiKey = process.env.GROQ_API_KEY;
     if (!groqApiKey) {
@@ -463,7 +478,7 @@ async function enhanceSearchResultsWithAI(query, searchResults, conversationMess
     }
 
     const searchResultsText = JSON.stringify(searchResults, null, 2);
-    
+
     // Build conversation context if available
     let conversationContext = "";
     if (conversationMessages && conversationMessages.length > 0) {
@@ -496,9 +511,10 @@ Provide your enhanced answer:`;
       {
         model: "llama-3.1-8b-instant",
         messages: [
-          { 
-            role: "system", 
-            content: "You are a helpful assistant that synthesizes web search results into clear, contextual answers. You consider the user's conversation history to provide relevant responses." 
+          {
+            role: "system",
+            content:
+              "You are a helpful assistant that synthesizes web search results into clear, contextual answers. You consider the user's conversation history to provide relevant responses.",
           },
           { role: "user", content: prompt },
         ],
@@ -527,7 +543,7 @@ Provide your enhanced answer:`;
 /**
  * Generate a structured study plan JSON using the AI model.
  * Returns an object: { plan: { title, modules: [...] } } or null on failure.
- * 
+ *
  * Study Plan Structure (per HYPER PROMPT requirements):
  * - Plan title, subject, grade level
  * - Ordered modules with: id, title, objective, key_topics, expected_outcome, estimated_effort
@@ -605,7 +621,8 @@ Return ONLY the JSON object, no explanations or markdown.`;
         messages: [
           {
             role: "system",
-            content: "You are a curriculum design expert. Output only valid JSON.",
+            content:
+              "You are a curriculum design expert. Output only valid JSON.",
           },
           { role: "user", content: prompt },
         ],
@@ -626,7 +643,7 @@ Return ONLY the JSON object, no explanations or markdown.`;
     responseText = responseText.replace(/```json\n?|```/g, "").trim();
 
     const parsed = JSON.parse(responseText);
-    
+
     // Validate structure
     if (!parsed.plan || !Array.isArray(parsed.plan.modules)) {
       console.error("[StudyPlan] Invalid plan structure received");
@@ -638,14 +655,22 @@ Return ONLY the JSON object, no explanations or markdown.`;
       id: mod.id || `module_${idx + 1}`,
       title: mod.title || `Module ${idx + 1}`,
       objective: mod.objective || mod.description || "",
-      key_topics: mod.key_topics || mod.subtopics || mod.learning_objectives || [],
+      key_topics:
+        mod.key_topics || mod.subtopics || mod.learning_objectives || [],
       expected_outcome: mod.expected_outcome || "",
-      estimated_effort: mod.estimated_effort || mod.estimated_time_minutes ? `${mod.estimated_time_minutes} minutes` : "30 minutes",
+      estimated_effort:
+        mod.estimated_effort || mod.estimated_time_minutes
+          ? `${mod.estimated_time_minutes} minutes`
+          : "30 minutes",
       difficulty: mod.difficulty || "Medium",
       order: mod.order || idx + 1,
     }));
 
-    console.log("[StudyPlan] Successfully generated plan with", parsed.plan.modules.length, "modules");
+    console.log(
+      "[StudyPlan] Successfully generated plan with",
+      parsed.plan.modules.length,
+      "modules",
+    );
     return parsed;
   } catch (err) {
     console.error("[generateStructuredStudyPlan] Error:", err.message);
@@ -724,7 +749,12 @@ function generateNaturalStudyBotInstructions(
   gradeLevel,
 ) {
   // Use the premium system instructions for elite educational experience
-  return generatePremiumSystemInstructions(botName, botTopic, description, gradeLevel);
+  return generatePremiumSystemInstructions(
+    botName,
+    botTopic,
+    description,
+    gradeLevel,
+  );
 }
 
 // ============= ENSURE DATABASE TABLES =============
@@ -1058,10 +1088,13 @@ app.post("/api/chat-enhanced", async (req, res) => {
         /how are you|how's your|how are you doing/i.test(lastBotMsg);
 
       // Also detect if user is explicitly asking for plan creation
-      const userWantsPlan = /create|make|generate|build|start.*plan/i.test(message || "");
+      const userWantsPlan = /create|make|generate|build|start.*plan/i.test(
+        message || "",
+      );
 
       if (
-        (botProgressState === "waiting_for_user" && shortAffirmative.test(message || "")) ||
+        (botProgressState === "waiting_for_user" &&
+          shortAffirmative.test(message || "")) ||
         userWantsPlan
       ) {
         // If the bot just asked to create a study plan, generate a structured plan,
@@ -1084,7 +1117,11 @@ app.post("/api/chat-enhanced", async (req, res) => {
 
           // Generate structured plan via AI - always generate when user confirms or asks
           let generatedPlan = null;
-          if (asksForPlan || userWantsPlan || botProgressState === "waiting_for_user") {
+          if (
+            asksForPlan ||
+            userWantsPlan ||
+            botProgressState === "waiting_for_user"
+          ) {
             console.log("[Chat-Enhanced] Generating study plan for user...");
             generatedPlan = await generateStructuredStudyPlan(
               botMeta?.name || "Study Bot",
@@ -1296,41 +1333,50 @@ app.post("/api/chat-enhanced", async (req, res) => {
         completedConcepts = row.completed_concepts || [];
         completedModulesCount = completedModules.length;
 
-        console.log("[Chat-Enhanced] 📚 Study plan found in DB:", plan ? `${plan.modules?.length || 0} modules` : "null");
+        console.log(
+          "[Chat-Enhanced] 📚 Study plan found in DB:",
+          plan ? `${plan.modules?.length || 0} modules` : "null",
+        );
 
         if (plan && plan.modules && plan.modules.length > 0) {
           const totalModules = plan.modules.length;
-          const progressPercent = Math.round((completedModulesCount / totalModules) * 100);
-          
+          const progressPercent = Math.round(
+            (completedModulesCount / totalModules) * 100,
+          );
+
           const modulesSummary = plan.modules
             .map((m, idx) => {
-              const status = completedModules.includes(idx) 
-                ? "✅ Completed" 
-                : idx === currentModuleIndex 
-                  ? "📍 Current" 
+              const status = completedModules.includes(idx)
+                ? "✅ Completed"
+                : idx === currentModuleIndex
+                  ? "📍 Current"
                   : "⏳ Pending";
               return `${idx + 1}. ${m.title || m.module_name} [${status}]`;
             })
             .join("\n");
 
           const currentModule = plan.modules[currentModuleIndex];
-          const keyTopics = currentModule?.key_topics || currentModule?.subtopics || [];
-          
+          const keyTopics =
+            currentModule?.key_topics || currentModule?.subtopics || [];
+
           // Build concept-level tracking for the current module
-          const conceptsWithStatus = keyTopics.map((topic, idx) => {
-            const conceptKey = `m${currentModuleIndex}_c${idx}`;
-            const isCompleted = completedConcepts.includes(conceptKey);
-            const isCurrent = idx === currentConceptIndex && !isCompleted;
-            const status = isCompleted ? "✅" : isCurrent ? "📍" : "⏳";
-            return `   ${status} ${idx + 1}. ${topic}`;
-          }).join("\n");
-          
-          const currentConceptName = keyTopics[currentConceptIndex] || "Introduction";
-          const completedConceptsInModule = keyTopics.filter((_, idx) => 
-            completedConcepts.includes(`m${currentModuleIndex}_c${idx}`)
+          const conceptsWithStatus = keyTopics
+            .map((topic, idx) => {
+              const conceptKey = `m${currentModuleIndex}_c${idx}`;
+              const isCompleted = completedConcepts.includes(conceptKey);
+              const isCurrent = idx === currentConceptIndex && !isCompleted;
+              const status = isCompleted ? "✅" : isCurrent ? "📍" : "⏳";
+              return `   ${status} ${idx + 1}. ${topic}`;
+            })
+            .join("\n");
+
+          const currentConceptName =
+            keyTopics[currentConceptIndex] || "Introduction";
+          const completedConceptsInModule = keyTopics.filter((_, idx) =>
+            completedConcepts.includes(`m${currentModuleIndex}_c${idx}`),
           ).length;
-          
-          const currentModuleDetails = currentModule 
+
+          const currentModuleDetails = currentModule
             ? `
 ═══════════════════════════════════════════════════════════
 📚 CURRENT MODULE: "${currentModule.title || currentModule.module_name}"
@@ -1411,11 +1457,20 @@ If user selects assessment option ("now", "quiz", "test me", "assessment", "chal
 - Always inspire intellectual curiosity`;
 
           enhancedInstructions = `${enhancedInstructions}${studyPlanContext}`;
-          console.log("[Chat-Enhanced] Instructions enhanced with premium teaching methodology (v" + currentPlanVersion + ", " + progressPercent + "% complete)");
+          console.log(
+            "[Chat-Enhanced] Instructions enhanced with premium teaching methodology (v" +
+              currentPlanVersion +
+              ", " +
+              progressPercent +
+              "% complete)",
+          );
         }
       }
     } catch (planErr) {
-      console.warn("[Chat-Enhanced] Could not fetch study plan:", planErr.message);
+      console.warn(
+        "[Chat-Enhanced] Could not fetch study plan:",
+        planErr.message,
+      );
     }
 
     // STEP 5: Prepare messages for AI model with MARKDOWN formatting requirement
@@ -1486,10 +1541,16 @@ Always prioritize intellectual clarity, aesthetic presentation, and cognitive en
 
     // STEP 5.5: Use conversation history from Firebase (sent by frontend) OR fallback to database
     const frontendHistory = req.body.conversationHistory;
-    
-    if (frontendHistory && Array.isArray(frontendHistory) && frontendHistory.length > 0) {
+
+    if (
+      frontendHistory &&
+      Array.isArray(frontendHistory) &&
+      frontendHistory.length > 0
+    ) {
       // Use conversation history from Firebase (sent by frontend)
-      console.log(`[Chat-Enhanced] 🔥 Using ${frontendHistory.length} messages from Firebase (via frontend)`);
+      console.log(
+        `[Chat-Enhanced] 🔥 Using ${frontendHistory.length} messages from Firebase (via frontend)`,
+      );
       for (const msg of frontendHistory) {
         if (msg.role && msg.content) {
           messages.push({ role: msg.role, content: msg.content });
@@ -1505,17 +1566,22 @@ Always prioritize intellectual clarity, aesthetic presentation, and cognitive en
            LIMIT 20`,
           [botId, userId],
         );
-        
+
         if (historyResult.rows.length > 0) {
-          console.log(`[Chat-Enhanced] 📜 Loading ${historyResult.rows.length} messages from PostgreSQL (fallback)`);
-          
+          console.log(
+            `[Chat-Enhanced] 📜 Loading ${historyResult.rows.length} messages from PostgreSQL (fallback)`,
+          );
+
           for (const row of historyResult.rows) {
-            const role = row.message_type === 'user' ? 'user' : 'assistant';
+            const role = row.message_type === "user" ? "user" : "assistant";
             messages.push({ role, content: row.content });
           }
         }
       } catch (histErr) {
-        console.warn("[Chat-Enhanced] Could not load conversation history:", histErr.message);
+        console.warn(
+          "[Chat-Enhanced] Could not load conversation history:",
+          histErr.message,
+        );
       }
     }
 
@@ -1530,10 +1596,15 @@ Always prioritize intellectual clarity, aesthetic presentation, and cognitive en
       );
       console.log("[Chat-Enhanced] 💬 User message saved to PostgreSQL");
     } catch (saveUserErr) {
-      console.warn("[Chat-Enhanced] Could not save user message:", saveUserErr.message);
+      console.warn(
+        "[Chat-Enhanced] Could not save user message:",
+        saveUserErr.message,
+      );
     }
 
-    console.log(`[Chat-Enhanced] Messages prepared (${messages.length} total), calling AI model...`);
+    console.log(
+      `[Chat-Enhanced] Messages prepared (${messages.length} total), calling AI model...`,
+    );
 
     // STEP 6: Call AI model with proper instructions
     const groqApiKey = process.env.GROQ_API_KEY;
@@ -1608,112 +1679,133 @@ Always prioritize intellectual clarity, aesthetic presentation, and cognitive en
     let newProgressPercentage = 0;
     let updatedCurrentModule = currentModuleIndex;
     let updatedCurrentConcept = currentConceptIndex;
-    
+
     try {
       // Check if AI signaled concept completion
       if (aiResponse.includes("[CONCEPT_COMPLETE]")) {
         conceptCompleted = true;
         aiResponse = aiResponse.replace(/\[CONCEPT_COMPLETE\]/g, "").trim();
         console.log("[Chat-Enhanced] ✅ Concept completion detected!");
-        
+
         const progressResult = await pool.query(
           `SELECT study_plan, current_module, current_concept_index, completed_concepts 
            FROM bot_progress WHERE bot_id = $1 AND user_id = $2 LIMIT 1`,
           [botId, userId],
         );
-        
+
         if (progressResult.rows.length > 0) {
           const row = progressResult.rows[0];
           const plan = row.study_plan;
           let currentMod = row.current_module || 0;
           let currentConcept = row.current_concept_index || 0;
           let completedConceptsList = row.completed_concepts || [];
-          
+
           if (plan && plan.modules && plan.modules.length > 0) {
             const currentModule = plan.modules[currentMod];
-            const keyTopics = currentModule?.key_topics || currentModule?.subtopics || [];
+            const keyTopics =
+              currentModule?.key_topics || currentModule?.subtopics || [];
             const conceptKey = `m${currentMod}_c${currentConcept}`;
-            
+
             // Mark current concept as completed
             if (!completedConceptsList.includes(conceptKey)) {
               completedConceptsList.push(conceptKey);
             }
-            
+
             // Move to next concept
             if (currentConcept < keyTopics.length - 1) {
               currentConcept = currentConcept + 1;
             }
-            
+
             updatedCurrentConcept = currentConcept;
-            
+
             // Update database with new concept index
             await pool.query(
               `UPDATE bot_progress 
                SET current_concept_index = $1, completed_concepts = $2, last_updated = NOW()
                WHERE bot_id = $3 AND user_id = $4`,
-              [currentConcept, JSON.stringify(completedConceptsList), botId, userId],
+              [
+                currentConcept,
+                JSON.stringify(completedConceptsList),
+                botId,
+                userId,
+              ],
             );
-            
-            console.log(`[Chat-Enhanced] 📚 Concept ${currentConcept + 1}/${keyTopics.length} in Module ${currentMod + 1}`);
+
+            console.log(
+              `[Chat-Enhanced] 📚 Concept ${currentConcept + 1}/${keyTopics.length} in Module ${currentMod + 1}`,
+            );
           }
         }
       }
-      
+
       // Check if AI signaled quiz trigger
       if (aiResponse.includes("[TRIGGER_QUIZ]")) {
         triggerQuiz = true;
         aiResponse = aiResponse.replace(/\[TRIGGER_QUIZ\]/g, "").trim();
         console.log("[Chat-Enhanced] 📝 Quiz trigger detected!");
       }
-      
+
       // Check if AI signaled module completion
       if (aiResponse.includes("[MODULE_COMPLETE]")) {
         moduleCompleted = true;
         aiResponse = aiResponse.replace(/\[MODULE_COMPLETE\]/g, "").trim();
         console.log("[Chat-Enhanced] 🎉 Module completion detected!");
-        
+
         const progressResult = await pool.query(
           `SELECT study_plan, current_module, completed_modules 
            FROM bot_progress WHERE bot_id = $1 AND user_id = $2 LIMIT 1`,
           [botId, userId],
         );
-        
+
         if (progressResult.rows.length > 0) {
           const row = progressResult.rows[0];
           const plan = row.study_plan;
           let currentMod = row.current_module || 0;
           let completedMods = row.completed_modules || [];
-          
+
           if (plan && plan.modules && plan.modules.length > 0) {
             const totalModules = plan.modules.length;
-            
+
             if (!completedMods.includes(currentMod)) {
               completedMods.push(currentMod);
             }
-            
+
             // Move to next module if available
             if (currentMod < totalModules - 1) {
               currentMod = currentMod + 1;
             }
-            
-            newProgressPercentage = Math.round((completedMods.length / totalModules) * 100);
+
+            newProgressPercentage = Math.round(
+              (completedMods.length / totalModules) * 100,
+            );
             updatedCurrentModule = currentMod;
             updatedCurrentConcept = 0; // Reset concept index for new module
-            
+
             // Update database - reset concept index to 0 for new module
             await pool.query(
               `UPDATE bot_progress 
                SET current_module = $1, completed_modules = $2, progress_percentage = $3, current_concept_index = 0, last_updated = NOW()
                WHERE bot_id = $4 AND user_id = $5`,
-              [currentMod, JSON.stringify(completedMods), newProgressPercentage, botId, userId],
+              [
+                currentMod,
+                JSON.stringify(completedMods),
+                newProgressPercentage,
+                botId,
+                userId,
+              ],
             );
-            
-            console.log(`[Chat-Enhanced] 📊 Progress updated: ${newProgressPercentage}%, Module ${currentMod + 1}/${totalModules}`);
+
+            console.log(
+              `[Chat-Enhanced] 📊 Progress updated: ${newProgressPercentage}%, Module ${currentMod + 1}/${totalModules}`,
+            );
           }
         }
       }
     } catch (progressErr) {
-      console.warn("[Chat-Enhanced] Progress update failed:", progressErr.message);
+      console.warn(
+        "[Chat-Enhanced] Progress update failed:",
+        progressErr.message,
+      );
     }
 
     // ALWAYS save bot response to chat_messages for conversation history
@@ -1724,7 +1816,10 @@ Always prioritize intellectual clarity, aesthetic presentation, and cognitive en
       );
       console.log("[Chat-Enhanced] 💬 Bot response saved to history");
     } catch (saveErr) {
-      console.warn("[Chat-Enhanced] Failed to save bot response:", saveErr.message);
+      console.warn(
+        "[Chat-Enhanced] Failed to save bot response:",
+        saveErr.message,
+      );
     }
 
     // Update bot progress state based on conversation flow
@@ -1747,15 +1842,24 @@ Always prioritize intellectual clarity, aesthetic presentation, and cognitive en
       );
       botProgressState = newState;
     } catch (stErr) {
-      console.warn("[Chat-Enhanced] Failed to update bot_progress:", stErr.message);
+      console.warn(
+        "[Chat-Enhanced] Failed to update bot_progress:",
+        stErr.message,
+      );
     }
 
     return res.json({
       status: "success",
       response: aiResponse,
       state: botProgressState || "intro",
-      progress: { 
-        percentage: moduleCompleted ? newProgressPercentage : (completedModulesCount > 0 ? Math.round((completedModulesCount / (completedModulesCount + 1)) * 100) : 0),
+      progress: {
+        percentage: moduleCompleted
+          ? newProgressPercentage
+          : completedModulesCount > 0
+            ? Math.round(
+                (completedModulesCount / (completedModulesCount + 1)) * 100,
+              )
+            : 0,
         currentModule: updatedCurrentModule,
         currentConcept: updatedCurrentConcept,
         completedModules: completedModulesCount + (moduleCompleted ? 1 : 0),
@@ -1820,19 +1924,23 @@ app.get("/api/bot-progress/:botId/:userId", async (req, res) => {
     const plan = row.study_plan || { modules: [] };
     const completedModules = row.completed_modules || [];
     const totalModules = plan.modules?.length || 0;
-    
+
     // Calculate progress percentage based on completed modules
     let progressPercentage = row.progress_percentage || 0;
     if (totalModules > 0 && completedModules.length > 0) {
-      progressPercentage = Math.round((completedModules.length / totalModules) * 100);
+      progressPercentage = Math.round(
+        (completedModules.length / totalModules) * 100,
+      );
     }
-    
-    console.log(`[bot-progress] Progress: ${progressPercentage}% (${completedModules.length}/${totalModules} modules)`);
-    
+
+    console.log(
+      `[bot-progress] Progress: ${progressPercentage}% (${completedModules.length}/${totalModules} modules)`,
+    );
+
     return res.json({
       status: "success",
       bot_state: row.bot_state || "intro",
-      progress: { 
+      progress: {
         percentage: progressPercentage,
         completedModules: completedModules.length,
         totalModules: totalModules,
@@ -1856,11 +1964,11 @@ app.get("/api/bot-progress/:botId/:userId", async (req, res) => {
 app.get("/api/user-bots/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
-    
+
     if (!userId) {
       return res.status(400).json({ error: "userId is required", bots: [] });
     }
-    
+
     console.log("[user-bots] Fetching bots for user:", userId);
 
     // Simple query - just get basic bot info first
@@ -1876,10 +1984,10 @@ app.get("/api/user-bots/:userId", async (req, res) => {
       );
     } catch (dbErr) {
       console.error("[user-bots] Database query failed:", dbErr.message);
-      return res.status(500).json({ 
-        error: "Database query failed", 
+      return res.status(500).json({
+        error: "Database query failed",
         message: dbErr.message,
-        bots: [] 
+        bots: [],
       });
     }
 
@@ -1892,10 +2000,10 @@ app.get("/api/user-bots/:userId", async (req, res) => {
 
     // Enrich each bot with progress and last message (with error handling)
     const enrichedBots = [];
-    
+
     for (const bot of botsResult.rows) {
       let progressPercentage = 0;
-      let botState = 'intro';
+      let botState = "intro";
       let lastMessage = null;
       let lastMessageTime = null;
 
@@ -1904,14 +2012,18 @@ app.get("/api/user-bots/:userId", async (req, res) => {
         const progressResult = await pool.query(
           `SELECT progress_percentage, bot_state FROM bot_progress 
            WHERE bot_id = $1 AND user_id = $2 LIMIT 1`,
-          [bot.bot_id, userId]
+          [bot.bot_id, userId],
         );
         if (progressResult.rows.length > 0) {
           progressPercentage = progressResult.rows[0].progress_percentage || 0;
-          botState = progressResult.rows[0].bot_state || 'intro';
+          botState = progressResult.rows[0].bot_state || "intro";
         }
       } catch (e) {
-        console.warn("[user-bots] Progress fetch failed for", bot.bot_id, e.message);
+        console.warn(
+          "[user-bots] Progress fetch failed for",
+          bot.bot_id,
+          e.message,
+        );
       }
 
       // Get last message (non-blocking)
@@ -1920,15 +2032,20 @@ app.get("/api/user-bots/:userId", async (req, res) => {
           `SELECT content, created_at FROM chat_messages 
            WHERE bot_id = $1 AND user_id = $2 
            ORDER BY created_at DESC LIMIT 1`,
-          [bot.bot_id, userId]
+          [bot.bot_id, userId],
         );
         if (msgResult.rows.length > 0) {
-          const content = msgResult.rows[0].content || '';
-          lastMessage = content.length > 100 ? content.substring(0, 100) + '...' : content;
+          const content = msgResult.rows[0].content || "";
+          lastMessage =
+            content.length > 100 ? content.substring(0, 100) + "..." : content;
           lastMessageTime = msgResult.rows[0].created_at;
         }
       } catch (e) {
-        console.warn("[user-bots] Last message fetch failed for", bot.bot_id, e.message);
+        console.warn(
+          "[user-bots] Last message fetch failed for",
+          bot.bot_id,
+          e.message,
+        );
       }
 
       enrichedBots.push({
@@ -2081,14 +2198,19 @@ app.post("/api/apply-study-plan", async (req, res) => {
   try {
     const { botId, userId, plan, studyPlan } = req.body;
     const planData = plan || studyPlan; // Support both parameter names
-    
+
     if (!botId || !userId || planData == null) {
       return res
         .status(400)
         .json({ error: "botId, userId and plan/studyPlan are required" });
     }
 
-    console.log("[apply-study-plan] Applying plan for bot:", botId, "user:", userId);
+    console.log(
+      "[apply-study-plan] Applying plan for bot:",
+      botId,
+      "user:",
+      userId,
+    );
 
     // Get current version and increment
     const versionResult = await pool.query(
@@ -2110,7 +2232,8 @@ app.post("/api/apply-study-plan", async (req, res) => {
 
     // Save a system chat message announcing plan application
     try {
-      const applyMsg = "✅ Study plan applied! Let's begin your learning journey.";
+      const applyMsg =
+        "✅ Study plan applied! Let's begin your learning journey.";
       await pool.query(
         `INSERT INTO chat_messages (bot_id, user_id, message_type, content) VALUES ($1, $2, $3, $4)`,
         [botId, userId, "bot", applyMsg],
@@ -2138,7 +2261,10 @@ app.post("/api/apply-study-plan", async (req, res) => {
 
 app.post("/api/generate-quiz", async (req, res) => {
   const timestamp = new Date().toISOString();
-  console.log("[POST /api/generate-quiz] ENHANCED Quiz generation request:", timestamp);
+  console.log(
+    "[POST /api/generate-quiz] ENHANCED Quiz generation request:",
+    timestamp,
+  );
 
   try {
     const {
@@ -2163,7 +2289,9 @@ app.post("/api/generate-quiz", async (req, res) => {
       });
     }
 
-    console.log("[generate-quiz] 🧠 Starting ENHANCED quiz generation with deep learning analysis...");
+    console.log(
+      "[generate-quiz] 🧠 Starting ENHANCED quiz generation with deep learning analysis...",
+    );
 
     // Generate enhanced quiz prompt based on comprehensive analysis
     const quizPrompt = await generateEnhancedQuizPrompt({
@@ -2174,10 +2302,12 @@ app.post("/api/generate-quiz", async (req, res) => {
       questionType,
       mcqCount,
       textCount,
-      useWebSearch
+      useWebSearch,
     });
 
-    console.log("[generate-quiz] 📝 Enhanced quiz prompt generated with learning analysis");
+    console.log(
+      "[generate-quiz] 📝 Enhanced quiz prompt generated with learning analysis",
+    );
 
     // Call Groq API with enhanced prompt
     const groqApiKey = process.env.GROQ_API_KEY;
@@ -2190,7 +2320,9 @@ app.post("/api/generate-quiz", async (req, res) => {
       });
     }
 
-    console.log("[generate-quiz] 🤖 Calling Groq API for PERSONALIZED question generation");
+    console.log(
+      "[generate-quiz] 🤖 Calling Groq API for PERSONALIZED question generation",
+    );
     const groqRes = await axios.post(
       "https://api.groq.com/openai/v1/chat/completions",
       {
@@ -2198,7 +2330,8 @@ app.post("/api/generate-quiz", async (req, res) => {
         messages: [
           {
             role: "system",
-            content: "You are an expert educational quiz generator specializing in personalized assessments. Generate ONLY valid JSON with no markdown, code blocks, or extra text. Make quizzes feel personal to each student's learning journey.",
+            content:
+              "You are an expert educational quiz generator specializing in personalized assessments. Generate ONLY valid JSON with no markdown, code blocks, or extra text. Make quizzes feel personal to each student's learning journey.",
           },
           {
             role: "user",
@@ -2236,7 +2369,11 @@ app.post("/api/generate-quiz", async (req, res) => {
     }
 
     // Enhanced validation
-    if (!quizJson || !quizJson.questions || !Array.isArray(quizJson.questions)) {
+    if (
+      !quizJson ||
+      !quizJson.questions ||
+      !Array.isArray(quizJson.questions)
+    ) {
       console.error("[generate-quiz] Invalid quiz structure received");
       return res.status(500).json({
         error: "Quiz generation failed",
@@ -2246,16 +2383,18 @@ app.post("/api/generate-quiz", async (req, res) => {
     }
 
     // Validate personalized elements
-    const hasPersonalization = quizJson.personalization && 
-      (quizJson.personalization.basedOnConversation || 
-       quizJson.personalization.addressesWeaknesses?.length > 0 ||
-       quizJson.personalization.buildsOnStrengths?.length > 0);
+    const hasPersonalization =
+      quizJson.personalization &&
+      (quizJson.personalization.basedOnConversation ||
+        quizJson.personalization.addressesWeaknesses?.length > 0 ||
+        quizJson.personalization.buildsOnStrengths?.length > 0);
 
     console.log("[generate-quiz] ✅ Enhanced quiz generated successfully:", {
       totalQuestions: quizJson.questions.length,
       personalized: hasPersonalization,
       hasAnswers: quizJson.answers && Array.isArray(quizJson.answers),
-      conceptsTested: quizJson.questions.map(q => q.concept).filter(Boolean).length
+      conceptsTested: quizJson.questions.map((q) => q.concept).filter(Boolean)
+        .length,
     });
 
     // Store quiz data with enhanced metadata
@@ -2265,12 +2404,17 @@ app.post("/api/generate-quiz", async (req, res) => {
          VALUES ($1, $2, $3, $4) 
          ON CONFLICT (bot_id, user_id, module_name) 
          DO UPDATE SET quiz_data = $4, created_at = CURRENT_TIMESTAMP`,
-        [botId, userId, moduleName, JSON.stringify({
-          ...quizJson,
-          enhanced: true,
-          generatedAt: timestamp,
-          personalized: hasPersonalization
-        })]
+        [
+          botId,
+          userId,
+          moduleName,
+          JSON.stringify({
+            ...quizJson,
+            enhanced: true,
+            generatedAt: timestamp,
+            personalized: hasPersonalization,
+          }),
+        ],
       );
       console.log("[generate-quiz] 📚 Enhanced quiz stored in database");
     } catch (dbErr) {
@@ -2288,11 +2432,10 @@ app.post("/api/generate-quiz", async (req, res) => {
         generatedAt: timestamp,
         analysisUsed: true,
         conversationAnalyzed: true,
-        studyPlanContext: true
+        studyPlanContext: true,
       },
       timestamp,
     });
-
   } catch (err) {
     console.error("[POST /api/generate-quiz] Error:", err.message);
     console.error("[POST /api/generate-quiz] Stack:", err.stack);
@@ -2357,9 +2500,15 @@ app.post("/api/create-study-bot", async (req, res) => {
 
     console.log("[create-study-bot] Bot created successfully:", botId);
 
-    // Auto-generate an initial structured study plan based on user description
+    // GUARANTEE study plan generation - this is critical for bot functionality
     let generatedPlan = null;
+    let planGenerationSuccess = false;
     try {
+      console.log("[create-study-bot] Generating study plan for:", {
+        name,
+        topic,
+        grade_level,
+      });
       generatedPlan = await generateStructuredStudyPlan(
         name,
         topic,
@@ -2368,44 +2517,95 @@ app.post("/api/create-study-bot", async (req, res) => {
         null,
       );
 
-      if (generatedPlan && generatedPlan.plan) {
-        // Persist the generated plan to bot_progress and set state to plan_review
-        try {
-          const planWithMeta = {
-            plan: generatedPlan.plan,
-            metadata: {
-              version: 1,
-              user_id: user_id,
-              conversation_id: botId,
-              last_updated: new Date().toISOString(),
-            },
-          };
-
-          await pool.query(
-            `UPDATE bot_progress SET study_plan = $1, bot_state = $2, last_updated = NOW() WHERE bot_id = $3 AND user_id = $4`,
-            [JSON.stringify(planWithMeta), "plan_review", botId, user_id],
-          );
-
-          // Do NOT insert the full plan into chat_messages (plan must not be dumped into chat)
-          // Instead, include plan in response so frontend can open the editor for review
-          // Reflect new next state
-          welcomeMessagesCount = Math.max(1, welcomeMessagesCount);
-          // Attach to response via local variable
-          // (we'll attach below when composing the response)
-          // store plan to include in response
-          var _initialGeneratedPlanForResponse = generatedPlan.plan;
-        } catch (saveErr) {
-          console.warn(
-            "[create-study-bot] Failed to persist generated study plan:",
-            saveErr.message,
-          );
-        }
+      if (
+        generatedPlan &&
+        generatedPlan.plan &&
+        generatedPlan.plan.modules &&
+        generatedPlan.plan.modules.length > 0
+      ) {
+        planGenerationSuccess = true;
+        console.log(
+          "[create-study-bot] ✅ Study plan generated with",
+          generatedPlan.plan.modules.length,
+          "modules",
+        );
+      } else {
+        console.warn(
+          "[create-study-bot] ❌ Study plan generation returned empty or invalid plan",
+        );
       }
     } catch (planErr) {
-      console.warn(
-        "[create-study-bot] Study plan generation failed:",
+      console.error(
+        "[create-study-bot] ❌ Study plan generation failed:",
         planErr.message,
       );
+      // Create a fallback plan if generation fails
+      generatedPlan = {
+        plan: {
+          title: `${topic} Study Plan`,
+          subject: topic,
+          grade_level: grade_level,
+          description: `A comprehensive study plan for ${topic} at ${grade_level} level`,
+          total_estimated_hours: 10,
+          modules: [
+            {
+              id: "module_1",
+              title: "Introduction to " + topic,
+              objective: "Understand the basics of " + topic,
+              key_topics: ["Basic concepts", "Key terms", "Overview"],
+              expected_outcome: "Gain foundational knowledge",
+              estimated_effort: "30 minutes",
+              difficulty: "Easy",
+              order: 1,
+            },
+            {
+              id: "module_2",
+              title: "Core Concepts",
+              objective: "Master fundamental principles",
+              key_topics: [
+                "Main ideas",
+                "Important relationships",
+                "Applications",
+              ],
+              expected_outcome: "Apply core concepts",
+              estimated_effort: "45 minutes",
+              difficulty: "Medium",
+              order: 2,
+            },
+          ],
+        },
+      };
+      planGenerationSuccess = true;
+      console.log("[create-study-bot] ✅ Fallback study plan created");
+    }
+
+    // Always persist the study plan (either generated or fallback)
+    if (generatedPlan && generatedPlan.plan) {
+      try {
+        const planWithMeta = {
+          plan: generatedPlan.plan,
+          metadata: {
+            version: 1,
+            user_id: user_id,
+            conversation_id: botId,
+            last_updated: new Date().toISOString(),
+            generation_success: planGenerationSuccess,
+          },
+        };
+
+        await pool.query(
+          `UPDATE bot_progress SET study_plan = $1, bot_state = $2, last_updated = NOW() WHERE bot_id = $3 AND user_id = $4`,
+          [JSON.stringify(planWithMeta), "plan_review", botId, user_id],
+        );
+        console.log("[create-study-bot] ✅ Study plan persisted to database");
+      } catch (saveErr) {
+        console.error(
+          "[create-study-bot] ❌ Failed to persist study plan:",
+          saveErr.message,
+        );
+        // This is critical - throw error if we can't save the plan
+        throw new Error("Failed to save study plan: " + saveErr.message);
+      }
     }
 
     // --- Verification & single-welcome enforcement ---
@@ -3368,16 +3568,20 @@ If the user specifies length, format, or style, follow the user exactly and igno
           }
 
           // Get conversation history from request (if provided by client)
-          const conversationMessages = Array.isArray(data.messages) ? data.messages : [];
-          
+          const conversationMessages = Array.isArray(data.messages)
+            ? data.messages
+            : [];
+
           // Enhance the search query with conversation context
           // This ensures the search is relevant to what the user was discussing
           let enhancedSearchQuery = originalQuery;
           if (conversationMessages.length > 0) {
-            console.log("[Search] Enhancing query with conversation context...");
+            console.log(
+              "[Search] Enhancing query with conversation context...",
+            );
             enhancedSearchQuery = await summarizeConversationForSearch(
               conversationMessages,
-              originalQuery
+              originalQuery,
             );
           }
 
@@ -3385,7 +3589,7 @@ If the user specifies length, format, or style, follow the user exactly and igno
 
           const resp = await axios.post(
             "https://api.tavily.com/search",
-            { 
+            {
               api_key: TAVILY_KEY,
               query: enhancedSearchQuery,
               include_answer: true,

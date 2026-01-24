@@ -79,20 +79,16 @@ class _OnboardingOverlayState extends State<OnboardingOverlay>
       duration: const Duration(milliseconds: 600),
       vsync: this,
     );
-    _contentSlideAnimation = Tween<Offset>(
-      begin: Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _contentController,
-      curve: Curves.easeOutCubic,
-    ));
-    _contentFadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _contentController,
-      curve: Curves.easeOut,
-    ));
+    _contentSlideAnimation =
+        Tween<Offset>(begin: Offset(0, 0.3), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _contentController,
+            curve: Curves.easeOutCubic,
+          ),
+        );
+    _contentFadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _contentController, curve: Curves.easeOut),
+    );
 
     _fadeController.forward();
     Future.delayed(const Duration(milliseconds: 200), () {
@@ -207,9 +203,7 @@ class _OnboardingOverlayState extends State<OnboardingOverlay>
                         height: 8,
                         decoration: BoxDecoration(
                           gradient: index == _currentStep
-                              ? LinearGradient(
-                                  colors: AppTheme.primaryGradient,
-                                )
+                              ? LinearGradient(colors: AppTheme.primaryGradient)
                               : null,
                           color: index == _currentStep
                               ? null
@@ -218,7 +212,9 @@ class _OnboardingOverlayState extends State<OnboardingOverlay>
                           boxShadow: index == _currentStep
                               ? [
                                   BoxShadow(
-                                    color: AppTheme.primaryBlue.withOpacity(0.4),
+                                    color: AppTheme.primaryBlue.withOpacity(
+                                      0.4,
+                                    ),
                                     blurRadius: 8,
                                     offset: Offset(0, 2),
                                   ),
@@ -249,9 +245,7 @@ class _OnboardingOverlayState extends State<OnboardingOverlay>
                           ),
                           borderRadius: BorderRadius.circular(24),
                           border: Border.all(
-                            color: AppTheme.surfaceElevated.withOpacity(
-                              0.4,
-                            ),
+                            color: AppTheme.surfaceElevated.withOpacity(0.4),
                             width: 1,
                           ),
                           boxShadow: [
@@ -279,7 +273,9 @@ class _OnboardingOverlayState extends State<OnboardingOverlay>
                               child: step.illustration != null
                                   ? TweenAnimationBuilder<double>(
                                       tween: Tween(begin: 0.0, end: 1.0),
-                                      duration: const Duration(milliseconds: 800),
+                                      duration: const Duration(
+                                        milliseconds: 800,
+                                      ),
                                       curve: Curves.elasticOut,
                                       builder: (context, value, child) {
                                         return Transform.scale(
@@ -339,7 +335,9 @@ class _OnboardingOverlayState extends State<OnboardingOverlay>
                                 if (_currentStep > 0)
                                   Expanded(
                                     child: AnimatedContainer(
-                                      duration: const Duration(milliseconds: 300),
+                                      duration: const Duration(
+                                        milliseconds: 300,
+                                      ),
                                       child: TextButton(
                                         onPressed: _previousStep,
                                         style: TextButton.styleFrom(
@@ -348,15 +346,19 @@ class _OnboardingOverlayState extends State<OnboardingOverlay>
                                             horizontal: 20,
                                           ),
                                           shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(12),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
                                             side: BorderSide(
-                                              color: AppTheme.surfaceElevated.withOpacity(0.5),
+                                              color: AppTheme.surfaceElevated
+                                                  .withOpacity(0.5),
                                               width: 1,
                                             ),
                                           ),
                                         ),
                                         child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
                                           children: [
                                             Icon(
                                               Icons.arrow_back,
@@ -366,10 +368,12 @@ class _OnboardingOverlayState extends State<OnboardingOverlay>
                                             SizedBox(width: 8),
                                             Text(
                                               'Previous',
-                                              style: AppTheme.bodyLarge.copyWith(
-                                                color: AppTheme.textSecondary,
-                                                fontWeight: FontWeight.w600,
-                                              ),
+                                              style: AppTheme.bodyLarge
+                                                  .copyWith(
+                                                    color:
+                                                        AppTheme.textSecondary,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
                                             ),
                                           ],
                                         ),
@@ -377,8 +381,7 @@ class _OnboardingOverlayState extends State<OnboardingOverlay>
                                     ),
                                   ),
 
-                                if (_currentStep > 0)
-                                  const SizedBox(width: 12),
+                                if (_currentStep > 0) const SizedBox(width: 12),
 
                                 // Skip button
                                 Expanded(
@@ -410,14 +413,22 @@ class _OnboardingOverlayState extends State<OnboardingOverlay>
                                     decoration: BoxDecoration(
                                       gradient: LinearGradient(
                                         colors: isLastStep
-                                            ? [AppTheme.success, AppTheme.success.withValues(alpha: 0.8)]
+                                            ? [
+                                                AppTheme.success,
+                                                AppTheme.success.withValues(
+                                                  alpha: 0.8,
+                                                ),
+                                              ]
                                             : AppTheme.primaryGradient,
                                       ),
                                       borderRadius: BorderRadius.circular(16),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: (isLastStep ? AppTheme.success : AppTheme.primaryBlue)
-                                              .withOpacity(0.4),
+                                          color:
+                                              (isLastStep
+                                                      ? AppTheme.success
+                                                      : AppTheme.primaryBlue)
+                                                  .withOpacity(0.4),
                                           blurRadius: 16,
                                           offset: Offset(0, 8),
                                         ),
@@ -434,11 +445,14 @@ class _OnboardingOverlayState extends State<OnboardingOverlay>
                                           horizontal: 24,
                                         ),
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(16),
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
                                         ),
                                       ),
                                       child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
                                         children: [
                                           Text(
                                             isLastStep
@@ -452,16 +466,10 @@ class _OnboardingOverlayState extends State<OnboardingOverlay>
                                           ),
                                           if (!isLastStep) ...[
                                             SizedBox(width: 8),
-                                            Icon(
-                                              Icons.arrow_forward,
-                                              size: 18,
-                                            ),
+                                            Icon(Icons.arrow_forward, size: 18),
                                           ] else ...[
                                             SizedBox(width: 8),
-                                            Icon(
-                                              Icons.celebration,
-                                              size: 18,
-                                            ),
+                                            Icon(Icons.celebration, size: 18),
                                           ],
                                         ],
                                       ),
@@ -535,7 +543,8 @@ class SpotlightPainter extends CustomPainter {
           targetKey!.currentContext!.findRenderObject() as RenderBox;
       final position = renderBox.localToGlobal(Offset.zero);
       final widgetSize = renderBox.size;
-      spotlightCenter = position + Offset(widgetSize.width / 2, widgetSize.height / 2);
+      spotlightCenter =
+          position + Offset(widgetSize.width / 2, widgetSize.height / 2);
       spotlightRadius = (widgetSize.width + widgetSize.height) / 2 + 40;
     } else if (manualPosition != null) {
       // Use manual position
@@ -560,7 +569,7 @@ class SpotlightPainter extends CustomPainter {
     // Add subtle glow effect
     final glowPaint = Paint()
       ..shader = RadialGradient(
-        center: spotlightCenter / canvasSize.bottomRight(Offset.zero),
+        center: Alignment.center,
         radius: spotlightRadius / canvasSize.width,
         colors: [
           AppTheme.primaryBlue.withValues(alpha: 0.3 * animation),
@@ -570,7 +579,11 @@ class SpotlightPainter extends CustomPainter {
         stops: [0.0, 0.7, 1.0],
       ).createShader(Rect.fromLTWH(0, 0, canvasSize.width, canvasSize.height));
 
-    canvas.drawCircle(spotlightCenter, spotlightRadius * 1.2 * animation, glowPaint);
+    canvas.drawCircle(
+      spotlightCenter,
+      spotlightRadius * 1.2 * animation,
+      glowPaint,
+    );
 
     // Create spotlight cutout with smooth edges
     final spotlightEffect = Path.combine(
@@ -592,7 +605,11 @@ class SpotlightPainter extends CustomPainter {
       ..strokeWidth = 2.0
       ..maskFilter = MaskFilter.blur(BlurStyle.normal, 4.0);
 
-    canvas.drawCircle(spotlightCenter, spotlightRadius * animation, borderPaint);
+    canvas.drawCircle(
+      spotlightCenter,
+      spotlightRadius * animation,
+      borderPaint,
+    );
   }
 
   @override

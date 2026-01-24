@@ -514,7 +514,10 @@ class _RecentStudyBotsScreenState extends State<RecentStudyBotsScreen> {
                   Padding(
                     padding: EdgeInsets.only(top: AppTheme.spaceSm, left: 50),
                     child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: AppTheme.primaryBlue.withOpacity(0.08),
                         borderRadius: BorderRadius.circular(8),
@@ -537,9 +540,13 @@ class _RecentStudyBotsScreenState extends State<RecentStudyBotsScreen> {
                   child: Row(
                     children: [
                       // Progress indicator
-                      if (bot['progress_percentage'] != null && (bot['progress_percentage'] as num) > 0) ...[
+                      if (bot['progress_percentage'] != null &&
+                          (bot['progress_percentage'] as num) > 0) ...[
                         Container(
-                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: AppTheme.primaryBlue.withOpacity(0.15),
                             borderRadius: BorderRadius.circular(10),

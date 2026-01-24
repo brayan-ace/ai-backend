@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:math';
 import '../utils/theme.dart';
 import '../services/analytics_service.dart';
 import '../services/push_notification_service.dart';
@@ -11,14 +12,16 @@ class AnalyticsDashboardScreen extends StatefulWidget {
   const AnalyticsDashboardScreen({super.key});
 
   @override
-  State<AnalyticsDashboardScreen> createState() => _AnalyticsDashboardScreenState();
+  State<AnalyticsDashboardScreen> createState() =>
+      _AnalyticsDashboardScreenState();
 }
 
 class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
     with TickerProviderStateMixin {
   final AnalyticsService _analyticsService = AnalyticsService();
-  final PushNotificationService _notificationService = PushNotificationService();
-  
+  final PushNotificationService _notificationService =
+      PushNotificationService();
+
   Map<String, dynamic> _analyticsData = {};
   List<String> _insights = [];
   bool _isLoading = true;
@@ -38,32 +41,32 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
       duration: Duration(milliseconds: 600),
       vsync: this,
     );
-    
+
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut),
     );
-    
-    _slideAnimation = Tween<Offset>(
-      begin: Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic));
-    
+
+    _slideAnimation = Tween<Offset>(begin: Offset(0, 0.3), end: Offset.zero)
+        .animate(
+          CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
+        );
+
     _loadAnalytics();
   }
 
   Future<void> _loadAnalytics() async {
     setState(() => _isLoading = true);
-    
+
     try {
       final analytics = await _analyticsService.getLearningAnalytics();
       final insights = await _analyticsService.generatePersonalizedInsights();
-      
+
       setState(() {
         _analyticsData = analytics;
         _insights = insights;
         _isLoading = false;
       });
-      
+
       _fadeController.forward();
       _slideController.forward();
     } catch (e) {
@@ -105,7 +108,9 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
         ],
       ),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: AppTheme.primaryBlue))
+          ? Center(
+              child: CircularProgressIndicator(color: AppTheme.primaryBlue),
+            )
           : RefreshIndicator(
               onRefresh: _loadAnalytics,
               color: AppTheme.primaryBlue,
@@ -121,23 +126,23 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
                         // Header Stats
                         _buildHeaderStats(),
                         const SizedBox(height: AppTheme.spaceLg),
-                        
+
                         // Learning Progress Chart
                         _buildLearningProgressChart(),
                         const SizedBox(height: AppTheme.spaceLg),
-                        
+
                         // Key Metrics Grid
                         _buildMetricsGrid(),
                         const SizedBox(height: AppTheme.spaceLg),
-                        
+
                         // Personalized Insights
                         _buildInsightsSection(),
                         const SizedBox(height: AppTheme.spaceLg),
-                        
+
                         // Activity Patterns
                         _buildActivityPatterns(),
                         const SizedBox(height: AppTheme.spaceLg),
-                        
+
                         // Achievement Highlights
                         _buildAchievementHighlights(),
                       ],
@@ -229,10 +234,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
       ),
       child: Column(
         children: [
-          Text(
-            emoji,
-            style: TextStyle(fontSize: 24),
-          ),
+          Text(emoji, style: TextStyle(fontSize: 24)),
           SizedBox(height: 4),
           Text(
             value,
@@ -243,9 +245,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
           ),
           Text(
             title,
-            style: AppTheme.bodySmall.copyWith(
-              color: Colors.white70,
-            ),
+            style: AppTheme.bodySmall.copyWith(color: Colors.white70),
           ),
         ],
       ),
@@ -305,7 +305,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
             ),
             _buildMetricCard(
               'Concepts Learned',
-              '${(_analyticsData['concepts_learned']?.length ?? 0}',
+              '${(_analyticsData['concepts_learned']?.length ?? 0)}',
               Icons.psychology,
               AppTheme.warning,
             ),
@@ -315,7 +315,12 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
     );
   }
 
-  Widget _buildMetricCard(String title, String value, IconData icon, Color color) {
+  Widget _buildMetricCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Container(
       padding: const EdgeInsets.all(AppTheme.spaceMd),
       decoration: BoxDecoration(
@@ -348,9 +353,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
           ),
           Text(
             title,
-            style: AppTheme.bodySmall.copyWith(
-              color: AppTheme.textSecondary,
-            ),
+            style: AppTheme.bodySmall.copyWith(color: AppTheme.textSecondary),
           ),
         ],
       ),
@@ -363,33 +366,39 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ..._insights.map((insight) => Padding(
-            padding: const EdgeInsets.only(bottom: AppTheme.spaceMd),
-            child: Container(
-              padding: const EdgeInsets.all(AppTheme.spaceMd),
-              decoration: BoxDecoration(
-                color: AppTheme.primaryBlue.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                border: Border.all(
-                  color: AppTheme.primaryBlue.withOpacity(0.3),
+          ..._insights.map(
+            (insight) => Padding(
+              padding: const EdgeInsets.only(bottom: AppTheme.spaceMd),
+              child: Container(
+                padding: const EdgeInsets.all(AppTheme.spaceMd),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryBlue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                  border: Border.all(
+                    color: AppTheme.primaryBlue.withOpacity(0.3),
+                  ),
                 ),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.lightbulb, color: AppTheme.primaryBlue, size: 20),
-                  SizedBox(width: AppTheme.spaceSm),
-                  Expanded(
-                    child: Text(
-                      insight,
-                      style: AppTheme.bodyMedium.copyWith(
-                        color: AppTheme.textPrimary,
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.lightbulb,
+                      color: AppTheme.primaryBlue,
+                      size: 20,
+                    ),
+                    SizedBox(width: AppTheme.spaceSm),
+                    Expanded(
+                      child: Text(
+                        insight,
+                        style: AppTheme.bodyMedium.copyWith(
+                          color: AppTheme.textPrimary,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          )),
+          ),
         ],
       ),
     );
@@ -471,10 +480,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
     );
   }
 
-  Widget _buildSectionCard({
-    required String title,
-    required Widget child,
-  }) {
+  Widget _buildSectionCard({required String title, required Widget child}) {
     return Container(
       margin: const EdgeInsets.only(bottom: AppTheme.spaceMd),
       padding: const EdgeInsets.all(AppTheme.spaceLg),
@@ -508,16 +514,16 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
     // Generate sample data for the last 7 days
     List<Map<String, dynamic>> data = [];
     DateTime now = DateTime.now();
-    
+
     for (int i = 6; i >= 0; i--) {
       DateTime date = now.subtract(Duration(days: i));
       data.add({
         'day': _getDayName(date.weekday),
-        'value': math.Random().nextInt(60) + 20, // Random study minutes
+        'value': Random().nextInt(60) + 20, // Random study minutes
         'date': date,
       });
     }
-    
+
     return data;
   }
 
@@ -532,14 +538,22 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
 
   String _getDayName(int weekday) {
     switch (weekday) {
-      case 1: return 'Mon';
-      case 2: return 'Tue';
-      case 3: return 'Wed';
-      case 4: return 'Thu';
-      case 5: return 'Fri';
-      case 6: return 'Sat';
-      case 7: return 'Sun';
-      default: return 'Mon';
+      case 1:
+        return 'Mon';
+      case 2:
+        return 'Tue';
+      case 3:
+        return 'Wed';
+      case 4:
+        return 'Thu';
+      case 5:
+        return 'Fri';
+      case 6:
+        return 'Sat';
+      case 7:
+        return 'Sun';
+      default:
+        return 'Mon';
     }
   }
 }

@@ -5,6 +5,11 @@ import '../utils/theme.dart';
 import '../services/auth_services.dart';
 import '../widgets/social_media_icons.dart';
 
+// Global keys for navigation and scaffolding
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
+    GlobalKey<ScaffoldMessengerState>();
+
 class AuthScreen extends StatefulWidget {
   final VoidCallback? onAuthenticated;
 
@@ -46,11 +51,7 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
               title: Row(
                 children: [
-                  Icon(
-                    Icons.lock_reset,
-                    color: AppTheme.primaryBlue,
-                    size: 24,
-                  ),
+                  Icon(Icons.lock_reset, color: AppTheme.primaryBlue, size: 24),
                   SizedBox(width: 12),
                   Text(
                     'Reset Password',
@@ -76,7 +77,10 @@ class _AuthScreenState extends State<AuthScreen> {
                     controller: emailController,
                     decoration: InputDecoration(
                       labelText: 'Email Address',
-                      prefixIcon: Icon(Icons.email_outlined, color: AppTheme.primaryBlue),
+                      prefixIcon: Icon(
+                        Icons.email_outlined,
+                        color: AppTheme.primaryBlue,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide(color: AppTheme.surfaceElevated),
@@ -110,35 +114,39 @@ class _AuthScreenState extends State<AuthScreen> {
                   ),
                 ),
                 ElevatedButton(
-                  onPressed: isLoading ? null : () async {
-                    if (emailController.text.isEmpty) {
-                      _showError('Please enter your email address');
-                      return;
-                    }
+                  onPressed: isLoading
+                      ? null
+                      : () async {
+                          if (emailController.text.isEmpty) {
+                            _showError('Please enter your email address');
+                            return;
+                          }
 
-                    setState(() => isLoading = true);
-                    Navigator.of(context).pop();
+                          setState(() => isLoading = true);
+                          Navigator.of(context).pop();
 
-                    try {
-                      await FirebaseAuth.instance.sendPasswordResetEmail(
-                        email: emailController.text.trim(),
-                      );
+                          try {
+                            await FirebaseAuth.instance.sendPasswordResetEmail(
+                              email: emailController.text.trim(),
+                            );
 
-                      if (mounted) {
-                        _showSuccessMessage(
-                          'Password reset email sent! Check your inbox.',
-                        );
-                      }
-                    } catch (e) {
-                      if (mounted) {
-                        _showError('Failed to send reset email: ${e.toString()}');
-                      }
-                    } finally {
-                      if (mounted) {
-                        setState(() => isLoading = false);
-                      }
-                    }
-                  },
+                            if (mounted) {
+                              _showSuccessMessage(
+                                'Password reset email sent! Check your inbox.',
+                              );
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              _showError(
+                                'Failed to send reset email: ${e.toString()}',
+                              );
+                            }
+                          } finally {
+                            if (mounted) {
+                              setState(() => isLoading = false);
+                            }
+                          }
+                        },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primaryBlue,
                     foregroundColor: Colors.white,
@@ -153,7 +161,9 @@ class _AuthScreenState extends State<AuthScreen> {
                           height: 16,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
                           ),
                         )
                       : Text(
@@ -351,12 +361,12 @@ class _AuthScreenState extends State<AuthScreen> {
 
                                     if (!user.emailVerified) {
                                       // prompt verify (push on top of tabs instead of replacing)
-                                      navigatorKey.currentState?.push(
-                                        MaterialPageRoute(
-                                          builder: (_) =>
-                                              const VerifyEmailScreen(),
-                                        ),
-                                      );
+                                      // navigatorKey.currentState?.push(
+                                      //   MaterialPageRoute(
+                                      //     builder: (_) =>
+                                      //         const VerifyEmailScreen(),
+                                      //   ),
+                                      // );
                                       // do not call onAuthenticated; wait for verification
                                       setState(() => _loading = false);
                                       return;
@@ -369,8 +379,8 @@ class _AuthScreenState extends State<AuthScreen> {
                                       return;
                                     }
 
-                                    navigatorKey.currentState
-                                        ?.pushReplacementNamed('/ai');
+                                    // navigatorKey.currentState
+                                    //     ?.pushReplacementNamed('/ai');
                                     setState(() => _loading = false);
                                   },
                             child: _loading

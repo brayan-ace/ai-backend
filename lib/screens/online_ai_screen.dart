@@ -903,32 +903,35 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
             final consent = await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
-              title: Text('Show founder?'),
-              content: Text('Would you like to know my founder or my builder?'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: Text('No'),
+                title: Text('Show founder?'),
+                content: Text(
+                  'Would you like to know my founder or my builder?',
                 ),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  child: Text('Yes'),
-                ),
-              ],
-            ),
-          );
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: Text('No'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: Text('Yes'),
+                  ),
+                ],
+              ),
+            );
 
-          if (consent == true) {
-            final raw2 = await ApiService.sendRaw('chat', {
-              'message': 'reveal',
-              'action': 'reveal_founder',
-              'confirm': true,
-            });
-            final reply2 = raw2['reply'] ?? raw2['response'] ?? raw2.toString();
-            print('🔍 [RAW IDENTITY REVEAL RESPONSE] ${reply2.toString()}');
-            _logAndAddAiMessage(reply2.toString());
+            if (consent == true) {
+              final raw2 = await ApiService.sendRaw('chat', {
+                'message': 'reveal',
+                'action': 'reveal_founder',
+                'confirm': true,
+              });
+              final reply2 =
+                  raw2['reply'] ?? raw2['response'] ?? raw2.toString();
+              print('🔍 [RAW IDENTITY REVEAL RESPONSE] ${reply2.toString()}');
+              _logAndAddAiMessage(reply2.toString());
+            }
           }
-        }
         }
 
         handledLocally = true;
@@ -3436,11 +3439,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
               ),
             ),
           ),
-          if (_showOnboarding) OnboardingOverlay(
-            steps: OnboardingConfig.getSteps(),
-            onComplete: _onOnboardingComplete,
-            onSkip: _onOnboardingSkip,
-          ),
+        ),
       ],
     );
   }
