@@ -285,47 +285,62 @@ class AppTheme {
       primary: primaryBlueDark,
       secondary: primaryBlue,
       tertiary: accentBlue,
-      surface: Color(0xFFFFFFFF), // White surfaces
-      background: Color(0xFFFFFFFF), // White background
+      surface: Color(0xFFFFFFFF), // White card surfaces
+      background: Color(0xFFFFFFFF), // Pure white background
       error: error,
       onPrimary: Colors.white,
       onSecondary: Colors.white,
-      onSurface: Color(0xFFFFFFFF), // White text on surfaces
-      onBackground: Color(0xFFFFFFFF), // White text on background
+      onSurface: Color(0xFF1F2937), // Dark text on surfaces
+      onBackground: Color(0xFF1F2937), // Dark text on background
       onError: Colors.white,
     ),
-    scaffoldBackgroundColor: Color(0xFFFFFFFF), // White scaffold
+    scaffoldBackgroundColor: Color(0xFFFFFFFF), // Pure white scaffold
     textTheme: TextTheme(
-      displayLarge: displayLarge.copyWith(color: Color(0xFFFFFFFF)), // White text
-      displayMedium: displayMedium.copyWith(color: Color(0xFFFFFFFF)), // White text
-      headlineLarge: headlineLarge.copyWith(color: Color(0xFFFFFFFF)), // White text
-      headlineMedium: headlineMedium.copyWith(color: Color(0xFFFFFFFF)), // White text
-      bodyLarge: bodyLarge.copyWith(color: Color(0xFFFFFFFF)), // White text
-      bodyMedium: bodyMedium.copyWith(color: Color(0xFFFFFFFF)), // White text
-      bodySmall: bodySmall.copyWith(color: Color(0xFFFFFFFF)), // White text
-      labelLarge: labelLarge.copyWith(color: Color(0xFFFFFFFF)), // White text
-      labelMedium: labelMedium.copyWith(color: Color(0xFFFFFFFF)), // White text
+      displayLarge: displayLarge.copyWith(
+        color: Color(0xFF1F2937),
+      ), // Dark text
+      displayMedium: displayMedium.copyWith(
+        color: Color(0xFF1F2937),
+      ), // Dark text
+      headlineLarge: headlineLarge.copyWith(
+        color: Color(0xFF1F2937),
+      ), // Dark text
+      headlineMedium: headlineMedium.copyWith(
+        color: Color(0xFF1F2937),
+      ), // Dark text
+      bodyLarge: bodyLarge.copyWith(color: Color(0xFF374151)), // Dark gray text
+      bodyMedium: bodyMedium.copyWith(
+        color: Color(0xFF374151),
+      ), // Dark gray text
+      bodySmall: bodySmall.copyWith(
+        color: Color(0xFF6B7280),
+      ), // Medium gray text
+      labelLarge: labelLarge.copyWith(color: Color(0xFF1F2937)), // Dark text
+      labelMedium: labelMedium.copyWith(
+        color: Color(0xFF374151),
+      ), // Dark gray text
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: Color(0xFFF5F7FA), // Light input background
+      fillColor: Color(0xFFF9FAFB), // Very light input background
       contentPadding: EdgeInsets.symmetric(
         horizontal: spaceMd,
         vertical: spaceMd,
       ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radiusLg),
-        borderSide: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+        borderSide: BorderSide(color: Color(0xFFE5E7EB), width: 1),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radiusLg),
-        borderSide: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+        borderSide: BorderSide(color: Color(0xFFE5E7EB), width: 1),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radiusLg),
         borderSide: BorderSide(color: primaryBlueDark, width: 2),
       ),
-      hintStyle: TextStyle(color: Color(0xFFA0AEC0), fontSize: 15),
+      hintStyle: TextStyle(color: Color(0xFF9CA3AF), fontSize: 15),
+      labelStyle: TextStyle(color: Color(0xFF374151)),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
@@ -350,7 +365,7 @@ class AppTheme {
         borderRadius: BorderRadius.circular(radiusLg),
       ),
     ),
-    dividerColor: Color(0xFFE2E8F0),
+    dividerColor: Color(0xFFE5E7EB),
     shadowColor: Colors.black.withOpacity(0.1),
   );
 }

@@ -394,7 +394,7 @@ CURRENT SEARCH REQUEST: "${currentQuery}"
 Create an enhanced search query that incorporates relevant conversation context:`,
             },
           ],
-          model: "llama-3.1-8b-instant",
+          model: "openai/gpt-oss-20b",
           max_tokens: 150,
           temperature: 0.3,
         }),
@@ -509,7 +509,7 @@ Provide your enhanced answer:`;
     const response = await axios.post(
       "https://api.groq.com/openai/v1/chat/completions",
       {
-        model: "llama-3.1-8b-instant",
+        model: "openai/gpt-oss-20b",
         messages: [
           {
             role: "system",

@@ -5,7 +5,7 @@ import 'notes_screen.dart';
 import '../utils/globals.dart';
 import '../utils/theme.dart';
 
-/// MainTabs with bottom navigation: Sirri (chat) and Notes
+/// MainTabs with bottom navigation: Your AI (chat) and Notes
 class MainTabs extends StatefulWidget {
   final int initialIndex;
   const MainTabs({super.key, this.initialIndex = 0});
@@ -26,7 +26,7 @@ class _MainTabsState extends State<MainTabs> {
   @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
-      const OnlineAiScreen(), // Sirri AI Chat
+      const OnlineAiScreen(), // Your AI Chat
       const NotesScreen(), // Notes
     ];
 
@@ -72,7 +72,7 @@ class _MainTabsState extends State<MainTabs> {
                 children: [
                   _buildNavItem(
                     icon: Icons.chat_bubble_rounded,
-                    label: 'Sirri',
+                    label: 'Your AI',
                     index: 0,
                     gradient: AppTheme.primaryGradient,
                   ),

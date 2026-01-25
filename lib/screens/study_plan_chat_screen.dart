@@ -3399,11 +3399,77 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         300, // Assume 5 minutes spent
       );
 
+      // Automatically mark modules as completed based on milestones
+      await _updateModuleCompletion(type, description);
+
       print(
         '[ChatScreen] Milestone recorded: $description, Progress: ${_progressPercentage.toStringAsFixed(1)}%, XP: +$xpAmount',
       );
     } catch (e) {
       print('[ChatScreen] Error recording milestone: $e');
+    }
+  }
+
+  /// Automatically update module completion based on milestones
+  Future<void> _updateModuleCompletion(
+    String milestoneType,
+    String description,
+  ) async {
+    if (_botState == null || _studyPlan == null) return;
+
+    final modules = _studyPlan!['modules'] as List?;
+    if (modules == null || modules.isEmpty) return;
+
+    final currentModuleIndex = _botState!.currentModule;
+    final completedModules = List<int>.from(_botState!.completedModules ?? []);
+
+    bool shouldMarkComplete = false;
+
+    // Logic to determine when a module should be marked complete
+    switch (milestoneType) {
+      case 'module_completion':
+        shouldMarkComplete = true;
+        break;
+      case 'concept_mastery':
+        // Mark complete if user has demonstrated understanding multiple times
+        // or if this is a significant milestone
+        if (description.toLowerCase().contains('mastered') ||
+            description.toLowerCase().contains('completed') ||
+            description.toLowerCase().contains('understood')) {
+          shouldMarkComplete = true;
+        }
+        break;
+      case 'quiz_completion':
+        // Quiz completion often indicates module mastery
+        shouldMarkComplete = true;
+        break;
+    }
+
+    if (shouldMarkComplete && !completedModules.contains(currentModuleIndex)) {
+      completedModules.add(currentModuleIndex);
+
+      // Update bot state with completed modules
+      final updatedState = _botState!.copyWith(
+        completedModules: completedModules,
+        currentModule: currentModuleIndex + 1, // Move to next module
+      );
+
+      // Save updated state to backend
+      try {
+        await _planService.saveBotState(updatedState);
+        setState(() {
+          _botState = updatedState;
+        });
+
+        print(
+          '[ChatScreen] Module $currentModuleIndex marked as completed. Moving to module ${currentModuleIndex + 1}',
+        );
+
+        // Reload study plan to update hamburger menu
+        await _loadStudyPlan();
+      } catch (e) {
+        print('[ChatScreen] Error updating module completion: $e');
+      }
     }
   }
 

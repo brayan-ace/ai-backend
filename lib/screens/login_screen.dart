@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../utils/theme.dart';
 import '../services/user_profile_service.dart';
+import '../widgets/google_sign_in_button.dart';
 
 /// Login screen with email and password fields
 /// Features proper error handling, loading states, and smooth UX
@@ -65,8 +66,28 @@ class _LoginScreenState extends State<LoginScreen>
   void _validatePassword() {
     final password = _passwordController.text;
     setState(() {
-      _passwordValid = password.length >= 6;
+      _passwordValid = _isPasswordStrong(password);
     });
+  }
+
+  /// Enhanced password strength validation
+  /// Requires: 8+ chars, uppercase, lowercase, number, special char
+  bool _isPasswordStrong(String password) {
+    if (password.length < 8) return false;
+
+    // Check for at least one uppercase letter
+    if (!RegExp(r'[A-Z]').hasMatch(password)) return false;
+
+    // Check for at least one lowercase letter
+    if (!RegExp(r'[a-z]').hasMatch(password)) return false;
+
+    // Check for at least one number
+    if (!RegExp(r'[0-9]').hasMatch(password)) return false;
+
+    // Check for at least one special character
+    if (!RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(password)) return false;
+
+    return true;
   }
 
   bool get _isFormValid => _emailValid && _passwordValid;
@@ -158,9 +179,7 @@ class _LoginScreenState extends State<LoginScreen>
             children: [
               Icon(Icons.check_circle, color: Colors.white, size: 20),
               SizedBox(width: 8),
-              Expanded(
-                child: Text('Password reset email sent to $email'),
-              ),
+              Expanded(child: Text('Password reset email sent to $email')),
             ],
           ),
           backgroundColor: AppTheme.success,
@@ -297,7 +316,8 @@ class _LoginScreenState extends State<LoginScreen>
                         _buildTextField(
                           controller: _passwordController,
                           label: 'Password',
-                          hint: 'Enter your password',
+                          hint:
+                              '8+ chars, uppercase, lowercase, number, special char',
                           icon: Icons.lock_outline_rounded,
                           isValid: _passwordValid,
                           obscureText: _obscurePassword,
@@ -305,7 +325,9 @@ class _LoginScreenState extends State<LoginScreen>
                           onSubmitted: (_) => _handleLogin(),
                           suffixIcon: IconButton(
                             onPressed: () {
-                              setState(() => _obscurePassword = !_obscurePassword);
+                              setState(
+                                () => _obscurePassword = !_obscurePassword,
+                              );
                             },
                             icon: Icon(
                               _obscurePassword
@@ -372,6 +394,44 @@ class _LoginScreenState extends State<LoginScreen>
                         // Login button
                         _buildLoginButton(),
 
+                        const SizedBox(height: 24),
+
+                        // Divider with "or"
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Divider(
+                                color: AppTheme.surfaceElevated,
+                                thickness: 1,
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              child: Text(
+                                'or',
+                                style: TextStyle(
+                                  color: AppTheme.textTertiary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Divider(
+                                color: AppTheme.surfaceElevated,
+                                thickness: 1,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // Google Sign-In Button
+                        const GoogleSignInButton(),
+
                         const SizedBox(height: 32),
 
                         // Sign up link
@@ -387,7 +447,10 @@ class _LoginScreenState extends State<LoginScreen>
                             ),
                             GestureDetector(
                               onTap: () {
-                                Navigator.pushReplacementNamed(context, '/signup');
+                                Navigator.pushReplacementNamed(
+                                  context,
+                                  '/signup',
+                                );
                               },
                               child: Text(
                                 'Sign Up',
@@ -457,18 +520,13 @@ class _LoginScreenState extends State<LoginScreen>
             keyboardType: keyboardType,
             textInputAction: textInputAction,
             onSubmitted: onSubmitted,
-            style: TextStyle(
-              color: AppTheme.textPrimary,
-              fontSize: 16,
-            ),
+            style: TextStyle(color: AppTheme.textPrimary, fontSize: 16),
             decoration: InputDecoration(
               hintText: hint,
-              hintStyle: TextStyle(
-                color: AppTheme.textTertiary,
-                fontSize: 16,
-              ),
+              hintStyle: TextStyle(color: AppTheme.textTertiary, fontSize: 16),
               prefixIcon: Icon(icon, color: AppTheme.textTertiary),
-              suffixIcon: suffixIcon ??
+              suffixIcon:
+                  suffixIcon ??
                   (hasContent && isValid
                       ? Icon(
                           Icons.check_circle,
@@ -526,7 +584,9 @@ class _LoginScreenState extends State<LoginScreen>
                 : Text(
                     'Log In',
                     style: TextStyle(
-                      color: _isFormValid ? Colors.white : AppTheme.textTertiary,
+                      color: _isFormValid
+                          ? Colors.white
+                          : AppTheme.textTertiary,
                       fontSize: 17,
                       fontWeight: FontWeight.w600,
                     ),

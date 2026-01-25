@@ -14,16 +14,16 @@ async function getUserConversationHistory(botId, userId) {
        FROM chat_messages 
        WHERE bot_id = $1 AND user_id = $2 
        ORDER BY created_at ASC`,
-      [botId, userId]
+      [botId, userId],
     );
-    
-    return result.rows.map(msg => ({
+
+    return result.rows.map((msg) => ({
       type: msg.message_type,
       content: msg.content,
-      timestamp: msg.created_at
+      timestamp: msg.created_at,
     }));
   } catch (error) {
-    console.error('[EnhancedQuiz] Error fetching conversation history:', error);
+    console.error("[EnhancedQuiz] Error fetching conversation history:", error);
     return [];
   }
 }
@@ -37,27 +37,33 @@ async function analyzeLearningConcepts(conversationHistory, gradeLevel) {
     return {
       conceptsDiscussed: [],
       userInterests: [],
-      difficultyLevel: gradeLevel || 'Medium',
-      learningStyle: 'unknown'
+      difficultyLevel: gradeLevel || "Medium",
+      learningStyle: "unknown",
     };
   }
 
   try {
     const groqApiKey = process.env.GROQ_API_KEY;
     if (!groqApiKey) {
-      console.warn('[EnhancedQuiz] GROQ_API_KEY not available for concept analysis');
-      return { conceptsDiscussed: [], userInterests: [], difficultyLevel: gradeLevel };
+      console.warn(
+        "[EnhancedQuiz] GROQ_API_KEY not available for concept analysis",
+      );
+      return {
+        conceptsDiscussed: [],
+        userInterests: [],
+        difficultyLevel: gradeLevel,
+      };
     }
 
     // Build conversation text for analysis
     const conversationText = conversationHistory
       .slice(-20) // Last 20 messages for context
-      .map(msg => `${msg.type.toUpperCase()}: ${msg.content}`)
-      .join('\n');
+      .map((msg) => `${msg.type.toUpperCase()}: ${msg.content}`)
+      .join("\n");
 
     const analysisPrompt = `You are an educational analyst. Analyze this student's conversation with their AI tutor and extract key learning insights.
 
-GRADE LEVEL: ${gradeLevel || 'General'}
+GRADE LEVEL: ${gradeLevel || "General"}
 
 CONVERSATION HISTORY:
 ${conversationText}
@@ -87,13 +93,14 @@ Return ONLY valid JSON, no explanations.`;
     const response = await axios.post(
       "https://api.groq.com/openai/v1/chat/completions",
       {
-        model: "llama-3.1-8b-instant",
+        model: "openai/gpt-oss-20b",
         messages: [
           {
             role: "system",
-            content: "You are an expert educational analyst. Analyze conversations to extract learning insights. Return only valid JSON."
+            content:
+              "You are an expert educational analyst. Analyze conversations to extract learning insights. Return only valid JSON.",
           },
-          { role: "user", content: analysisPrompt }
+          { role: "user", content: analysisPrompt },
         ],
         max_tokens: 1000,
         temperature: 0.3,
@@ -104,22 +111,28 @@ Return ONLY valid JSON, no explanations.`;
           Authorization: `Bearer ${groqApiKey}`,
         },
         timeout: 20000,
-      }
+      },
     );
 
     const analysisText = response.data?.choices?.[0]?.message?.content || "{}";
-    const analysis = JSON.parse(analysisText.replace(/```json\n?|```/g, "").trim());
-    
-    console.log('[EnhancedQuiz] Learning analysis completed:', {
+    const analysis = JSON.parse(
+      analysisText.replace(/```json\n?|```/g, "").trim(),
+    );
+
+    console.log("[EnhancedQuiz] Learning analysis completed:", {
       conceptsFound: analysis.conceptsDiscussed?.length || 0,
       difficultyLevel: analysis.difficultyLevel,
-      learningStyle: analysis.learningStyle
+      learningStyle: analysis.learningStyle,
     });
 
     return analysis;
   } catch (error) {
-    console.error('[EnhancedQuiz] Error analyzing learning concepts:', error);
-    return { conceptsDiscussed: [], userInterests: [], difficultyLevel: gradeLevel };
+    console.error("[EnhancedQuiz] Error analyzing learning concepts:", error);
+    return {
+      conceptsDiscussed: [],
+      userInterests: [],
+      difficultyLevel: gradeLevel,
+    };
   }
 }
 
@@ -133,7 +146,7 @@ async function getUserStudyPlan(botId, userId) {
       `SELECT study_plan, current_module, completed_modules, progress_percentage 
        FROM bot_progress 
        WHERE bot_id = $1 AND user_id = $2`,
-      [botId, userId]
+      [botId, userId],
     );
 
     if (result.rows.length > 0) {
@@ -142,12 +155,12 @@ async function getUserStudyPlan(botId, userId) {
         studyPlan: row.study_plan,
         currentModule: row.current_module,
         completedModules: row.completed_modules || [],
-        progressPercentage: row.progress_percentage || 0
+        progressPercentage: row.progress_percentage || 0,
       };
     }
     return null;
   } catch (error) {
-    console.error('[EnhancedQuiz] Error fetching study plan:', error);
+    console.error("[EnhancedQuiz] Error fetching study plan:", error);
     return null;
   }
 }
@@ -163,28 +176,33 @@ async function generateEnhancedQuizPrompt({
   questionType,
   mcqCount,
   textCount,
-  useWebSearch
+  useWebSearch,
 }) {
-  console.log('[EnhancedQuiz] Starting deep analysis for quiz generation...');
+  console.log("[EnhancedQuiz] Starting deep analysis for quiz generation...");
 
   // 1. Get conversation history
   const conversationHistory = await getUserConversationHistory(botId, userId);
-  console.log(`[EnhancedQuiz] Found ${conversationHistory.length} conversation messages`);
+  console.log(
+    `[EnhancedQuiz] Found ${conversationHistory.length} conversation messages`,
+  );
 
   // 2. Analyze learning concepts
-  const learningAnalysis = await analyzeLearningConcepts(conversationHistory, gradeLevel);
-  console.log('[EnhancedQuiz] Learning analysis completed');
+  const learningAnalysis = await analyzeLearningConcepts(
+    conversationHistory,
+    gradeLevel,
+  );
+  console.log("[EnhancedQuiz] Learning analysis completed");
 
   // 3. Get study plan context
   const studyPlan = await getUserStudyPlan(botId, userId);
-  console.log('[EnhancedQuiz] Study plan context retrieved');
+  console.log("[EnhancedQuiz] Study plan context retrieved");
 
   // 4. Get web search context if enabled
   let searchContext = "";
   if (useWebSearch) {
     const searchResults = await searchTopicOnline(
-      `${moduleName} ${learningAnalysis.conceptsDiscussed.join(' ')}`.trim(),
-      gradeLevel || "General"
+      `${moduleName} ${learningAnalysis.conceptsDiscussed.join(" ")}`.trim(),
+      gradeLevel || "General",
     );
     if (searchResults && searchResults.answer) {
       searchContext = `Web search context: ${searchResults.answer}`;
@@ -195,34 +213,41 @@ async function generateEnhancedQuizPrompt({
   let quizPrompt = `Generate a PERSONALIZED quiz based on deep analysis of this student's learning journey.
 
 STUDENT PROFILE:
-- Grade Level: ${gradeLevel || 'General'}
-- Learning Style: ${learningAnalysis.learningStyle || 'unknown'}
-- Difficulty Level: ${learningAnalysis.difficultyLevel || 'Medium'}
+- Grade Level: ${gradeLevel || "General"}
+- Learning Style: ${learningAnalysis.learningStyle || "unknown"}
+- Difficulty Level: ${learningAnalysis.difficultyLevel || "Medium"}
 - Progress: ${studyPlan?.progressPercentage || 0}% complete
 
-CONCEPTS DISCUSSED: ${learningAnalysis.conceptsDiscussed.join(', ')}
+CONCEPTS DISCUSSED: ${learningAnalysis.conceptsDiscussed.join(", ")}
 
-STUDENT INTERESTS: ${learningAnalysis.userInterests.join(', ')}
+STUDENT INTERESTS: ${learningAnalysis.userInterests.join(", ")}
 
-STRENGTHS: ${learningAnalysis.strengths?.join(', ') || 'None identified'}
+STRENGTHS: ${learningAnalysis.strengths?.join(", ") || "None identified"}
 
-AREAS FOR IMPROVEMENT: ${learningAnalysis.weaknesses?.join(', ') || 'None identified'}
+AREAS FOR IMPROVEMENT: ${learningAnalysis.weaknesses?.join(", ") || "None identified"}
 
-COMMON QUESTIONS: ${learningAnalysis.keyQuestions?.join(', ') || 'None identified'}
+COMMON QUESTIONS: ${learningAnalysis.keyQuestions?.join(", ") || "None identified"}
 
-MISCONCEPTIONS TO ADDRESS: ${learningAnalysis.misconceptions?.join(', ') || 'None identified'}
+MISCONCEPTIONS TO ADDRESS: ${learningAnalysis.misconceptions?.join(", ") || "None identified"}
 
 CURRENT MODULE: "${moduleName}"
 
-${studyPlan ? `STUDY PLAN CONTEXT:
+${
+  studyPlan
+    ? `STUDY PLAN CONTEXT:
 - Current Module: ${studyPlan.currentModule + 1}
 - Completed Modules: ${studyPlan.completedModules.length}
-- Total Modules: ${studyPlan.studyPlan?.modules?.length || 0}` : ''}
+- Total Modules: ${studyPlan.studyPlan?.modules?.length || 0}`
+    : ""
+}
 
-${searchContext ? `\n${searchContext}` : ''}
+${searchContext ? `\n${searchContext}` : ""}
 
 RECENT LEARNING CONVERSATION SAMPLE:
-${conversationHistory.slice(-6).map(msg => `${msg.type}: ${msg.content}`).join('\n')}
+${conversationHistory
+  .slice(-6)
+  .map((msg) => `${msg.type}: ${msg.content}`)
+  .join("\n")}
 
 GENERATION REQUIREMENTS:
 1. Focus on concepts the student has actually discussed
@@ -293,5 +318,5 @@ module.exports = {
   generateEnhancedQuizPrompt,
   getUserConversationHistory,
   analyzeLearningConcepts,
-  getUserStudyPlan
+  getUserStudyPlan,
 };

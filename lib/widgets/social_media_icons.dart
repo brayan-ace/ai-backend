@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 /// Custom social media icons with proper brand colors and designs
 class SocialMediaIcon extends StatelessWidget {
@@ -27,7 +28,7 @@ class SocialMediaIcon extends StatelessWidget {
 
 class _WhatsAppIcon extends StatelessWidget {
   final double size;
-  
+
   const _WhatsAppIcon({Key? key, required this.size}) : super(key: key);
 
   @override
@@ -40,7 +41,7 @@ class _WhatsAppIcon extends StatelessWidget {
         borderRadius: BorderRadius.circular(size * 0.2),
       ),
       child: Icon(
-        Icons.message,
+        FontAwesomeIcons.whatsapp,
         color: Colors.white,
         size: size * 0.6,
       ),
@@ -50,7 +51,7 @@ class _WhatsAppIcon extends StatelessWidget {
 
 class _FacebookIcon extends StatelessWidget {
   final double size;
-  
+
   const _FacebookIcon({Key? key, required this.size}) : super(key: key);
 
   @override
@@ -63,7 +64,7 @@ class _FacebookIcon extends StatelessWidget {
         borderRadius: BorderRadius.circular(size * 0.2),
       ),
       child: Icon(
-        Icons.facebook,
+        FontAwesomeIcons.facebook,
         color: Colors.white,
         size: size * 0.6,
       ),
@@ -73,7 +74,7 @@ class _FacebookIcon extends StatelessWidget {
 
 class _InstagramIcon extends StatelessWidget {
   final double size;
-  
+
   const _InstagramIcon({Key? key, required this.size}) : super(key: key);
 
   @override
@@ -83,18 +84,14 @@ class _InstagramIcon extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            Colors.purple,
-            Colors.pink,
-            Colors.orange,
-          ],
+          colors: [Colors.purple, Colors.pink, Colors.orange],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(size * 0.2),
       ),
       child: Icon(
-        Icons.camera_alt,
+        FontAwesomeIcons.instagram,
         color: Colors.white,
         size: size * 0.6,
       ),
@@ -104,7 +101,7 @@ class _InstagramIcon extends StatelessWidget {
 
 class _TikTokIcon extends StatelessWidget {
   final double size;
-  
+
   const _TikTokIcon({Key? key, required this.size}) : super(key: key);
 
   @override
@@ -116,48 +113,11 @@ class _TikTokIcon extends StatelessWidget {
         color: Colors.black,
         borderRadius: BorderRadius.circular(size * 0.2),
       ),
-      child: CustomPaint(
-        size: Size(size * 0.8, size * 0.8),
-        painter: _TikTokLogoPainter(),
+      child: Icon(
+        FontAwesomeIcons.tiktok,
+        color: Colors.white,
+        size: size * 0.6,
       ),
     );
   }
-}
-
-class _TikTokLogoPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..style = PaintingStyle.fill;
-
-    // TikTok logo design (simplified)
-    final path = Path();
-    
-    // Blue part
-    paint.color = Color(0xFF25F4EE);
-    path.addRRect(RRect.fromRectAndRadius(
-      Rect.fromLTWH(size.width * 0.1, size.height * 0.2, size.width * 0.3, size.height * 0.6),
-      Radius.circular(size.width * 0.1),
-    ));
-    canvas.drawPath(path, paint);
-
-    // Pink part
-    paint.color = Color(0xFFFE2C55);
-    path.addRRect(RRect.fromRectAndRadius(
-      Rect.fromLTWH(size.width * 0.35, size.height * 0.1, size.width * 0.3, size.height * 0.7),
-      Radius.circular(size.width * 0.1),
-    ));
-    canvas.drawPath(path, paint);
-
-    // Black part
-    paint.color = Colors.white;
-    path.addRRect(RRect.fromRectAndRadius(
-      Rect.fromLTWH(size.width * 0.6, size.height * 0.3, size.width * 0.25, size.height * 0.4),
-      Radius.circular(size.width * 0.08),
-    ));
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

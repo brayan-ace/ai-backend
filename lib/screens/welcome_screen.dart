@@ -16,7 +16,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   late AnimationController _fadeController;
   late AnimationController _pulseController;
   late AnimationController _floatController;
-  
+
   late Animation<double> _fadeAnimation;
   late Animation<double> _pulseAnimation;
   late Animation<double> _floatAnimation;
@@ -25,7 +25,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   @override
   void initState() {
     super.initState();
-    
+
     // Fade in animation
     _fadeController = AnimationController(
       vsync: this,
@@ -38,7 +38,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     _slideAnimation = Tween<double>(begin: 30, end: 0).animate(
       CurvedAnimation(parent: _fadeController, curve: Curves.easeOutCubic),
     );
-    
+
     // Pulse animation for the logo glow
     _pulseController = AnimationController(
       vsync: this,
@@ -47,7 +47,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     _pulseAnimation = Tween<double>(begin: 0.3, end: 0.6).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
-    
+
     // Float animation for decorative elements
     _floatController = AnimationController(
       vsync: this,
@@ -56,7 +56,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     _floatAnimation = Tween<double>(begin: -8, end: 8).animate(
       CurvedAnimation(parent: _floatController, curve: Curves.easeInOut),
     );
-    
+
     // Start fade animation
     _fadeController.forward();
   }
@@ -72,7 +72,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    
+
     return Scaffold(
       body: Container(
         width: double.infinity,
@@ -93,7 +93,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
           children: [
             // Animated background particles/orbs
             ..._buildBackgroundOrbs(size),
-            
+
             // Main content
             SafeArea(
               child: AnimatedBuilder(
@@ -112,12 +112,12 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                   child: Column(
                     children: [
                       const Spacer(flex: 2),
-                      
+
                       // Animated Logo with glow
                       _buildAnimatedLogo(),
-                      
+
                       const SizedBox(height: 32),
-                      
+
                       // App Name
                       ShaderMask(
                         shaderCallback: (bounds) => LinearGradient(
@@ -137,9 +137,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           ),
                         ),
                       ),
-                      
+
                       const SizedBox(height: 12),
-                      
+
                       // Tagline
                       Text(
                         'The Ultimate Studying AI',
@@ -150,14 +150,14 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           letterSpacing: 0.5,
                         ),
                       ),
-                      
+
                       const SizedBox(height: 48),
-                      
+
                       // Feature highlights
                       _buildFeatureHighlights(),
-                      
+
                       const Spacer(flex: 2),
-                      
+
                       // Get Started Button (Primary)
                       _buildPrimaryButton(
                         label: 'Get Started',
@@ -166,9 +166,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           Navigator.pushNamed(context, '/signup');
                         },
                       ),
-                      
+
                       const SizedBox(height: 16),
-                      
+
                       // Already have account (Secondary)
                       _buildSecondaryButton(
                         label: 'I Already Have an Account',
@@ -176,23 +176,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           Navigator.pushNamed(context, '/login');
                         },
                       ),
-                      
-                      const SizedBox(height: 32),
-                      
-                      // Skip for now (subtle)
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pushReplacementNamed(context, '/main');
-                        },
-                        child: Text(
-                          'Continue as Guest',
-                          style: TextStyle(
-                            color: AppTheme.textTertiary,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                      
+
                       const SizedBox(height: 24),
                     ],
                   ),
@@ -219,19 +203,20 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  AppTheme.primaryBlue,
-                  AppTheme.primaryBlueDark,
-                ],
+                colors: [AppTheme.primaryBlue, AppTheme.primaryBlueDark],
               ),
               boxShadow: [
                 BoxShadow(
-                  color: AppTheme.primaryBlue.withOpacity(_pulseAnimation.value),
+                  color: AppTheme.primaryBlue.withOpacity(
+                    _pulseAnimation.value,
+                  ),
                   blurRadius: 40,
                   spreadRadius: 10,
                 ),
                 BoxShadow(
-                  color: AppTheme.accentBlue.withOpacity(_pulseAnimation.value * 0.5),
+                  color: AppTheme.accentBlue.withOpacity(
+                    _pulseAnimation.value * 0.5,
+                  ),
                   blurRadius: 60,
                   spreadRadius: 20,
                 ),
@@ -256,7 +241,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       {'icon': Icons.school_rounded, 'text': 'Personalized Study Plans'},
       {'icon': Icons.quiz_rounded, 'text': 'Smart Quizzes & Tests'},
     ];
-    
+
     return Column(
       children: features.map((feature) {
         return Padding(
@@ -301,9 +286,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       width: double.infinity,
       height: 56,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: AppTheme.primaryGradient,
-        ),
+        gradient: LinearGradient(colors: AppTheme.primaryGradient),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -436,7 +419,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    AppTheme.primaryBlue.withOpacity(_pulseAnimation.value * 0.1),
+                    AppTheme.primaryBlue.withOpacity(
+                      _pulseAnimation.value * 0.1,
+                    ),
                     Colors.transparent,
                   ],
                 ),

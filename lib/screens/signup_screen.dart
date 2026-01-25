@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../utils/theme.dart';
 import '../services/auth_services.dart';
 import '../services/user_profile_service.dart';
+import '../widgets/google_sign_in_button.dart';
 import 'email_verification_screen.dart';
 
 /// Sign-up screen with username, email, password fields
@@ -110,15 +111,21 @@ class _SignUpScreenState extends State<SignUpScreen>
       if (password.isEmpty) {
         _passwordValid = false;
         _passwordError = null;
-      } else if (password.length < 6) {
+      } else if (password.length < 8) {
         _passwordValid = false;
-        _passwordError = 'Password must be at least 6 characters';
+        _passwordError = 'Password must be at least 8 characters';
+      } else if (!RegExp(r'[A-Z]').hasMatch(password)) {
+        _passwordValid = false;
+        _passwordError = 'Password must contain at least one uppercase letter';
+      } else if (!RegExp(r'[a-z]').hasMatch(password)) {
+        _passwordValid = false;
+        _passwordError = 'Password must contain at least one lowercase letter';
       } else if (!RegExp(r'[0-9]').hasMatch(password)) {
         _passwordValid = false;
         _passwordError = 'Password must contain at least one number';
-      } else if (!RegExp(r'[a-zA-Z]').hasMatch(password)) {
+      } else if (!RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(password)) {
         _passwordValid = false;
-        _passwordError = 'Password must contain at least one letter';
+        _passwordError = 'Password must contain at least one special character';
       } else {
         _passwordValid = true;
         _passwordError = null;
@@ -163,10 +170,8 @@ class _SignUpScreenState extends State<SignUpScreen>
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => EmailVerificationScreen(
-              email: email,
-              username: username,
-            ),
+            builder: (context) =>
+                EmailVerificationScreen(email: email, username: username),
           ),
         );
       }
@@ -300,7 +305,8 @@ class _SignUpScreenState extends State<SignUpScreen>
                         _buildTextField(
                           controller: _passwordController,
                           label: 'Password',
-                          hint: 'Create a password',
+                          hint:
+                              '8+ chars, uppercase, lowercase, number, special char',
                           icon: Icons.lock_outline_rounded,
                           isValid: _passwordValid,
                           errorText: _passwordError,
@@ -309,7 +315,9 @@ class _SignUpScreenState extends State<SignUpScreen>
                           onSubmitted: (_) => _handleSignUp(),
                           suffixIcon: IconButton(
                             onPressed: () {
-                              setState(() => _obscurePassword = !_obscurePassword);
+                              setState(
+                                () => _obscurePassword = !_obscurePassword,
+                              );
                             },
                             icon: Icon(
                               _obscurePassword
@@ -365,6 +373,44 @@ class _SignUpScreenState extends State<SignUpScreen>
 
                         const SizedBox(height: 24),
 
+                        // Divider with "or"
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Divider(
+                                color: AppTheme.surfaceElevated,
+                                thickness: 1,
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              child: Text(
+                                'or',
+                                style: TextStyle(
+                                  color: AppTheme.textTertiary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Divider(
+                                color: AppTheme.surfaceElevated,
+                                thickness: 1,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // Google Sign-In Button
+                        const GoogleSignInButton(),
+
+                        const SizedBox(height: 24),
+
                         // Login link
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -378,7 +424,10 @@ class _SignUpScreenState extends State<SignUpScreen>
                             ),
                             GestureDetector(
                               onTap: () {
-                                Navigator.pushReplacementNamed(context, '/login');
+                                Navigator.pushReplacementNamed(
+                                  context,
+                                  '/login',
+                                );
                               },
                               child: Text(
                                 'Log In',
@@ -440,8 +489,8 @@ class _SignUpScreenState extends State<SignUpScreen>
               color: errorText != null
                   ? AppTheme.error.withOpacity(0.5)
                   : isValid
-                      ? AppTheme.success.withOpacity(0.5)
-                      : AppTheme.surfaceElevated,
+                  ? AppTheme.success.withOpacity(0.5)
+                  : AppTheme.surfaceElevated,
               width: 1.5,
             ),
           ),
@@ -451,18 +500,13 @@ class _SignUpScreenState extends State<SignUpScreen>
             keyboardType: keyboardType,
             textInputAction: textInputAction,
             onSubmitted: onSubmitted,
-            style: TextStyle(
-              color: AppTheme.textPrimary,
-              fontSize: 16,
-            ),
+            style: TextStyle(color: AppTheme.textPrimary, fontSize: 16),
             decoration: InputDecoration(
               hintText: hint,
-              hintStyle: TextStyle(
-                color: AppTheme.textTertiary,
-                fontSize: 16,
-              ),
+              hintStyle: TextStyle(color: AppTheme.textTertiary, fontSize: 16),
               prefixIcon: Icon(icon, color: AppTheme.textTertiary),
-              suffixIcon: suffixIcon ??
+              suffixIcon:
+                  suffixIcon ??
                   (hasContent
                       ? Icon(
                           isValid ? Icons.check_circle : Icons.cancel,
@@ -483,10 +527,7 @@ class _SignUpScreenState extends State<SignUpScreen>
             padding: const EdgeInsets.only(top: 6, left: 4),
             child: Text(
               errorText,
-              style: TextStyle(
-                color: AppTheme.error,
-                fontSize: 12,
-              ),
+              style: TextStyle(color: AppTheme.error, fontSize: 12),
             ),
           ),
       ],
@@ -495,16 +536,20 @@ class _SignUpScreenState extends State<SignUpScreen>
 
   Widget _buildPasswordRequirements() {
     final password = _passwordController.text;
-    final hasMinLength = password.length >= 6;
+    final hasMinLength = password.length >= 8;
+    final hasUppercase = RegExp(r'[A-Z]').hasMatch(password);
+    final hasLowercase = RegExp(r'[a-z]').hasMatch(password);
     final hasNumber = RegExp(r'[0-9]').hasMatch(password);
-    final hasLetter = RegExp(r'[a-zA-Z]').hasMatch(password);
+    final hasSpecialChar = RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(password);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildRequirement('At least 6 characters', hasMinLength),
+        _buildRequirement('At least 8 characters', hasMinLength),
+        _buildRequirement('Contains an uppercase letter', hasUppercase),
+        _buildRequirement('Contains a lowercase letter', hasLowercase),
         _buildRequirement('Contains a number', hasNumber),
-        _buildRequirement('Contains a letter', hasLetter),
+        _buildRequirement('Contains a special character', hasSpecialChar),
       ],
     );
   }
@@ -570,7 +615,9 @@ class _SignUpScreenState extends State<SignUpScreen>
                 : Text(
                     'Create Account',
                     style: TextStyle(
-                      color: _isFormValid ? Colors.white : AppTheme.textTertiary,
+                      color: _isFormValid
+                          ? Colors.white
+                          : AppTheme.textTertiary,
                       fontSize: 17,
                       fontWeight: FontWeight.w600,
                     ),

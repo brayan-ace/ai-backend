@@ -3,9 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:math' as math;
 import '../models/study_bot_state.dart';
-import '../utils/theme.dart';
 
 class PremiumColors {
   static const Color darkBg = Color(0xFF0a0a0a);
@@ -69,13 +67,13 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     );
-    _progressAnimation = Tween<double>(
-      begin: 0,
-      end: widget.progressPercentage / 100,
-    ).animate(CurvedAnimation(
-      parent: _progressController,
-      curve: Curves.easeOutCubic,
-    ));
+    _progressAnimation =
+        Tween<double>(begin: 0, end: widget.progressPercentage / 100).animate(
+          CurvedAnimation(
+            parent: _progressController,
+            curve: Curves.easeOutCubic,
+          ),
+        );
     _progressController.forward();
 
     // Pulse animation for current module
@@ -115,7 +113,8 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
           children: [
             _buildPremiumHeader(),
             Expanded(
-              child: widget.tableOfContents == null ||
+              child:
+                  widget.tableOfContents == null ||
                       widget.tableOfContents!.isEmpty
                   ? _buildEmptyState()
                   : _buildModulesList(),
@@ -174,7 +173,9 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
-                              color: PremiumColors.accentGradient2.withOpacity(0.4),
+                              color: PremiumColors.accentGradient2.withOpacity(
+                                0.4,
+                              ),
                               blurRadius: 12,
                               spreadRadius: 2,
                             ),
@@ -252,10 +253,7 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
           ],
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.1),
-          width: 1,
-        ),
+        border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
       ),
       child: Row(
         children: [
@@ -310,10 +308,7 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                         ),
                         Text(
                           'Complete',
-                          style: TextStyle(
-                            color: Colors.white54,
-                            fontSize: 10,
-                          ),
+                          style: TextStyle(color: Colors.white54, fontSize: 10),
                         ),
                       ],
                     ),
@@ -483,139 +478,97 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
   }
 
   Widget _buildModulesList() {
-    return ListView.builder(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      itemCount: widget.tableOfContents!.length,
-      itemBuilder: (context, index) {
-        final toc = widget.tableOfContents![index];
-        final isCompleted = widget.completedModules?.contains(index) ?? false;
-        final isCurrent = widget.currentModule == index;
-
-        return _buildModuleCard(toc, index, isCompleted, isCurrent);
-      },
-    );
-  }
-
-  Widget _buildModuleCard(
-    TableOfContentsItem toc,
-    int index,
-    bool isCompleted,
-    bool isCurrent,
-  ) {
-    return AnimatedContainer(
-      duration: Duration(milliseconds: 300),
-      margin: EdgeInsets.only(bottom: 12),
+    return Container(
+      margin: EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: isCurrent
-              ? [
-                  PremiumColors.accentGradient1.withOpacity(0.15),
-                  PremiumColors.accentGradient2.withOpacity(0.1),
-                ]
-              : isCompleted
-                  ? [
-                      PremiumColors.successGreen.withOpacity(0.1),
-                      PremiumColors.successGreen.withOpacity(0.05),
-                    ]
-                  : [
-                      Colors.white.withOpacity(0.05),
-                      Colors.white.withOpacity(0.02),
-                    ],
+          colors: [
+            Colors.white.withOpacity(0.08),
+            Colors.white.withOpacity(0.04),
+          ],
         ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isCurrent
-              ? PremiumColors.accentGradient1.withOpacity(0.4)
-              : isCompleted
-                  ? PremiumColors.successGreen.withOpacity(0.3)
-                  : Colors.white.withOpacity(0.1),
-          width: isCurrent ? 2 : 1,
-        ),
-        boxShadow: isCurrent
-            ? [
-                BoxShadow(
-                  color: PremiumColors.accentGradient1.withOpacity(0.2),
-                  blurRadius: 12,
-                  spreadRadius: 2,
-                ),
-              ]
-            : [],
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () {
-            HapticFeedback.selectionClick();
-            setState(() {
-              _expandedModules[index] = !_expandedModules[index];
-            });
-          },
-          child: Padding(
+      child: Column(
+        children: [
+          // Header
+          Container(
             padding: EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  PremiumColors.accentGradient2.withOpacity(0.2),
+                  PremiumColors.accentGradient1.withOpacity(0.1),
+                ],
+              ),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+              ),
+            ),
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    // Status indicator with animation
-                    _buildStatusIndicator(index, isCompleted, isCurrent),
-                    SizedBox(width: 14),
-                    // Module info
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            toc.title,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 4,
-                            children: [
-                              _buildTag(
-                                toc.estimatedTime,
-                                Icons.access_time,
-                              ),
-                              _buildTag(
-                                toc.difficultyLevel,
-                                Icons.signal_cellular_alt,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Expand icon
-                    AnimatedRotation(
-                      turns: _expandedModules[index] ? 0.5 : 0,
-                      duration: Duration(milliseconds: 200),
-                      child: Icon(
-                        Icons.keyboard_arrow_down,
-                        color: Colors.white54,
-                      ),
-                    ),
-                  ],
+                Icon(
+                  Icons.checklist,
+                  color: PremiumColors.accentGradient1,
+                  size: 24,
                 ),
-                // Expanded content
-                AnimatedCrossFade(
-                  firstChild: SizedBox.shrink(),
-                  secondChild: _buildExpandedContent(toc),
-                  crossFadeState: _expandedModules[index]
-                      ? CrossFadeState.showSecond
-                      : CrossFadeState.showFirst,
-                  duration: Duration(milliseconds: 200),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    widget.planTitle ?? 'Study Plan',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: PremiumColors.successGreen.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${widget.completedModules?.length ?? 0}/${widget.tableOfContents?.length ?? 0} Complete',
+                    style: TextStyle(
+                      color: PremiumColors.successGreen,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
-        ),
+          // Scrollable study plan content
+          Expanded(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children:
+                    widget.tableOfContents?.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final toc = entry.value;
+                      final isCompleted =
+                          widget.completedModules?.contains(index) ?? false;
+                      final isCurrent = widget.currentModule == index;
+
+                      return _buildStudyPlanItem(
+                        toc,
+                        index,
+                        isCompleted,
+                        isCurrent,
+                      );
+                    }).toList() ??
+                    [],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -636,13 +589,13 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                     ],
                   )
                 : isCurrent
-                    ? LinearGradient(
-                        colors: [
-                          PremiumColors.accentGradient2,
-                          PremiumColors.accentGradient1,
-                        ],
-                      )
-                    : null,
+                ? LinearGradient(
+                    colors: [
+                      PremiumColors.accentGradient2,
+                      PremiumColors.accentGradient1,
+                    ],
+                  )
+                : null,
             color: !isCompleted && !isCurrent
                 ? Colors.white.withOpacity(0.1)
                 : null,
@@ -650,8 +603,9 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
             boxShadow: isCurrent
                 ? [
                     BoxShadow(
-                      color: PremiumColors.accentGradient1
-                          .withOpacity(_pulseAnimation.value * 0.5),
+                      color: PremiumColors.accentGradient1.withOpacity(
+                        _pulseAnimation.value * 0.5,
+                      ),
                       blurRadius: 12,
                       spreadRadius: 2,
                     ),
@@ -662,15 +616,15 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
             child: isCompleted
                 ? Icon(Icons.check, color: Colors.white, size: 20)
                 : isCurrent
-                    ? Icon(Icons.play_arrow, color: Colors.white, size: 20)
-                    : Text(
-                        '${index + 1}',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
+                ? Icon(Icons.play_arrow, color: Colors.white, size: 20)
+                : Text(
+                    '${index + 1}',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
           ),
         );
       },
@@ -689,13 +643,7 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
         children: [
           Icon(icon, color: Colors.white54, size: 12),
           SizedBox(width: 4),
-          Text(
-            text,
-            style: TextStyle(
-              color: Colors.white54,
-              fontSize: 11,
-            ),
-          ),
+          Text(text, style: TextStyle(color: Colors.white54, fontSize: 11)),
         ],
       ),
     );
@@ -750,10 +698,7 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                   ),
                   child: Text(
                     subtopic,
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
                   ),
                 );
               }).toList(),
@@ -764,21 +709,208 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
     );
   }
 
+  Widget _buildStudyPlanItem(
+    TableOfContentsItem toc,
+    int index,
+    bool isCompleted,
+    bool isCurrent,
+  ) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: isCurrent
+            ? LinearGradient(
+                colors: [
+                  PremiumColors.accentGradient1.withOpacity(0.15),
+                  PremiumColors.accentGradient2.withOpacity(0.1),
+                ],
+              )
+            : isCompleted
+            ? LinearGradient(
+                colors: [
+                  PremiumColors.successGreen.withOpacity(0.1),
+                  PremiumColors.successGreen.withOpacity(0.05),
+                ],
+              )
+            : LinearGradient(
+                colors: [
+                  Colors.white.withOpacity(0.05),
+                  Colors.white.withOpacity(0.02),
+                ],
+              ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isCurrent
+              ? PremiumColors.accentGradient1.withOpacity(0.4)
+              : isCompleted
+              ? PremiumColors.successGreen.withOpacity(0.3)
+              : Colors.white.withOpacity(0.1),
+          width: isCurrent ? 2 : 1,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Checkbox
+          Container(
+            margin: EdgeInsets.only(top: 2),
+            child: AnimatedContainer(
+              duration: Duration(milliseconds: 300),
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                gradient: isCompleted
+                    ? LinearGradient(
+                        colors: [
+                          PremiumColors.successGreen,
+                          PremiumColors.successGreen.withOpacity(0.8),
+                        ],
+                      )
+                    : isCurrent
+                    ? LinearGradient(
+                        colors: [
+                          PremiumColors.accentGradient2,
+                          PremiumColors.accentGradient1,
+                        ],
+                      )
+                    : null,
+                color: !isCompleted && !isCurrent
+                    ? Colors.white.withOpacity(0.2)
+                    : null,
+                shape: BoxShape.circle,
+                border: !isCompleted && !isCurrent
+                    ? Border.all(color: Colors.white.withOpacity(0.3), width: 2)
+                    : null,
+              ),
+              child: Center(
+                child: isCompleted
+                    ? Icon(Icons.check, color: Colors.white, size: 16)
+                    : isCurrent
+                    ? Icon(Icons.play_arrow, color: Colors.white, size: 16)
+                    : SizedBox.shrink(),
+              ),
+            ),
+          ),
+          SizedBox(width: 12),
+          // Content
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Title
+                Text(
+                  toc.title,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    decoration: isCompleted ? TextDecoration.lineThrough : null,
+                    decorationColor: PremiumColors.successGreen,
+                    decorationThickness: 2,
+                  ),
+                ),
+                SizedBox(height: 8),
+                // Description/Objective
+                Text(
+                  toc.description ??
+                      'Complete this module to advance your learning',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.8),
+                    fontSize: 14,
+                    height: 1.4,
+                  ),
+                ),
+                SizedBox(height: 8),
+                // Tags
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    _buildInfoChip(
+                      toc.estimatedTime ?? '30 min',
+                      Icons.access_time,
+                      isCompleted,
+                    ),
+                    _buildInfoChip(
+                      toc.difficultyLevel ?? 'Medium',
+                      Icons.signal_cellular_alt,
+                      isCompleted,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // Tap to focus
+          if (!isCompleted)
+            IconButton(
+              icon: Icon(
+                Icons.arrow_forward,
+                color: isCurrent
+                    ? PremiumColors.accentGradient1
+                    : Colors.white.withOpacity(0.5),
+                size: 20,
+              ),
+              onPressed: () {
+                HapticFeedback.selectionClick();
+                widget.onModuleTap?.call(index);
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoChip(String text, IconData icon, bool isCompleted) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isCompleted
+            ? PremiumColors.successGreen.withOpacity(0.2)
+            : Colors.white.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isCompleted
+              ? PremiumColors.successGreen.withOpacity(0.3)
+              : Colors.white.withOpacity(0.1),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: isCompleted
+                ? PremiumColors.successGreen
+                : Colors.white.withOpacity(0.6),
+            size: 12,
+          ),
+          SizedBox(width: 4),
+          Text(
+            text,
+            style: TextStyle(
+              color: isCompleted
+                  ? PremiumColors.successGreen
+                  : Colors.white.withOpacity(0.8),
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFooter() {
     return Container(
       padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            Colors.white.withOpacity(0.05),
-            Colors.transparent,
-          ],
+          colors: [Colors.white.withOpacity(0.05), Colors.transparent],
         ),
         border: Border(
-          top: BorderSide(
-            color: Colors.white.withOpacity(0.1),
-            width: 1,
-          ),
+          top: BorderSide(color: Colors.white.withOpacity(0.1), width: 1),
         ),
       ),
       child: SafeArea(
@@ -801,7 +933,8 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
               child: _buildFooterButton(
                 icon: Icons.edit,
                 label: 'Edit Plan',
-                onTap: widget.tableOfContents != null &&
+                onTap:
+                    widget.tableOfContents != null &&
                         widget.tableOfContents!.isNotEmpty
                     ? () {
                         HapticFeedback.mediumImpact();
@@ -845,8 +978,8 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
             color: !isPrimary
                 ? Colors.white.withOpacity(0.08)
                 : !isEnabled
-                    ? Colors.white.withOpacity(0.05)
-                    : null,
+                ? Colors.white.withOpacity(0.05)
+                : null,
             borderRadius: BorderRadius.circular(12),
             border: !isPrimary
                 ? Border.all(color: Colors.white.withOpacity(0.2))

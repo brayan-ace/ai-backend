@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../utils/globals.dart';
 import '../services/study_plan_service.dart';
 import '../utils/theme.dart';
+import '../services/user_profile_service.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -63,7 +64,7 @@ class HomeScreen extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              'Guest',
+                              UserProfileService.instance.getDisplayNameSync(),
                               style: AppTheme.headlineMedium.copyWith(
                                 color: Colors.black,
                                 fontWeight: FontWeight.bold,
