@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../utils/globals.dart';
+import '../utils/theme.dart';
 import 'bot_processing_screen.dart';
 import 'recent_study_bots_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -97,16 +98,19 @@ class _BotCreationScreenState extends State<BotCreationScreen>
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [PremiumColors.cardBg, PremiumColors.darkBg2],
+              colors: [
+                AppTheme.surfaceCardFromContext(context),
+                AppTheme.backgroundGradientEndFromContext(context),
+              ],
             ),
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: PremiumColors.accentGradient1.withOpacity(0.3),
+              color: AppTheme.primaryBlue.withOpacity(0.3),
               width: 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: PremiumColors.accentGradient1.withOpacity(0.2),
+                color: AppTheme.primaryBlue.withOpacity(0.2),
                 blurRadius: 24,
                 spreadRadius: 8,
               ),
@@ -124,10 +128,7 @@ class _BotCreationScreenState extends State<BotCreationScreen>
                   gradient: LinearGradient(
                     begin: Alignment.topRight,
                     end: Alignment.bottomLeft,
-                    colors: [
-                      PremiumColors.accentGradient2,
-                      PremiumColors.accentGradient3,
-                    ],
+                    colors: [AppTheme.accentBlue, AppTheme.primaryBlue],
                   ),
                 ),
                 child: Stack(
@@ -145,7 +146,9 @@ class _BotCreationScreenState extends State<BotCreationScreen>
                         height: 48,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: PremiumColors.darkBg,
+                          color: AppTheme.backgroundGradientStartFromContext(
+                            context,
+                          ),
                         ),
                       ),
                     ),
@@ -155,10 +158,7 @@ class _BotCreationScreenState extends State<BotCreationScreen>
               const SizedBox(height: 24),
               ShaderMask(
                 shaderCallback: (bounds) => LinearGradient(
-                  colors: [
-                    PremiumColors.accentGradient1,
-                    PremiumColors.accentGradient2,
-                  ],
+                  colors: [AppTheme.primaryBlue, AppTheme.accentBlue],
                 ).createShader(bounds),
                 child: const Text(
                   'Crafting Your Study Bot',
@@ -373,10 +373,13 @@ class _BotCreationScreenState extends State<BotCreationScreen>
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [PremiumColors.cardBg, PremiumColors.cardBg.withOpacity(0.6)],
+          colors: [
+            AppTheme.surfaceCardFromContext(context),
+            AppTheme.surfaceCardFromContext(context).withOpacity(0.6),
+          ],
         ),
         border: Border.all(
-          color: PremiumColors.accentGradient1.withOpacity(0.2),
+          color: AppTheme.primaryBlue.withOpacity(0.2),
           width: 1,
         ),
         boxShadow: [
@@ -391,40 +394,33 @@ class _BotCreationScreenState extends State<BotCreationScreen>
         controller: controller,
         maxLines: maxLines,
         onChanged: (_) => onChanged?.call(),
-        style: const TextStyle(
-          color: Colors.white,
+        style: TextStyle(
+          color: AppTheme.textPrimaryFromContext(context),
           fontSize: 15,
           letterSpacing: 0.2,
         ),
-        cursorColor: PremiumColors.accentGradient1,
+        cursorColor: AppTheme.primaryBlue,
         decoration: InputDecoration(
           labelText: label,
           labelStyle: TextStyle(
-            color: Colors.white.withOpacity(0.5),
+            color: AppTheme.textSecondaryFromContext(context),
             fontSize: 14,
             fontWeight: FontWeight.w500,
             letterSpacing: 0.2,
           ),
-          prefixIcon: Icon(
-            icon,
-            color: PremiumColors.accentGradient1,
-            size: 22,
-          ),
+          prefixIcon: Icon(icon, color: AppTheme.primaryBlue, size: 22),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.all(16),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide(
-              color: PremiumColors.accentGradient1.withOpacity(0.15),
+              color: AppTheme.primaryBlue.withOpacity(0.15),
               width: 1,
             ),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(
-              color: PremiumColors.accentGradient1,
-              width: 2,
-            ),
+            borderSide: BorderSide(color: AppTheme.primaryBlue, width: 2),
           ),
         ),
       ),
@@ -437,7 +433,7 @@ class _BotCreationScreenState extends State<BotCreationScreen>
     final wordPercentage = (wordCount / 100).clamp(0.0, 1.0);
 
     return Scaffold(
-      backgroundColor: PremiumColors.darkBg,
+      backgroundColor: AppTheme.backgroundGradientStartFromContext(context),
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -445,10 +441,7 @@ class _BotCreationScreenState extends State<BotCreationScreen>
         centerTitle: true,
         title: ShaderMask(
           shaderCallback: (bounds) => LinearGradient(
-            colors: [
-              PremiumColors.accentGradient1,
-              PremiumColors.accentGradient2,
-            ],
+            colors: [AppTheme.primaryBlue, AppTheme.accentBlue],
           ).createShader(bounds),
           child: const Text(
             'Create Your Study Bot',
@@ -472,16 +465,12 @@ class _BotCreationScreenState extends State<BotCreationScreen>
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
                   colors: [
-                    PremiumColors.accentGradient1.withOpacity(0.2),
-                    PremiumColors.accentGradient2.withOpacity(0.2),
+                    AppTheme.primaryBlue.withOpacity(0.2),
+                    AppTheme.accentBlue.withOpacity(0.2),
                   ],
                 ),
               ),
-              child: const Icon(
-                Icons.history,
-                color: PremiumColors.accentGradient1,
-                size: 18,
-              ),
+              child: Icon(Icons.history, color: AppTheme.primaryBlue, size: 18),
             ),
             onPressed: () {
               Navigator.of(context).push(
@@ -504,7 +493,10 @@ class _BotCreationScreenState extends State<BotCreationScreen>
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [PremiumColors.darkBg, PremiumColors.darkBg2],
+                colors: [
+                  AppTheme.backgroundGradientStartFromContext(context),
+                  AppTheme.backgroundGradientEndFromContext(context),
+                ],
               ),
             ),
             child: SingleChildScrollView(
@@ -528,7 +520,7 @@ class _BotCreationScreenState extends State<BotCreationScreen>
                           style: TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.w800,
-                            color: Colors.white,
+                            color: AppTheme.textPrimaryFromContext(context),
                             letterSpacing: -0.5,
                           ),
                         ),
@@ -537,7 +529,7 @@ class _BotCreationScreenState extends State<BotCreationScreen>
                           'Design your AI mentor that learns your style',
                           style: TextStyle(
                             fontSize: 15,
-                            color: Colors.white.withOpacity(0.6),
+                            color: AppTheme.textSecondaryFromContext(context),
                             letterSpacing: 0.2,
                           ),
                         ),
@@ -562,19 +554,21 @@ class _BotCreationScreenState extends State<BotCreationScreen>
                                   borderRadius: BorderRadius.circular(2),
                                   gradient: LinearGradient(
                                     colors: [
-                                      PremiumColors.accentGradient1,
-                                      PremiumColors.accentGradient2,
+                                      AppTheme.primaryBlue,
+                                      AppTheme.accentBlue,
                                     ],
                                   ),
                                 ),
                               ),
                               const SizedBox(width: 10),
-                              const Text(
+                              Text(
                                 'What will you study?',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
-                                  color: Colors.white,
+                                  color: AppTheme.textPrimaryFromContext(
+                                    context,
+                                  ),
                                   letterSpacing: 0.3,
                                 ),
                               ),
@@ -614,12 +608,14 @@ class _BotCreationScreenState extends State<BotCreationScreen>
                                 ),
                               ),
                               const SizedBox(width: 10),
-                              const Text(
+                              Text(
                                 'Your learning goals',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
-                                  color: Colors.white,
+                                  color: AppTheme.textPrimaryFromContext(
+                                    context,
+                                  ),
                                   letterSpacing: 0.3,
                                 ),
                               ),
@@ -727,12 +723,14 @@ class _BotCreationScreenState extends State<BotCreationScreen>
                                 ),
                               ),
                               const SizedBox(width: 10),
-                              const Text(
+                              Text(
                                 'Name your mentor',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
-                                  color: Colors.white,
+                                  color: AppTheme.textPrimaryFromContext(
+                                    context,
+                                  ),
                                   letterSpacing: 0.3,
                                 ),
                               ),

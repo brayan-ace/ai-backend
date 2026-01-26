@@ -1088,9 +1088,10 @@ app.post("/api/chat-enhanced", async (req, res) => {
         /how are you|how's your|how are you doing/i.test(lastBotMsg);
 
       // Also detect if user is explicitly asking for plan creation
-      const userWantsPlan = /create|make|generate|build|start.*plan/i.test(
-        message || "",
-      );
+      const userWantsPlan =
+        /create|make|generate|build|start.*plan|yes.*create.*plan/i.test(
+          message || "",
+        );
 
       if (
         (botProgressState === "waiting_for_user" &&

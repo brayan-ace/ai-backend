@@ -36,8 +36,8 @@ class _MainTabsState extends State<MainTabs> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            AppTheme.backgroundGradientStart,
-            AppTheme.backgroundGradientEnd,
+            AppTheme.backgroundGradientStartFromContext(context),
+            AppTheme.backgroundGradientEndFromContext(context),
           ],
         ),
       ),
@@ -46,10 +46,14 @@ class _MainTabsState extends State<MainTabs> {
         body: IndexedStack(index: _selected, children: pages),
         bottomNavigationBar: Container(
           decoration: BoxDecoration(
-            gradient: LinearGradient(colors: AppTheme.surfaceGradient),
+            gradient: LinearGradient(
+              colors: AppTheme.surfaceGradientFromContext(context),
+            ),
             border: Border(
               top: BorderSide(
-                color: AppTheme.surfaceElevated.withOpacity(0.3),
+                color: AppTheme.surfaceElevatedFromContext(
+                  context,
+                ).withOpacity(0.3),
                 width: 1,
               ),
             ),

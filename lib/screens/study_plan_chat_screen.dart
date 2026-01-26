@@ -10,6 +10,7 @@ import '../services/study_bot_flow_controller.dart';
 import '../services/tutor_engagement_service.dart';
 import '../services/progress_tracking_service.dart';
 import '../services/study_bot_storage_service.dart';
+import '../services/study_bot_firebase_service.dart';
 import '../services/gamification_service.dart';
 import '../services/analytics_service.dart';
 import '../utils/theme.dart';
@@ -247,8 +248,8 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // Firebase storage service for conversation history
-  late final StudyBotStorageService _storageService;
+  late StudyBotStorageService _storageService;
+  late StudyBotFirebaseService _firebaseService;
 
   @override
   void initState() {
@@ -260,6 +261,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     _gamificationService = GamificationService();
     _analyticsService = AnalyticsService();
     _storageService = StudyBotStorageService();
+    _firebaseService = StudyBotFirebaseService();
 
     // Add scroll listener for scroll-to-bottom button
     _scrollController.addListener(_onScroll);
@@ -341,6 +343,24 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
             description: widget.planDescription,
           );
           print('[ChatScreen] 🔥 Firebase chat session initialized');
+
+          // Save bot metadata to Firestore for RecentStudyBotsScreen
+          try {
+            await _firebaseService.saveBot(
+              botId: widget.botId!,
+              name: widget.botName ?? 'Study Bot',
+              topic: widget.planName ?? '',
+              description: widget.planDescription ?? '',
+              gradeLevel: widget.educationLevel ?? '',
+              systemInstructions: widget.systemInstructions,
+              progressPercentage: _progressPercentage,
+              currentModule: 0,
+              botState: _botCurrentState,
+            );
+            print('[ChatScreen] 🔥 Bot metadata saved to Firestore');
+          } catch (e) {
+            print('[ChatScreen] ⚠️ Bot metadata save error (non-blocking): $e');
+          }
         } catch (e) {
           print('[ChatScreen] ⚠️ Firebase init error (non-blocking): $e');
         }
@@ -647,6 +667,20 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
             fromUser: false,
           );
           print('[ChatScreen] 🔥 Bot message saved to Firebase');
+
+          // Update bot metadata in Firestore
+          await _firebaseService.saveBot(
+            botId: widget.botId!,
+            name: widget.botName ?? 'Study Bot',
+            topic: widget.planName ?? '',
+            description: widget.planDescription ?? '',
+            gradeLevel: widget.educationLevel ?? '',
+            systemInstructions: widget.systemInstructions,
+            progressPercentage: _progressPercentage,
+            currentModule: 0,
+            botState: _botCurrentState,
+          );
+          print('[ChatScreen] 🔥 Bot metadata updated in Firestore');
         } catch (e) {
           print('[ChatScreen] ⚠️ Firebase save error (non-blocking): $e');
         }
@@ -678,6 +712,20 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
           fromUser: true,
         );
         print('[ChatScreen] 🔥 User message saved to Firebase');
+
+        // Update bot metadata in Firestore
+        await _firebaseService.saveBot(
+          botId: widget.botId!,
+          name: widget.botName ?? 'Study Bot',
+          topic: widget.planName ?? '',
+          description: widget.planDescription ?? '',
+          gradeLevel: widget.educationLevel ?? '',
+          systemInstructions: widget.systemInstructions,
+          progressPercentage: _progressPercentage,
+          currentModule: 0,
+          botState: _botCurrentState,
+        );
+        print('[ChatScreen] 🔥 Bot metadata updated in Firestore');
       } catch (e) {
         print('[ChatScreen] ⚠️ Firebase save error (non-blocking): $e');
       }
@@ -1203,17 +1251,14 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       },
       child: Scaffold(
         key: _scaffoldKey,
-        backgroundColor: PremiumColors.darkBg,
+        backgroundColor: AppTheme.backgroundGradientStartFromContext(context),
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
           leading: null,
           title: ShaderMask(
             shaderCallback: (bounds) => LinearGradient(
-              colors: [
-                PremiumColors.accentGradient2,
-                PremiumColors.accentGradient1,
-              ],
+              colors: [AppTheme.accentBlue, AppTheme.primaryBlue],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ).createShader(bounds),
@@ -1253,20 +1298,20 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        PremiumColors.accentGradient2.withOpacity(0.2),
-                        PremiumColors.accentGradient1.withOpacity(0.15),
+                        AppTheme.accentBlue.withOpacity(0.2),
+                        AppTheme.primaryBlue.withOpacity(0.15),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: PremiumColors.accentGradient1.withOpacity(0.3),
+                      color: AppTheme.primaryBlue.withOpacity(0.3),
                       width: 1.5,
                     ),
                   ),
                   child: IconButton(
                     icon: Icon(
                       Icons.bookmark,
-                      color: PremiumColors.accentGradient1,
+                      color: AppTheme.primaryBlue,
                       size: 22,
                     ),
                     tooltip: 'View Study Plan',
@@ -1281,13 +1326,14 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
               ),
             // 3-Dot Menu
             PopupMenuButton<String>(
-              icon: Icon(Icons.more_vert, color: Colors.white70),
-              color: PremiumColors.cardBg,
+              icon: Icon(
+                Icons.more_vert,
+                color: AppTheme.textSecondaryFromContext(context),
+              ),
+              color: AppTheme.surfaceCardFromContext(context),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
-                side: BorderSide(
-                  color: PremiumColors.accentGradient1.withOpacity(0.2),
-                ),
+                side: BorderSide(color: AppTheme.primaryBlue.withOpacity(0.2)),
               ),
               onSelected: (value) {
                 HapticFeedback.selectionClick();
@@ -1305,7 +1351,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text('Mode switching coming soon!'),
-                        backgroundColor: PremiumColors.accentGradient1,
+                        backgroundColor: AppTheme.primaryBlue,
                       ),
                     );
                     break;
@@ -1318,13 +1364,15 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                     children: [
                       Icon(
                         Icons.smart_toy,
-                        color: PremiumColors.accentGradient1,
+                        color: AppTheme.primaryBlue,
                         size: 20,
                       ),
                       SizedBox(width: 12),
                       Text(
                         'Go to Main AI',
-                        style: TextStyle(color: Colors.white),
+                        style: TextStyle(
+                          color: AppTheme.textPrimaryFromContext(context),
+                        ),
                       ),
                     ],
                   ),
@@ -1333,15 +1381,13 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                   value: 'bot_history',
                   child: Row(
                     children: [
-                      Icon(
-                        Icons.school,
-                        color: PremiumColors.accentGradient1,
-                        size: 20,
-                      ),
+                      Icon(Icons.school, color: AppTheme.primaryBlue, size: 20),
                       SizedBox(width: 12),
                       Text(
                         'My Study Bots',
-                        style: TextStyle(color: Colors.white),
+                        style: TextStyle(
+                          color: AppTheme.textPrimaryFromContext(context),
+                        ),
                       ),
                     ],
                   ),
@@ -1352,13 +1398,15 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                     children: [
                       Icon(
                         Icons.history,
-                        color: PremiumColors.accentGradient1,
+                        color: AppTheme.primaryBlue,
                         size: 20,
                       ),
                       SizedBox(width: 12),
                       Text(
                         'Chat History',
-                        style: TextStyle(color: Colors.white),
+                        style: TextStyle(
+                          color: AppTheme.textPrimaryFromContext(context),
+                        ),
                       ),
                     ],
                   ),
@@ -1387,8 +1435,10 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                PremiumColors.darkBg,
-                PremiumColors.darkBg2.withOpacity(0.5),
+                AppTheme.backgroundGradientStartFromContext(context),
+                AppTheme.backgroundGradientEndFromContext(
+                  context,
+                ).withOpacity(0.5),
               ],
             ),
           ),
@@ -1402,13 +1452,13 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          PremiumColors.accentGradient1.withOpacity(0.08),
-                          PremiumColors.accentGradient2.withOpacity(0.05),
+                          AppTheme.primaryBlue.withOpacity(0.08),
+                          AppTheme.accentBlue.withOpacity(0.05),
                         ],
                       ),
                       border: Border(
                         bottom: BorderSide(
-                          color: PremiumColors.accentGradient1.withOpacity(0.2),
+                          color: AppTheme.primaryBlue.withOpacity(0.2),
                           width: 1.5,
                         ),
                       ),
@@ -1434,8 +1484,8 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: [
-                                    PremiumColors.accentGradient2,
-                                    PremiumColors.accentGradient1,
+                                    AppTheme.accentBlue,
+                                    AppTheme.primaryBlue,
                                   ],
                                 ),
                                 borderRadius: BorderRadius.circular(12),
@@ -1457,10 +1507,11 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                           child: LinearProgressIndicator(
                             value: _progressPercentage / 100,
                             minHeight: 6,
-                            backgroundColor: PremiumColors.accentGradient1
-                                .withOpacity(0.15),
+                            backgroundColor: AppTheme.primaryBlue.withOpacity(
+                              0.15,
+                            ),
                             valueColor: AlwaysStoppedAnimation<Color>(
-                              PremiumColors.accentGradient1,
+                              AppTheme.primaryBlue,
                             ),
                           ),
                         ),
@@ -1530,15 +1581,16 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
                                     colors: [
-                                      PremiumColors.accentGradient2,
-                                      PremiumColors.accentGradient1,
+                                      AppTheme.accentBlue,
+                                      AppTheme.primaryBlue,
                                     ],
                                   ),
                                   shape: BoxShape.circle,
                                   boxShadow: [
                                     BoxShadow(
-                                      color: PremiumColors.accentGradient2
-                                          .withOpacity(0.4),
+                                      color: AppTheme.accentBlue.withOpacity(
+                                        0.4,
+                                      ),
                                       blurRadius: 12,
                                       spreadRadius: 2,
                                     ),
@@ -1615,19 +1667,19 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          PremiumColors.accentGradient1.withOpacity(0.15),
-                          PremiumColors.accentGradient2.withOpacity(0.1),
+                          AppTheme.primaryBlue.withOpacity(0.15),
+                          AppTheme.accentBlue.withOpacity(0.1),
                         ],
                       ),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: PremiumColors.accentGradient1.withOpacity(0.3),
+                        color: AppTheme.primaryBlue.withOpacity(0.3),
                       ),
                     ),
                     child: Text(
                       text,
                       style: TextStyle(
-                        color: PremiumColors.accentGradient1,
+                        color: AppTheme.primaryBlue,
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
                       ),
@@ -1651,13 +1703,13 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            PremiumColors.darkBg2.withOpacity(0.9),
-            PremiumColors.cardBg,
+            AppTheme.backgroundGradientEndFromContext(context).withOpacity(0.9),
+            AppTheme.surfaceCardFromContext(context),
           ],
         ),
         border: Border(
           top: BorderSide(
-            color: PremiumColors.accentGradient1.withOpacity(0.2),
+            color: AppTheme.primaryBlue.withOpacity(0.2),
             width: 1,
           ),
         ),
@@ -1700,7 +1752,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                   ),
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(
-                    color: PremiumColors.accentGradient1.withOpacity(0.2),
+                    color: AppTheme.primaryBlue.withOpacity(0.2),
                   ),
                 ),
                 child: Row(
@@ -1742,10 +1794,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
               decoration: BoxDecoration(
                 gradient: _inputController.text.isNotEmpty || _isLoading
                     ? LinearGradient(
-                        colors: [
-                          PremiumColors.accentGradient2,
-                          PremiumColors.accentGradient1,
-                        ],
+                        colors: [AppTheme.accentBlue, AppTheme.primaryBlue],
                       )
                     : null,
                 color: _inputController.text.isEmpty && !_isLoading
@@ -1755,7 +1804,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                 boxShadow: _inputController.text.isNotEmpty
                     ? [
                         BoxShadow(
-                          color: PremiumColors.accentGradient2.withOpacity(0.4),
+                          color: AppTheme.accentBlue.withOpacity(0.4),
                           blurRadius: 12,
                           spreadRadius: 2,
                         ),
@@ -1797,7 +1846,10 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         padding: EdgeInsets.all(20),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [PremiumColors.cardBg, PremiumColors.darkBg2],
+            colors: [
+              AppTheme.surfaceCardFromContext(context),
+              AppTheme.backgroundGradientEndFromContext(context),
+            ],
           ),
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
@@ -1865,16 +1917,22 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  PremiumColors.accentGradient1.withOpacity(0.2),
-                  PremiumColors.accentGradient2.withOpacity(0.1),
+                  AppTheme.primaryBlue.withOpacity(0.2),
+                  AppTheme.accentBlue.withOpacity(0.1),
                 ],
               ),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: PremiumColors.accentGradient1, size: 28),
+            child: Icon(icon, color: AppTheme.primaryBlue, size: 28),
           ),
           SizedBox(height: 8),
-          Text(label, style: TextStyle(color: Colors.white70, fontSize: 12)),
+          Text(
+            label,
+            style: TextStyle(
+              color: AppTheme.textSecondaryFromContext(context),
+              fontSize: 12,
+            ),
+          ),
         ],
       ),
     );
@@ -1887,13 +1945,13 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            PremiumColors.darkBg2.withOpacity(0.8),
-            PremiumColors.cardBg,
+            AppTheme.backgroundGradientEndFromContext(context).withOpacity(0.8),
+            AppTheme.surfaceCardFromContext(context),
           ],
         ),
         border: Border(
           top: BorderSide(
-            color: PremiumColors.accentGradient1.withOpacity(0.2),
+            color: AppTheme.primaryBlue.withOpacity(0.2),
             width: 1.5,
           ),
         ),
@@ -1905,13 +1963,15 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    PremiumColors.cardBg.withOpacity(0.6),
-                    PremiumColors.darkBg2.withOpacity(0.4),
+                    AppTheme.surfaceCardFromContext(context).withOpacity(0.6),
+                    AppTheme.backgroundGradientEndFromContext(
+                      context,
+                    ).withOpacity(0.4),
                   ],
                 ),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: PremiumColors.accentGradient1.withOpacity(0.2),
+                  color: AppTheme.primaryBlue.withOpacity(0.2),
                   width: 1.5,
                 ),
               ),
@@ -1943,15 +2003,12 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [
-                  PremiumColors.accentGradient2,
-                  PremiumColors.accentGradient1,
-                ],
+                colors: [AppTheme.accentBlue, AppTheme.primaryBlue],
               ),
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: PremiumColors.accentGradient2.withOpacity(0.4),
+                  color: AppTheme.accentBlue.withOpacity(0.4),
                   blurRadius: 15,
                   spreadRadius: 2,
                 ),
@@ -2127,12 +2184,16 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     print('[ChatScreen] 🍔 tocItems count: ${tocItems.length}');
 
     return PremiumStudyPlanMenu(
+      key: ValueKey(
+        'study_plan_${_planVersion}_${_studyPlan?.hashCode ?? 0}',
+      ), // Force rebuild when study plan changes
       tableOfContents: tocItems.isNotEmpty ? tocItems : null,
       currentModule: _botState?.currentModule ?? 0,
       completedModules: _botState?.completedModules,
       progressPercentage: _progressPercentage,
       planVersion: _planVersion,
       planTitle: _studyPlan?['title'] as String?,
+      context: context, // Pass context for theme access
       onModuleEdit: (moduleIndex, moduleName) {
         print('[ChatScreen] Edit module $moduleIndex: $moduleName');
         _openPlanEditor();
@@ -2892,16 +2953,19 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [PremiumColors.cardBg, PremiumColors.darkBg2],
+                colors: [
+                  AppTheme.surfaceCardFromContext(context),
+                  AppTheme.backgroundGradientEndFromContext(context),
+                ],
               ),
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
-                color: PremiumColors.accentGradient1.withOpacity(0.3),
+                color: AppTheme.primaryBlue.withOpacity(0.3),
                 width: 2,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: PremiumColors.accentGradient2.withOpacity(0.3),
+                  color: AppTheme.accentBlue.withOpacity(0.3),
                   blurRadius: 30,
                   spreadRadius: 5,
                 ),
@@ -2917,14 +2981,11 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: LinearGradient(
-                      colors: [
-                        PremiumColors.accentGradient2,
-                        PremiumColors.accentGradient1,
-                      ],
+                      colors: [AppTheme.accentBlue, AppTheme.primaryBlue],
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: PremiumColors.accentGradient2.withOpacity(0.5),
+                        color: AppTheme.accentBlue.withOpacity(0.5),
                         blurRadius: 20,
                         spreadRadius: 5,
                       ),
@@ -2977,7 +3038,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                           Text(
                             '$percentage%',
                             style: TextStyle(
-                              color: PremiumColors.accentGradient1,
+                              color: AppTheme.primaryBlue,
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
@@ -2999,15 +3060,14 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 colors: [
-                                  PremiumColors.accentGradient2,
-                                  PremiumColors.accentGradient1,
+                                  AppTheme.accentBlue,
+                                  AppTheme.primaryBlue,
                                 ],
                               ),
                               borderRadius: BorderRadius.circular(4),
                               boxShadow: [
                                 BoxShadow(
-                                  color: PremiumColors.accentGradient1
-                                      .withOpacity(0.5),
+                                  color: AppTheme.primaryBlue.withOpacity(0.5),
                                   blurRadius: 6,
                                 ),
                               ],
@@ -3035,7 +3095,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                       _loadStudyPlan();
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: PremiumColors.accentGradient1,
+                      backgroundColor: AppTheme.primaryBlue,
                       padding: EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),

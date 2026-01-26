@@ -4,7 +4,10 @@ import 'dart:math';
 import '../utils/theme.dart';
 import '../services/analytics_service.dart';
 import '../services/push_notification_service.dart';
+import '../services/gamification_service.dart';
 import '../widgets/premium_chart_widget.dart';
+import '../widgets/premium_message_bubble.dart';
+import '../widgets/typing_indicator.dart';
 
 /// Premium Analytics Dashboard Screen
 /// Displays comprehensive learning analytics and insights
@@ -21,14 +24,20 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
   final AnalyticsService _analyticsService = AnalyticsService();
   final PushNotificationService _notificationService =
       PushNotificationService();
+  final GamificationService _gamificationService = GamificationService();
 
   Map<String, dynamic> _analyticsData = {};
   List<String> _insights = [];
+  Map<String, dynamic> _gamificationData = {};
+  List<Map<String, dynamic>> _leaderboard = [];
+  List<Map<String, dynamic>> _recentAchievements = [];
   bool _isLoading = true;
   late AnimationController _fadeController;
   late AnimationController _slideController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+  late AnimationController _achievementController;
+  late Animation<double> _achievementAnimation;
 
   @override
   void initState() {
@@ -41,6 +50,10 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
       duration: Duration(milliseconds: 600),
       vsync: this,
     );
+    _achievementController = AnimationController(
+      duration: Duration(milliseconds: 1500),
+      vsync: this,
+    );
 
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut),
@@ -51,7 +64,14 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
           CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
         );
 
+    _achievementAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _achievementController, curve: Curves.elasticOut),
+    );
+
     _loadAnalytics();
+    _loadGamificationData();
+    _loadLeaderboard();
+    _loadRecentAchievements();
   }
 
   Future<void> _loadAnalytics() async {
@@ -75,10 +95,68 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
     }
   }
 
+  Future<void> _loadGamificationData() async {
+    try {
+      final data = _gamificationService.getUserStats();
+      setState(() {
+        _gamificationData = data;
+      });
+      _achievementController.forward();
+    } catch (e) {
+      print('[AnalyticsDashboard] Error loading gamification data: $e');
+    }
+  }
+
+  Future<void> _loadLeaderboard() async {
+    try {
+      final leaderboard = await _gamificationService.getLeaderboard(type: 'xp');
+      setState(() {
+        _leaderboard = leaderboard;
+      });
+    } catch (e) {
+      print('[AnalyticsDashboard] Error loading leaderboard: $e');
+    }
+  }
+
+  Future<void> _loadRecentAchievements() async {
+    try {
+      // Simulate loading recent achievements
+      final achievements = [
+        {
+          'title': 'Level Up!',
+          'description': 'You reached level 5!',
+          'icon': '🎉',
+          'xp': 500,
+          'date': DateTime.now().subtract(Duration(days: 1)),
+        },
+        {
+          'title': 'Quiz Master',
+          'description': 'Completed 10 quizzes with 90%+ accuracy',
+          'icon': '🧠',
+          'xp': 300,
+          'date': DateTime.now().subtract(Duration(days: 3)),
+        },
+        {
+          'title': 'Streak Warrior',
+          'description': '7-day learning streak achieved',
+          'icon': '🔥',
+          'xp': 350,
+          'date': DateTime.now().subtract(Duration(days: 7)),
+        },
+      ];
+      setState(() {
+        _recentAchievements = achievements;
+      });
+    } catch (e) {
+      print('[AnalyticsDashboard] Error loading achievements: $e');
+    }
+  }
+
   @override
   void dispose() {
     _fadeController.dispose();
     _slideController.dispose();
+    _achievementController.dispose();
     super.dispose();
   }
 

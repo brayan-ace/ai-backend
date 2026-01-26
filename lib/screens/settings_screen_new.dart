@@ -70,10 +70,9 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
     ),
     child: Text(
       text.toUpperCase(),
-      style: AppTheme.labelMedium.copyWith(
-        color: AppTheme.textTertiary,
-        letterSpacing: 1.5,
-      ),
+      style: AppTheme.labelMediumFromContext(
+        context,
+      ).copyWith(letterSpacing: 1.5),
     ),
   );
 
@@ -134,10 +133,14 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
     return Container(
       margin: EdgeInsets.symmetric(horizontal: AppTheme.spaceSm),
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: AppTheme.surfaceGradient),
+        gradient: LinearGradient(
+          colors: AppTheme.surfaceGradientFromContext(context),
+        ),
         borderRadius: BorderRadius.circular(AppTheme.radiusLg),
         border: Border.all(
-          color: AppTheme.surfaceElevated.withValues(alpha: 0.5),
+          color: AppTheme.surfaceElevatedFromContext(
+            context,
+          ).withValues(alpha: 0.5),
           width: 1,
         ),
         boxShadow: AppTheme.cardShadow,
@@ -164,8 +167,8 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            AppTheme.backgroundGradientStart,
-            AppTheme.backgroundGradientEnd,
+            AppTheme.backgroundGradientStartFromContext(context),
+            AppTheme.backgroundGradientEndFromContext(context),
           ],
         ),
       ),
@@ -177,10 +180,14 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
           elevation: 0,
           flexibleSpace: Container(
             decoration: BoxDecoration(
-              gradient: LinearGradient(colors: AppTheme.glassGradient),
+              gradient: LinearGradient(
+                colors: AppTheme.glassGradientFromContext(context),
+              ),
               border: Border(
                 bottom: BorderSide(
-                  color: AppTheme.surfaceElevated.withValues(alpha: 0.3),
+                  color: AppTheme.surfaceElevatedFromContext(
+                    context,
+                  ).withValues(alpha: 0.3),
                   width: 0.5,
                 ),
               ),
@@ -260,7 +267,8 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     icon: Icons.notifications_active,
                     title: 'Notification Settings',
                     subtitle: 'Manage push notifications',
-                    onTap: () => Navigator.pushNamed(context, '/notification-settings'),
+                    onTap: () =>
+                        Navigator.pushNamed(context, '/notification-settings'),
                   ),
                   _buildDivider(),
                   _tile(

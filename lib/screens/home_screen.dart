@@ -20,8 +20,8 @@ class HomeScreen extends StatelessWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                AppTheme.backgroundGradientStart,
-                AppTheme.backgroundGradientEnd,
+                AppTheme.backgroundGradientStartFromContext(context),
+                AppTheme.backgroundGradientEndFromContext(context),
               ],
             ),
           ),

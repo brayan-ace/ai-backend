@@ -2,6 +2,7 @@
 /// Beautiful animated chat bubbles with glassmorphism effects
 
 import 'package:flutter/material.dart';
+import '../utils/theme.dart';
 import 'package:flutter/services.dart';
 import 'professional_message_widget.dart';
 
@@ -57,13 +58,15 @@ class _PremiumMessageBubbleState extends State<PremiumMessageBubble>
       vsync: this,
     );
 
-    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
-    );
+    _scaleAnimation = Tween<double>(
+      begin: 0.8,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
     _slideAnimation = Tween<Offset>(
       begin: Offset(widget.isBot ? -0.3 : 0.3, 0),
@@ -99,8 +102,9 @@ class _PremiumMessageBubbleState extends State<PremiumMessageBubble>
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisAlignment:
-                  widget.isBot ? MainAxisAlignment.start : MainAxisAlignment.end,
+              mainAxisAlignment: widget.isBot
+                  ? MainAxisAlignment.start
+                  : MainAxisAlignment.end,
               children: [
                 if (widget.isBot && widget.showAvatar) ...[
                   _buildBotAvatar(),
@@ -124,25 +128,18 @@ class _PremiumMessageBubbleState extends State<PremiumMessageBubble>
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            PremiumColors.accentGradient2,
-            PremiumColors.accentGradient1,
-          ],
+          colors: [AppTheme.accentBlue, AppTheme.primaryBlue],
         ),
         boxShadow: [
           BoxShadow(
-            color: PremiumColors.accentGradient2.withOpacity(0.4),
+            color: AppTheme.accentBlue.withOpacity(0.4),
             blurRadius: 12,
             spreadRadius: 2,
           ),
         ],
       ),
       child: Center(
-        child: Icon(
-          Icons.psychology,
-          color: Colors.white,
-          size: 20,
-        ),
+        child: Icon(Icons.psychology, color: Colors.white, size: 20),
       ),
     );
   }
@@ -172,17 +169,16 @@ class _PremiumMessageBubbleState extends State<PremiumMessageBubble>
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      PremiumColors.cardBg.withOpacity(0.9),
-                      PremiumColors.darkBg2.withOpacity(0.7),
+                      AppTheme.surfaceCardFromContext(context).withOpacity(0.9),
+                      AppTheme.backgroundGradientEndFromContext(
+                        context,
+                      ).withOpacity(0.7),
                     ],
                   )
                 : LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [
-                      PremiumColors.accentGradient2,
-                      PremiumColors.accentGradient1,
-                    ],
+                    colors: [AppTheme.accentBlue, AppTheme.primaryBlue],
                   ),
             borderRadius: BorderRadius.only(
               topLeft: Radius.circular(widget.isBot ? 4 : 20),
@@ -192,7 +188,7 @@ class _PremiumMessageBubbleState extends State<PremiumMessageBubble>
             ),
             border: widget.isBot
                 ? Border.all(
-                    color: PremiumColors.accentGradient1.withOpacity(0.2),
+                    color: AppTheme.primaryBlue.withOpacity(0.2),
                     width: 1,
                   )
                 : null,
@@ -200,7 +196,7 @@ class _PremiumMessageBubbleState extends State<PremiumMessageBubble>
               BoxShadow(
                 color: widget.isBot
                     ? Colors.black.withOpacity(0.2)
-                    : PremiumColors.accentGradient2.withOpacity(0.3),
+                    : AppTheme.accentBlue.withOpacity(0.3),
                 blurRadius: 12,
                 offset: Offset(0, 4),
               ),
@@ -255,14 +251,12 @@ class _PremiumMessageBubbleState extends State<PremiumMessageBubble>
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              PremiumColors.cardBg,
-              PremiumColors.darkBg2,
+              AppTheme.surfaceCardFromContext(context),
+              AppTheme.backgroundGradientEndFromContext(context),
             ],
           ),
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          border: Border.all(
-            color: PremiumColors.accentGradient1.withOpacity(0.2),
-          ),
+          border: Border.all(color: AppTheme.primaryBlue.withOpacity(0.2)),
         ),
         child: SafeArea(
           child: Column(
@@ -286,7 +280,7 @@ class _PremiumMessageBubbleState extends State<PremiumMessageBubble>
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Message copied'),
-                      backgroundColor: PremiumColors.successGreen,
+                      backgroundColor: AppTheme.success,
                       behavior: SnackBarBehavior.floating,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
@@ -345,20 +339,16 @@ class _PremiumMessageBubbleState extends State<PremiumMessageBubble>
               Container(
                 padding: EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: PremiumColors.accentGradient1.withOpacity(0.1),
+                  color: AppTheme.primaryBlue.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(
-                  icon,
-                  color: PremiumColors.accentGradient1,
-                  size: 20,
-                ),
+                child: Icon(icon, color: AppTheme.primaryBlue, size: 20),
               ),
               SizedBox(width: 14),
               Text(
                 label,
                 style: TextStyle(
-                  color: Colors.white,
+                  color: AppTheme.textPrimaryFromContext(context),
                   fontSize: 15,
                   fontWeight: FontWeight.w500,
                 ),
@@ -412,19 +402,17 @@ class QuickActionChips extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                PremiumColors.accentGradient1.withOpacity(0.15),
-                PremiumColors.accentGradient2.withOpacity(0.1),
+                AppTheme.primaryBlue.withOpacity(0.15),
+                AppTheme.accentBlue.withOpacity(0.1),
               ],
             ),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: PremiumColors.accentGradient1.withOpacity(0.3),
-            ),
+            border: Border.all(color: AppTheme.primaryBlue.withOpacity(0.3)),
           ),
           child: Text(
             text,
             style: TextStyle(
-              color: PremiumColors.accentGradient1,
+              color: AppTheme.primaryBlue,
               fontSize: 13,
               fontWeight: FontWeight.w500,
             ),

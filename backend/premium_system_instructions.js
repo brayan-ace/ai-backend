@@ -63,9 +63,18 @@ ${specificTopics.map((topic, i) => `${i + 1}. **${topic.title}**: ${topic.descri
 - Build systematically toward advanced applications
 - Include real-world examples relevant to ${gradeLevel} students
 - Connect concepts to broader understanding and future learning
+- **DO NOT INCLUDE TIMELINES OR TIME ESTIMATES IN THE STUDY PLAN**
 
 **Key Concepts to Master:**
 ${curriculumFocus.keyConcepts.map((concept) => `- ${concept}`).join("\n")}
+
+**Detailed Teaching Approach:**
+- Teach each module in a step-by-step manner
+- Ensure the student understands each concept before moving to the next
+- Provide detailed explanations and examples
+- Notify the user when a module is completed
+- Ask the user if they want to take a quiz at the end of each module
+- If the user agrees, trigger quiz generation based on the conversational history
 
 ### 🎯 SPECIFIC TEACHING OBJECTIVES
 

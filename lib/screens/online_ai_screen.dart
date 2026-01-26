@@ -2255,8 +2255,8 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              AppTheme.backgroundGradientStart,
-              AppTheme.backgroundGradientEnd,
+              AppTheme.backgroundGradientStartFromContext(context),
+              AppTheme.backgroundGradientEndFromContext(context),
             ],
           ),
         ),
@@ -2954,8 +2954,8 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                AppTheme.backgroundGradientStart,
-                AppTheme.backgroundGradientEnd,
+                AppTheme.backgroundGradientStartFromContext(context),
+                AppTheme.backgroundGradientEndFromContext(context),
               ],
             ),
             // Add any additional widgets or logic here
@@ -3218,6 +3218,12 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                         imagePath: m.imagePath,
                                         gradientColors: m.fromUser
                                             ? AppTheme.primaryGradient
+                                            : Theme.of(context).brightness ==
+                                                  Brightness.light
+                                            ? [
+                                                Colors.black,
+                                                Colors.grey.shade800,
+                                              ]
                                             : AppTheme.surfaceGradient,
                                         detailedByDefault:
                                             _responseMode == 'detailed',

@@ -203,6 +203,211 @@ class AppTheme {
     height: 1.2,
   );
 
+  // Dynamic Typography Methods (use these instead of static getters for theme-aware colors)
+  static TextStyle displayLargeFromContext(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return TextStyle(
+      fontSize: 32,
+      fontWeight: FontWeight.bold,
+      color: isDark
+          ? textPrimary
+          : Color(0xFF1F2937), // Dark text for light mode
+      letterSpacing: -0.5,
+      height: 1.2,
+    );
+  }
+
+  static TextStyle displayMediumFromContext(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return TextStyle(
+      fontSize: 28,
+      fontWeight: FontWeight.bold,
+      color: isDark ? textPrimary : Color(0xFF1F2937),
+      letterSpacing: -0.3,
+      height: 1.25,
+    );
+  }
+
+  static TextStyle displaySmallFromContext(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return TextStyle(
+      fontSize: 24,
+      fontWeight: FontWeight.w500,
+      color: isDark ? textPrimary : Color(0xFF1F2937),
+      letterSpacing: -0.2,
+      height: 1.3,
+    );
+  }
+
+  static TextStyle headlineLargeFromContext(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return TextStyle(
+      fontSize: 24,
+      fontWeight: FontWeight.w600,
+      color: isDark ? textPrimary : Color(0xFF1F2937),
+      letterSpacing: 0,
+      height: 1.3,
+    );
+  }
+
+  static TextStyle headlineMediumFromContext(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return TextStyle(
+      fontSize: 20,
+      fontWeight: FontWeight.w600,
+      color: isDark ? textPrimary : Color(0xFF1F2937),
+      letterSpacing: 0,
+      height: 1.3,
+    );
+  }
+
+  static TextStyle headlineSmallFromContext(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return TextStyle(
+      fontSize: 18,
+      fontWeight: FontWeight.w600,
+      color: isDark ? textPrimary : Color(0xFF1F2937),
+      letterSpacing: 0,
+      height: 1.3,
+    );
+  }
+
+  static TextStyle bodyLargeFromContext(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.normal,
+      color: isDark
+          ? textSecondary
+          : Color(0xFF374151), // Dark gray for light mode
+      letterSpacing: 0.1,
+      height: 1.5,
+    );
+  }
+
+  static TextStyle bodyMediumFromContext(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.normal,
+      color: isDark ? textSecondary : Color(0xFF374151),
+      letterSpacing: 0.1,
+      height: 1.5,
+    );
+  }
+
+  static TextStyle bodySmallFromContext(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.normal,
+      color: isDark
+          ? textTertiary
+          : Color(0xFF6B7280), // Medium gray for light mode
+      letterSpacing: 0,
+      height: 1.4,
+    );
+  }
+
+  static TextStyle labelLargeFromContext(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return TextStyle(
+      fontSize: 15,
+      fontWeight: FontWeight.w500,
+      color: isDark ? textPrimary : Color(0xFF1F2937),
+      letterSpacing: 0.2,
+      height: 1.2,
+    );
+  }
+
+  static TextStyle labelMediumFromContext(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.w500,
+      color: isDark ? textSecondary : Color(0xFF374151),
+      letterSpacing: 0.3,
+      height: 1.2,
+    );
+  }
+
+  static TextStyle labelSmallFromContext(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return TextStyle(
+      fontSize: 11,
+      fontWeight: FontWeight.w500,
+      color: isDark ? textTertiary : Color(0xFF6B7280),
+      letterSpacing: 0.3,
+      height: 1.2,
+    );
+  }
+
+  // Dynamic Color Methods (use these instead of static constants for theme-aware colors)
+  static Color textPrimaryFromContext(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return isDark ? textPrimary : Color(0xFF1F2937); // Dark text for light mode
+  }
+
+  static Color textSecondaryFromContext(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return isDark
+        ? textSecondary
+        : Color(0xFF374151); // Dark gray for light mode
+  }
+
+  static Color textTertiaryFromContext(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return isDark
+        ? textTertiary
+        : Color(0xFF6B7280); // Medium gray for light mode
+  }
+
+  static Color surfaceCardFromContext(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return isDark ? surfaceCard : Color(0xFFFFFFFF); // White for light mode
+  }
+
+  static Color surfaceElevatedFromContext(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return isDark
+        ? surfaceElevated
+        : Color(0xFFF9FAFB); // Light gray for light mode
+  }
+
+  static Color backgroundGradientStartFromContext(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return isDark
+        ? backgroundGradientStart
+        : Color(0xFFFFFFFF); // White for light mode
+  }
+
+  static Color backgroundGradientEndFromContext(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return isDark
+        ? backgroundGradientEnd
+        : Color(0xFFFFFFFF); // White for light mode
+  }
+
+  static List<Color> surfaceGradientFromContext(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return isDark
+        ? surfaceGradient
+        : [
+            Color(0xFFFFFFFF),
+            Color(0xFFF9FAFB),
+          ]; // White gradient for light mode
+  }
+
+  static List<Color> glassGradientFromContext(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return isDark
+        ? glassGradient
+        : [
+            Color(0xFFFFFFFF).withOpacity(0.1),
+            Color(0xFFFFFFFF).withOpacity(0.05),
+          ]; // Light glass for light mode
+  }
+
   // Theme Data
   static ThemeData get darkTheme => ThemeData(
     useMaterial3: true,

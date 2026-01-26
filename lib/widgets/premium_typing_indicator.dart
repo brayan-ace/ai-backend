@@ -3,23 +3,14 @@
 
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
-
-class PremiumColors {
-  static const Color accentGradient1 = Color(0xFF6366f1);
-  static const Color accentGradient2 = Color(0xFF8b5cf6);
-  static const Color cardBg = Color(0xFF111827);
-  static const Color darkBg2 = Color(0xFF1a1a2e);
-}
+import '../utils/theme.dart';
 
 class PremiumTypingIndicator extends StatefulWidget {
   final String? botName;
   final bool showAvatar;
 
-  const PremiumTypingIndicator({
-    Key? key,
-    this.botName,
-    this.showAvatar = true,
-  }) : super(key: key);
+  const PremiumTypingIndicator({Key? key, this.botName, this.showAvatar = true})
+    : super(key: key);
 
   @override
   State<PremiumTypingIndicator> createState() => _PremiumTypingIndicatorState();
@@ -117,25 +108,18 @@ class _PremiumTypingIndicatorState extends State<PremiumTypingIndicator>
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  PremiumColors.accentGradient2,
-                  PremiumColors.accentGradient1,
-                ],
+                colors: [AppTheme.accentBlue, AppTheme.primaryBlue],
               ),
               boxShadow: [
                 BoxShadow(
-                  color: PremiumColors.accentGradient2.withOpacity(0.4),
+                  color: AppTheme.accentBlue.withOpacity(0.4),
                   blurRadius: 12,
                   spreadRadius: 2,
                 ),
               ],
             ),
             child: Center(
-              child: Icon(
-                Icons.psychology,
-                color: Colors.white,
-                size: 20,
-              ),
+              child: Icon(Icons.psychology, color: Colors.white, size: 20),
             ),
           ),
         );
@@ -154,8 +138,10 @@ class _PremiumTypingIndicatorState extends State<PremiumTypingIndicator>
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                PremiumColors.cardBg.withOpacity(0.9),
-                PremiumColors.darkBg2.withOpacity(0.7),
+                AppTheme.surfaceCardFromContext(context).withOpacity(0.9),
+                AppTheme.backgroundGradientEndFromContext(
+                  context,
+                ).withOpacity(0.7),
               ],
             ),
             borderRadius: BorderRadius.only(
@@ -165,7 +151,7 @@ class _PremiumTypingIndicatorState extends State<PremiumTypingIndicator>
               bottomRight: Radius.circular(20),
             ),
             border: Border.all(
-              color: PremiumColors.accentGradient1.withOpacity(0.3),
+              color: AppTheme.primaryBlue.withOpacity(0.3),
               width: 1,
             ),
             boxShadow: [
@@ -186,11 +172,7 @@ class _PremiumTypingIndicatorState extends State<PremiumTypingIndicator>
                     return LinearGradient(
                       begin: Alignment(_shimmerAnimation.value - 1, 0),
                       end: Alignment(_shimmerAnimation.value, 0),
-                      colors: [
-                        Colors.white54,
-                        Colors.white,
-                        Colors.white54,
-                      ],
+                      colors: [Colors.white54, Colors.white, Colors.white54],
                       stops: [0.0, 0.5, 1.0],
                     ).createShader(bounds);
                   },
@@ -216,7 +198,8 @@ class _PremiumTypingIndicatorState extends State<PremiumTypingIndicator>
                         child: Transform.translate(
                           offset: Offset(
                             0,
-                            -8 * math.sin(_dotAnimations[index].value * math.pi),
+                            -8 *
+                                math.sin(_dotAnimations[index].value * math.pi),
                           ),
                           child: Container(
                             width: 10,
@@ -225,17 +208,17 @@ class _PremiumTypingIndicatorState extends State<PremiumTypingIndicator>
                               shape: BoxShape.circle,
                               gradient: LinearGradient(
                                 colors: [
-                                  PremiumColors.accentGradient2.withOpacity(
+                                  AppTheme.accentBlue.withOpacity(
                                     0.5 + _dotAnimations[index].value * 0.5,
                                   ),
-                                  PremiumColors.accentGradient1.withOpacity(
+                                  AppTheme.primaryBlue.withOpacity(
                                     0.5 + _dotAnimations[index].value * 0.5,
                                   ),
                                 ],
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: PremiumColors.accentGradient1.withOpacity(
+                                  color: AppTheme.primaryBlue.withOpacity(
                                     _dotAnimations[index].value * 0.5,
                                   ),
                                   blurRadius: 8,
@@ -296,14 +279,14 @@ class _InlineTypingIndicatorState extends State<InlineTypingIndicator>
             final delay = index * 0.2;
             final value = ((_controller.value + delay) % 1.0);
             final opacity = 0.3 + 0.7 * math.sin(value * math.pi);
-            
+
             return Container(
               margin: EdgeInsets.symmetric(horizontal: 2),
               width: 6,
               height: 6,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: PremiumColors.accentGradient1.withOpacity(opacity),
+                color: AppTheme.primaryBlue.withOpacity(opacity),
               ),
             );
           }),
