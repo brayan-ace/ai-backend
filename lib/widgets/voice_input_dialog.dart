@@ -271,6 +271,8 @@ class _VoiceInputDialogState extends State<VoiceInputDialog>
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Dialog(
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -279,7 +281,7 @@ class _VoiceInputDialogState extends State<VoiceInputDialog>
         height: 270,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: const Color(0xE61E1E1E),
+          color: isDarkMode ? const Color(0xE61E1E1E) : const Color(0xFFF5F5F5),
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
@@ -296,7 +298,11 @@ class _VoiceInputDialogState extends State<VoiceInputDialog>
               top: 0,
               right: 0,
               child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white70, size: 20),
+                icon: Icon(
+                  Icons.close,
+                  color: isDarkMode ? Colors.white70 : Color(0xFF6B7280),
+                  size: 20,
+                ),
                 onPressed: () => Navigator.pop(context),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
@@ -349,9 +355,15 @@ class _VoiceInputDialogState extends State<VoiceInputDialog>
                     height: 70,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.grey.shade700,
+                      color: isDarkMode
+                          ? Colors.grey.shade700
+                          : Color(0xFFE5E7EB),
                     ),
-                    child: const Icon(Icons.mic, color: Colors.white, size: 35),
+                    child: Icon(
+                      Icons.mic,
+                      color: isDarkMode ? Colors.white : Color(0xFF1F2937),
+                      size: 35,
+                    ),
                   ),
 
                 const SizedBox(height: 20),
@@ -365,8 +377,10 @@ class _VoiceInputDialogState extends State<VoiceInputDialog>
                       : 'Initializing...',
                   style: TextStyle(
                     color: _errorMessage.isNotEmpty
-                        ? Colors.red.shade300
-                        : Colors.white,
+                        ? (isDarkMode
+                              ? Colors.red.shade300
+                              : Colors.red.shade600)
+                        : (isDarkMode ? Colors.white : Color(0xFF1F2937)),
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                   ),
@@ -406,8 +420,8 @@ class _VoiceInputDialogState extends State<VoiceInputDialog>
                           : _transcribedText,
                       style: TextStyle(
                         color: _transcribedText.isEmpty
-                            ? Colors.white54
-                            : Colors.white,
+                            ? (isDarkMode ? Colors.white54 : Color(0xFF9CA3AF))
+                            : (isDarkMode ? Colors.white : Color(0xFF1F2937)),
                         fontSize: 14,
                       ),
                       textAlign: TextAlign.center,

@@ -20,7 +20,10 @@ class ProfessionalMessageWidget extends StatelessWidget {
 
   // Static regex patterns for performance - compiled once
   static final RegExp _escapedNewlinePattern = RegExp(r'\\n');
-  static final RegExp _brTagPattern = RegExp(r'<br\s*\/?>', caseSensitive: false);
+  static final RegExp _brTagPattern = RegExp(
+    r'<br\s*\/?>',
+    caseSensitive: false,
+  );
   static final RegExp _crlfPattern = RegExp(r'\r\n');
   static final RegExp _trailingSpacesPattern = RegExp(r' {2,}\n');
   static final RegExp _lineEndSpacesPattern = RegExp(r'[ \t]+\n');
@@ -29,7 +32,10 @@ class ProfessionalMessageWidget extends StatelessWidget {
   static final RegExp _headingPattern = RegExp(r'^(#{1,3})\s+(.*)$');
   static final RegExp _numberedListPattern = RegExp(r'^(\d+)\.\s+(.*)$');
   static final RegExp _bulletListPattern = RegExp(r'^[-•*]\s+(.*)$');
-  static final RegExp _displayMathPattern = RegExp(r'^\$\$([\s\S]*?)\$\$$', multiLine: true);
+  static final RegExp _displayMathPattern = RegExp(
+    r'^\$\$([\s\S]*?)\$\$$',
+    multiLine: true,
+  );
   static final RegExp _latexBracketOpenPattern = RegExp(r'\\\[');
   static final RegExp _latexBracketClosePattern = RegExp(r'\\\]');
   static final RegExp _latexParenOpenPattern = RegExp(r'\\\(');
@@ -66,7 +72,7 @@ class ProfessionalMessageWidget extends StatelessWidget {
     final blocks = <MessageBlock>[];
     final normalized = _normalizeText(text);
     final lines = normalized.split('\n');
-    
+
     var currentBlock = <String>[];
     var blockType = BlockType.paragraph;
     var inCodeBlock = false;
@@ -130,7 +136,9 @@ class ProfessionalMessageWidget extends StatelessWidget {
         } else {
           // Ending a math block
           currentBlock.add(line);
-          blocks.add(MessageBlock(BlockType.mathBlock, currentBlock.join('\n')));
+          blocks.add(
+            MessageBlock(BlockType.mathBlock, currentBlock.join('\n')),
+          );
           currentBlock = [];
           inMathBlock = false;
           blockType = BlockType.paragraph;
@@ -219,10 +227,24 @@ class ProfessionalMessageWidget extends StatelessWidget {
       final inner = trimmed.substring(2, trimmed.length - 2).trim();
       // Only treat as heading if it's short and not generic
       if (inner.isNotEmpty && !inner.contains('**')) {
-        final wordCount = inner.split(RegExp(r'\s+')).where((s) => s.isNotEmpty).length;
+        final wordCount = inner
+            .split(RegExp(r'\s+'))
+            .where((s) => s.isNotEmpty)
+            .length;
         final lower = inner.toLowerCase();
-        final generic = {'answer', 'answers', 'response', 'reply', 'greeting', 
-                         'greetings', 'hello', 'hi', 'note', 'summary', 'definition'};
+        final generic = {
+          'answer',
+          'answers',
+          'response',
+          'reply',
+          'greeting',
+          'greetings',
+          'hello',
+          'hi',
+          'note',
+          'summary',
+          'definition',
+        };
         if (wordCount <= 6 && !generic.contains(lower)) {
           return BlockType.heading1;
         }
@@ -249,29 +271,30 @@ class ProfessionalMessageWidget extends StatelessWidget {
   Widget _buildBlock(MessageBlock block, BuildContext context) {
     switch (block.type) {
       case BlockType.heading1:
-        return _buildHeading(block.content, 1);
+        return _buildHeading(block.content, 1, context);
       case BlockType.heading2:
-        return _buildHeading(block.content, 2);
+        return _buildHeading(block.content, 2, context);
       case BlockType.heading3:
-        return _buildHeading(block.content, 3);
+        return _buildHeading(block.content, 3, context);
       case BlockType.code:
-        return _buildCodeBlock(block.content);
+        return _buildCodeBlock(block.content, context);
       case BlockType.bulletList:
-        return _buildBulletList(block.content);
+        return _buildBulletList(block.content, context);
       case BlockType.mathBlock:
-        return _buildMathBlock(block.content);
+        return _buildMathBlock(block.content, context);
       case BlockType.paragraph:
-        return _buildParagraph(block.content);
+        return _buildParagraph(block.content, context);
     }
   }
 
   /// Build paragraph with inline LaTeX support and markdown
-  Widget _buildParagraph(String content) {
+  Widget _buildParagraph(String content, BuildContext context) {
     final text = content.trim();
     if (text.isEmpty) return SizedBox.shrink();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final spans = _parseInlineContent(text);
-    
+    final spans = _parseInlineContent(text, context);
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: SelectableText.rich(
@@ -281,7 +304,7 @@ class ProfessionalMessageWidget extends StatelessWidget {
             fontSize: 15,
             height: 1.75,
             fontWeight: FontWeight.w400,
-            color: AppTheme.textPrimary,
+            color: isDark ? AppTheme.textPrimary : Color(0xFF374151),
             letterSpacing: 0.2,
           ),
         ),
@@ -291,31 +314,32 @@ class ProfessionalMessageWidget extends StatelessWidget {
 
   /// Parse inline content with proper handling of all markdown formats
   /// Uses a token-based approach to avoid regex conflicts
-  List<InlineSpan> _parseInlineContent(String text) {
+  List<InlineSpan> _parseInlineContent(String text, BuildContext context) {
     final spans = <InlineSpan>[];
     var i = 0;
     var plainBuffer = StringBuffer();
-    
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     final defaultStyle = TextStyle(
       fontSize: 15,
       height: 1.75,
-      color: AppTheme.textPrimary,
+      color: isDark ? AppTheme.textPrimary : Color(0xFF374151),
       fontWeight: FontWeight.w400,
       letterSpacing: 0.2,
     );
-    
+
     final boldStyle = TextStyle(
       fontSize: 15,
       height: 1.75,
-      color: AppTheme.textPrimary,
+      color: isDark ? AppTheme.textPrimary : Color(0xFF1F2937),
       fontWeight: FontWeight.w700,
       letterSpacing: 0.2,
     );
-    
+
     final italicStyle = TextStyle(
       fontSize: 15,
       height: 1.75,
-      color: AppTheme.textPrimary,
+      color: isDark ? AppTheme.textPrimary : Color(0xFF374151),
       fontStyle: FontStyle.italic,
       letterSpacing: 0.2,
     );
@@ -350,7 +374,9 @@ class ProfessionalMessageWidget extends StatelessWidget {
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: AppTheme.surfaceElevated.withOpacity(0.3),
+                  color: isDark
+                      ? AppTheme.surfaceElevated.withOpacity(0.3)
+                      : Color(0xFFF3F4F6),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
@@ -389,18 +415,7 @@ class ProfessionalMessageWidget extends StatelessWidget {
             spans.add(
               WidgetSpan(
                 alignment: PlaceholderAlignment.middle,
-                child: Math.tex(
-                  mathContent,
-                  textStyle: TextStyle(color: AppTheme.textPrimary, fontSize: 15),
-                  onErrorFallback: (_) => Text(
-                    mathContent,
-                    style: TextStyle(
-                      color: AppTheme.textSecondary,
-                      fontFamily: 'monospace',
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
+                child: _buildInlineLatexWidget(mathContent, isDark),
               ),
             );
             i = endIdx + 1;
@@ -417,14 +432,20 @@ class ProfessionalMessageWidget extends StatelessWidget {
           flushPlain();
           final boldContent = text.substring(i + 2, closeIdx);
           // Recursively parse bold content for nested formatting
-          if (boldContent.contains('*') || boldContent.contains('`') || boldContent.contains(r'$')) {
-            final innerSpans = _parseInlineContent(boldContent);
+          if (boldContent.contains('*') ||
+              boldContent.contains('`') ||
+              boldContent.contains(r'$')) {
+            final innerSpans = _parseInlineContent(boldContent, context);
             for (final span in innerSpans) {
               if (span is TextSpan) {
-                spans.add(TextSpan(
-                  text: span.text,
-                  style: boldStyle.merge(span.style?.copyWith(fontWeight: FontWeight.w700)),
-                ));
+                spans.add(
+                  TextSpan(
+                    text: span.text,
+                    style: boldStyle.merge(
+                      span.style?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                );
               } else {
                 spans.add(span);
               }
@@ -468,11 +489,11 @@ class ProfessionalMessageWidget extends StatelessWidget {
     }
 
     flushPlain();
-    
+
     if (spans.isEmpty) {
       return [TextSpan(text: text, style: defaultStyle)];
     }
-    
+
     return spans;
   }
 
@@ -482,54 +503,173 @@ class ProfessionalMessageWidget extends StatelessWidget {
     // If it's just a number, it's probably a price
     if (RegExp(r'^\d+\.?\d*$').hasMatch(content.trim())) return false;
     // If it contains math operators or LaTeX commands, it's math
-    if (content.contains('^') || content.contains('_') || 
-        content.contains('\\') || content.contains('{') ||
-        content.contains('frac') || content.contains('sqrt') ||
-        content.contains('sum') || content.contains('int') ||
-        content.contains('=') || content.contains('+') ||
+    if (content.contains('^') ||
+        content.contains('_') ||
+        content.contains('\\') ||
+        content.contains('{') ||
+        content.contains('frac') ||
+        content.contains('sqrt') ||
+        content.contains('sum') ||
+        content.contains('int') ||
+        content.contains('=') ||
+        content.contains('+') ||
         content.contains('-') && content.length > 2) {
       return true;
     }
     // If it has letters and numbers mixed with operators, likely math
-    if (RegExp(r'[a-zA-Z]').hasMatch(content) && 
+    if (RegExp(r'[a-zA-Z]').hasMatch(content) &&
         RegExp(r'[\^_{}=+\-*/]').hasMatch(content)) {
       return true;
     }
     // Single letter variables are math
     if (RegExp(r'^[a-zA-Z]$').hasMatch(content.trim())) return true;
     // Greek letters or common math expressions
-    if (content.contains('alpha') || content.contains('beta') ||
-        content.contains('gamma') || content.contains('pi') ||
-        content.contains('theta') || content.contains('lambda')) {
+    if (content.contains('alpha') ||
+        content.contains('beta') ||
+        content.contains('gamma') ||
+        content.contains('pi') ||
+        content.contains('theta') ||
+        content.contains('lambda')) {
       return true;
     }
     return content.length > 1;
   }
 
+  /// Build inline LaTeX widget with horizontal scroll support for long equations
+  /// This prevents overflow errors on portrait mode and long expressions
+  Widget _buildInlineLatexWidget(String mathContent, bool isDark) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 2, vertical: 0),
+        child: _buildLatexWithFallback(
+          mathContent,
+          isDark,
+          fontSize: 15,
+          isInline: true,
+        ),
+      ),
+    );
+  }
+
+  /// Build LaTeX widget with comprehensive error handling and graceful fallback
+  /// Handles both inline and display math modes
+  Widget _buildLatexWithFallback(
+    String mathContent,
+    bool isDark, {
+    double fontSize = 18,
+    bool isInline = false,
+  }) {
+    try {
+      // Guard against empty math content
+      if (mathContent.trim().isEmpty) {
+        return Text(
+          '\$\$',
+          style: TextStyle(
+            color: isDark ? AppTheme.textSecondary : Color(0xFF6B7280),
+            fontSize: fontSize,
+          ),
+        );
+      }
+
+      return Math.tex(
+        mathContent,
+        textStyle: TextStyle(
+          color: isDark ? AppTheme.textPrimary : Color(0xFF1F2937),
+          fontSize: fontSize,
+          fontWeight: isInline ? FontWeight.w400 : FontWeight.w500,
+        ),
+        onErrorFallback: (error) {
+          // Graceful fallback: render as monospace text when LaTeX parsing fails
+          // This prevents crashes on malformed or complex LaTeX
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: isInline ? 4 : 12,
+                vertical: isInline ? 2 : 8,
+              ),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? AppTheme.surfaceElevated.withOpacity(0.15)
+                    : Color(0xFFEEF2FF),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                // Show the raw math content in monospace for debugging
+                isInline ? mathContent : '\$\$\n$mathContent\n\$\$',
+                style: TextStyle(
+                  fontSize: fontSize - 1,
+                  color: isDark ? AppTheme.textSecondary : Color(0xFF6B7280),
+                  fontFamily: 'monospace',
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    } catch (e) {
+      // Emergency fallback if Math.tex throws an exception
+      // Prevents app crash on unexpected LaTeX errors
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: isInline ? 4 : 12,
+            vertical: isInline ? 2 : 8,
+          ),
+          decoration: BoxDecoration(
+            color: isDark
+                ? AppTheme.surfaceElevated.withOpacity(0.1)
+                : Color(0xFFFEE2E2),
+            border: Border.all(
+              color: isDark
+                  ? Color(0xFF7F1D1D).withOpacity(0.3)
+                  : Color(0xFFFECACA),
+              width: 1,
+            ),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            isInline ? mathContent : '\$\$\n$mathContent\n\$\$',
+            style: TextStyle(
+              fontSize: fontSize - 1,
+              color: isDark ? Color(0xFFFCA5A5) : Color(0xFFDC2626),
+              fontFamily: 'monospace',
+              letterSpacing: 0.3,
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
   /// Build heading with enhanced visual hierarchy
-  Widget _buildHeading(String content, int level) {
+  Widget _buildHeading(String content, int level, BuildContext context) {
     // Remove leading hashes if present, and also remove surrounding bold markers
     var text = content.replaceFirst(RegExp(r'^#+\s*'), '').trim();
     text = text.replaceAll(RegExp(r'^\*{2}\s*|\s*\*{2}$'), '').trim();
     if (text.isEmpty) return SizedBox.shrink();
     final topPadding = {1: 20.0, 2: 16.0, 3: 12.0};
     final bottomPadding = {1: 12.0, 2: 10.0, 3: 8.0};
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     TextStyle style;
     if (level == 1) {
       style = AppTheme.displayLarge.copyWith(
         fontSize: 28,
-        color: AppTheme.textPrimary,
+        color: isDark ? AppTheme.textPrimary : Color(0xFF1F2937),
       );
     } else if (level == 2) {
       style = AppTheme.displayMedium.copyWith(
         fontSize: 24,
-        color: AppTheme.textPrimary,
+        color: isDark ? AppTheme.textPrimary : Color(0xFF1F2937),
       );
     } else {
       style = AppTheme.displaySmall.copyWith(
         fontSize: 20,
-        color: AppTheme.textPrimary,
+        color: isDark ? AppTheme.textPrimary : Color(0xFF1F2937),
       );
     }
 
@@ -543,13 +683,14 @@ class ProfessionalMessageWidget extends StatelessWidget {
   }
 
   /// Build code block with enhanced styling
-  Widget _buildCodeBlock(String content) {
+  Widget _buildCodeBlock(String content, BuildContext context) {
     final code = content
         .replaceFirst('```', '')
         .replaceAll(RegExp(r'```$'), '')
         .trim();
 
     if (code.isEmpty) return SizedBox.shrink();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Extract language if specified
     final lines = code.split('\n');
@@ -564,7 +705,7 @@ class ProfessionalMessageWidget extends StatelessWidget {
     return Container(
       margin: EdgeInsets.symmetric(vertical: 12.0),
       decoration: BoxDecoration(
-        color: Color(0xFF1A1A1A),
+        color: isDark ? Color(0xFF1A1A1A) : Color(0xFFF9FAFB),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: AppTheme.primaryBlue.withOpacity(0.2),
@@ -572,7 +713,9 @@ class ProfessionalMessageWidget extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
+            color: isDark
+                ? Colors.black.withOpacity(0.3)
+                : Colors.black.withOpacity(0.05),
             blurRadius: 8,
             offset: Offset(0, 2),
           ),
@@ -612,7 +755,7 @@ class ProfessionalMessageWidget extends StatelessWidget {
                 fontFamily: 'monospace',
                 fontSize: 13,
                 height: 1.7,
-                color: Colors.grey[300],
+                color: isDark ? Colors.grey[300] : Color(0xFF1F2937),
                 fontWeight: FontWeight.w400,
               ),
             ),
@@ -623,7 +766,7 @@ class ProfessionalMessageWidget extends StatelessWidget {
   }
 
   /// Build bullet/numbered list with enhanced styling
-  Widget _buildBulletList(String content) {
+  Widget _buildBulletList(String content, BuildContext context) {
     final items = content
         .split('\n')
         .where((l) => l.trim().isNotEmpty)
@@ -635,7 +778,7 @@ class ProfessionalMessageWidget extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           for (int i = 0; i < items.length; i++) ...[
-            _buildListItem(items[i].trim()),
+            _buildListItem(items[i].trim(), context),
             if (i < items.length - 1) SizedBox(height: 6.0),
           ],
         ],
@@ -644,35 +787,38 @@ class ProfessionalMessageWidget extends StatelessWidget {
   }
 
   /// Build single list item with enhanced styling and inline markdown support
-  Widget _buildListItem(String item) {
+  Widget _buildListItem(String item, BuildContext context) {
     String bullet = '•';
     String text = item;
     Color bulletColor = AppTheme.primaryBlue;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Extract bullet/number - be careful with * to not confuse with bold
     if (item.startsWith('• ')) {
       text = item.substring(2).trim();
       bullet = '•';
-      bulletColor = AppTheme.textPrimary;
+      bulletColor = isDark ? AppTheme.textPrimary : Color(0xFF1F2937);
     } else if (item.startsWith('- ')) {
       text = item.substring(2).trim();
       bullet = '•';
-      bulletColor = AppTheme.textPrimary;
+      bulletColor = isDark ? AppTheme.textPrimary : Color(0xFF1F2937);
     } else if (item.startsWith('* ') && !item.startsWith('**')) {
       text = item.substring(2).trim();
       bullet = '◦';
-      bulletColor = AppTheme.textPrimary.withOpacity(0.9);
+      bulletColor = isDark
+          ? AppTheme.textPrimary.withOpacity(0.9)
+          : Color(0xFF374151);
     } else {
       final match = RegExp(r'^(\d+)\.\s+').firstMatch(item);
       if (match != null) {
         bullet = '${match.group(1)}.';
         text = item.substring(match.end).trim();
-        bulletColor = AppTheme.textPrimary;
+        bulletColor = isDark ? AppTheme.textPrimary : Color(0xFF1F2937);
       }
     }
 
     // Parse inline markdown within list item text
-    final spans = _parseInlineContent(text);
+    final spans = _parseInlineContent(text, context);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -696,7 +842,7 @@ class ProfessionalMessageWidget extends StatelessWidget {
               style: TextStyle(
                 fontSize: 16,
                 height: 1.75,
-                color: AppTheme.textPrimary,
+                color: isDark ? AppTheme.textPrimary : Color(0xFF374151),
                 fontWeight: FontWeight.w400,
                 letterSpacing: 0.2,
               ),
@@ -707,20 +853,24 @@ class ProfessionalMessageWidget extends StatelessWidget {
     );
   }
 
-  /// Build math block (display mode) with enhanced styling
-  Widget _buildMathBlock(String content) {
+  /// Build math block (display mode) with enhanced styling and horizontal scroll support
+  /// Prevents overflow errors on long equations in portrait mode
+  Widget _buildMathBlock(String content, BuildContext context) {
     final math = content
         .replaceAll(RegExp(r'^\$\$'), '')
         .replaceAll(RegExp(r'\$\$$'), '')
         .trim();
 
     if (math.isEmpty) return SizedBox.shrink();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       margin: EdgeInsets.symmetric(vertical: 16.0),
       padding: EdgeInsets.all(18.0),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceElevated.withOpacity(0.08),
+        color: isDark
+            ? AppTheme.surfaceElevated.withOpacity(0.08)
+            : Color(0xFFF3F4F6),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: AppTheme.primaryBlue.withOpacity(0.15),
@@ -728,31 +878,25 @@ class ProfessionalMessageWidget extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.primaryBlue.withOpacity(0.05),
+            color: isDark
+                ? AppTheme.primaryBlue.withOpacity(0.05)
+                : Colors.black.withOpacity(0.05),
             blurRadius: 8,
             offset: Offset(0, 2),
           ),
         ],
       ),
-      child: Center(
-        child: Math.tex(
-          math,
-          textStyle: TextStyle(
+      // Wrap in SingleChildScrollView with horizontal scroll capability
+      // This allows long equations to scroll horizontally on small screens
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Center(
+          child: _buildLatexWithFallback(
+            math,
+            isDark,
             fontSize: 18,
-            color: AppTheme.textPrimary,
-            fontWeight: FontWeight.w500,
+            isInline: false,
           ),
-          onErrorFallback: (error) {
-            return SelectableText(
-              '\$\$\n$math\n\$\$',
-              style: TextStyle(
-                fontSize: 14,
-                color: AppTheme.textSecondary,
-                fontFamily: 'monospace',
-              ),
-              textAlign: TextAlign.center,
-            );
-          },
         ),
       ),
     );

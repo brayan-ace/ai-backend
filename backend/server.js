@@ -2399,12 +2399,14 @@ app.post("/api/generate-quiz", async (req, res) => {
     });
 
     // Store quiz data with enhanced metadata
+    let quizId = null;
     try {
-      await pool.query(
+      const dbResult = await pool.query(
         `INSERT INTO quiz_data (bot_id, user_id, module_name, quiz_data) 
          VALUES ($1, $2, $3, $4) 
          ON CONFLICT (bot_id, user_id, module_name) 
-         DO UPDATE SET quiz_data = $4, created_at = CURRENT_TIMESTAMP`,
+         DO UPDATE SET quiz_data = $4, created_at = CURRENT_TIMESTAMP
+         RETURNING id`,
         [
           botId,
           userId,
@@ -2417,16 +2419,21 @@ app.post("/api/generate-quiz", async (req, res) => {
           }),
         ],
       );
-      console.log("[generate-quiz] 📚 Enhanced quiz stored in database");
+      quizId = dbResult.rows[0]?.id;
+      console.log(
+        "[generate-quiz] 📚 Enhanced quiz stored in database with ID:",
+        quizId,
+      );
     } catch (dbErr) {
       console.error("[generate-quiz] Database error:", dbErr.message);
       // Continue even if storage fails
     }
 
-    // Return enhanced response
+    // Return enhanced response with quizId
     return res.status(200).json({
       success: true,
       quiz: quizJson,
+      quizId: quizId,
       metadata: {
         enhanced: true,
         personalized: hasPersonalization,

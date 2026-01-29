@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../utils/theme.dart';
 import 'package:flutter/services.dart';
 import 'professional_message_widget.dart';
+import 'tts_speaker_icon.dart';
 
 class PremiumColors {
   static const Color darkBg = Color(0xFF0a0a0a);
@@ -88,34 +89,60 @@ class _PremiumMessageBubbleState extends State<PremiumMessageBubble>
 
   @override
   Widget build(BuildContext context) {
-    return SlideTransition(
-      position: _slideAnimation,
-      child: FadeTransition(
-        opacity: _fadeAnimation,
-        child: ScaleTransition(
-          scale: _scaleAnimation,
-          child: Padding(
-            padding: EdgeInsets.only(
-              left: widget.isBot ? 12 : 48,
-              right: widget.isBot ? 48 : 12,
-              bottom: 12,
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisAlignment: widget.isBot
-                  ? MainAxisAlignment.start
-                  : MainAxisAlignment.end,
-              children: [
-                if (widget.isBot && widget.showAvatar) ...[
-                  _buildBotAvatar(),
-                  SizedBox(width: 10),
-                ],
-                Flexible(child: _buildMessageContent()),
-              ],
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: widget.isBot
+          ? CrossAxisAlignment.start
+          : CrossAxisAlignment.end,
+      children: [
+        SlideTransition(
+          position: _slideAnimation,
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: ScaleTransition(
+              scale: _scaleAnimation,
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: widget.isBot ? 12 : 48,
+                  right: widget.isBot ? 48 : 12,
+                  bottom: 8,
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisAlignment: widget.isBot
+                      ? MainAxisAlignment.start
+                      : MainAxisAlignment.end,
+                  children: [
+                    if (widget.isBot && widget.showAvatar) ...[
+                      _buildBotAvatar(),
+                      SizedBox(width: 10),
+                    ],
+                    Flexible(child: _buildMessageContent()),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
-      ),
+        // Speaker icon and action buttons for AI messages
+        if (widget.isBot)
+          Padding(
+            padding: EdgeInsets.only(
+              left: widget.showAvatar ? 56 : 12,
+              bottom: 4,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TTSSpeakerIcon(
+                  messageId: widget.message.hashCode.toString(),
+                  messageText: widget.message,
+                  isAiMessage: true,
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 

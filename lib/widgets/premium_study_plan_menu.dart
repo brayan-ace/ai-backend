@@ -46,6 +46,22 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
   late Animation<double> _pulseAnimation;
   late List<bool> _expandedModules;
 
+  // Theme helper
+  Color getTextColor(bool isDarkMode) =>
+      isDarkMode ? Colors.white : Color(0xFF1F2937);
+  Color getSecondaryTextColor(bool isDarkMode) =>
+      isDarkMode ? Colors.white54 : Color(0xFF6B7280);
+  Color getCardBackground(bool isDarkMode) =>
+      isDarkMode ? Colors.white.withOpacity(0.08) : Color(0xFFF9FAFB);
+  Color getCardBorder(bool isDarkMode) =>
+      isDarkMode ? Colors.white.withOpacity(0.1) : Color(0xFFE5E7EB);
+  Color getBgOpacity10(bool isDarkMode) => isDarkMode
+      ? Colors.white.withOpacity(0.1)
+      : Color(0xFF1F2937).withOpacity(0.1);
+  Color getBgOpacity05(bool isDarkMode) => isDarkMode
+      ? Colors.white.withOpacity(0.05)
+      : Color(0xFF1F2937).withOpacity(0.05);
+
   @override
   void initState() {
     super.initState();
@@ -87,6 +103,7 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Drawer(
       backgroundColor: Colors.transparent,
       child: Container(
@@ -94,31 +111,33 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              AppTheme.backgroundGradientStartFromContext(widget.context),
-              AppTheme.backgroundGradientEndFromContext(widget.context),
-              AppTheme.surfaceCardFromContext(widget.context),
-            ],
+            colors: isDarkMode
+                ? [
+                    AppTheme.backgroundGradientStartFromContext(widget.context),
+                    AppTheme.backgroundGradientEndFromContext(widget.context),
+                    AppTheme.surfaceCardFromContext(widget.context),
+                  ]
+                : [Color(0xFFF5F7FA), Color(0xFFF0F4F8), Color(0xFFE8F0FA)],
           ),
         ),
         child: Column(
           children: [
-            _buildPremiumHeader(),
+            _buildPremiumHeader(isDarkMode),
             Expanded(
               child:
                   widget.tableOfContents == null ||
                       widget.tableOfContents!.isEmpty
-                  ? _buildEmptyState()
-                  : _buildModulesList(),
+                  ? _buildEmptyState(isDarkMode)
+                  : _buildModulesList(isDarkMode),
             ),
-            _buildFooter(),
+            _buildFooter(isDarkMode),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPremiumHeader() {
+  Widget _buildPremiumHeader(bool isDarkMode) {
     final totalModules = widget.tableOfContents?.length ?? 0;
     final completedCount = widget.completedModules?.length ?? 0;
 
@@ -128,15 +147,23 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            AppTheme.primaryBlue.withOpacity(0.3),
-            AppTheme.accentBlue.withOpacity(0.2),
-            AppTheme.accentBlue.withOpacity(0.1),
-          ],
+          colors: isDarkMode
+              ? [
+                  AppTheme.primaryBlue.withOpacity(0.3),
+                  AppTheme.accentBlue.withOpacity(0.2),
+                  AppTheme.accentBlue.withOpacity(0.1),
+                ]
+              : [
+                  AppTheme.primaryBlue.withOpacity(0.1),
+                  AppTheme.accentBlue.withOpacity(0.05),
+                  Color(0xFFE0E9FF).withOpacity(0.5),
+                ],
         ),
         border: Border(
           bottom: BorderSide(
-            color: AppTheme.primaryBlue.withOpacity(0.3),
+            color: isDarkMode
+                ? AppTheme.primaryBlue.withOpacity(0.3)
+                : Color(0xFFE5E7EB),
             width: 1,
           ),
         ),
@@ -182,7 +209,7 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                             Text(
                               'Study Plan',
                               style: TextStyle(
-                                color: Colors.white,
+                                color: getTextColor(isDarkMode),
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: -0.5,
@@ -193,7 +220,7 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                               Text(
                                 'Version ${widget.planVersion}',
                                 style: TextStyle(
-                                  color: Colors.white54,
+                                  color: getSecondaryTextColor(isDarkMode),
                                   fontSize: 11,
                                 ),
                               ),
@@ -205,11 +232,16 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                 ),
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
+                    color: isDarkMode
+                        ? Colors.white.withOpacity(0.1)
+                        : Color(0xFF1F2937).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: IconButton(
-                    icon: Icon(Icons.close, color: Colors.white70),
+                    icon: Icon(
+                      Icons.close,
+                      color: isDarkMode ? Colors.white70 : Color(0xFF6B7280),
+                    ),
                     onPressed: () {
                       HapticFeedback.lightImpact();
                       Navigator.pop(context);
@@ -222,25 +254,35 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
             SizedBox(height: 24),
 
             // Animated circular progress
-            _buildAnimatedProgressCard(totalModules, completedCount),
+            _buildAnimatedProgressCard(
+              totalModules,
+              completedCount,
+              isDarkMode,
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildAnimatedProgressCard(int totalModules, int completedCount) {
+  Widget _buildAnimatedProgressCard(
+    int totalModules,
+    int completedCount,
+    bool isDarkMode,
+  ) {
     return Container(
       padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            Colors.white.withOpacity(0.08),
-            Colors.white.withOpacity(0.04),
-          ],
+          colors: isDarkMode
+              ? [Colors.white.withOpacity(0.08), Colors.white.withOpacity(0.04)]
+              : [
+                  Color(0xFFF9FAFB).withOpacity(0.8),
+                  Color(0xFFF3F4F6).withOpacity(0.6),
+                ],
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+        border: Border.all(color: getCardBorder(isDarkMode), width: 1),
       ),
       child: Row(
         children: [
@@ -263,7 +305,9 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                         strokeWidth: 8,
                         backgroundColor: Colors.transparent,
                         valueColor: AlwaysStoppedAnimation<Color>(
-                          Colors.white.withOpacity(0.1),
+                          isDarkMode
+                              ? Colors.white.withOpacity(0.1)
+                              : Color(0xFFE5E7EB),
                         ),
                       ),
                     ),
@@ -288,14 +332,17 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                         Text(
                           '${(widget.progressPercentage).toStringAsFixed(0)}%',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: getTextColor(isDarkMode),
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         Text(
                           'Complete',
-                          style: TextStyle(color: Colors.white54, fontSize: 10),
+                          style: TextStyle(
+                            color: getSecondaryTextColor(isDarkMode),
+                            fontSize: 10,
+                          ),
                         ),
                       ],
                     ),
@@ -315,6 +362,7 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                   iconColor: AppTheme.success,
                   label: 'Completed',
                   value: '$completedCount modules',
+                  isDarkMode: isDarkMode,
                 ),
                 SizedBox(height: 8),
                 _buildStatRow(
@@ -322,6 +370,7 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                   iconColor: AppTheme.warning,
                   label: 'Remaining',
                   value: '${totalModules - completedCount} modules',
+                  isDarkMode: isDarkMode,
                 ),
                 SizedBox(height: 8),
                 _buildStatRow(
@@ -329,6 +378,7 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                   iconColor: AppTheme.primaryBlue,
                   label: 'Current',
                   value: 'Module ${widget.currentModule + 1}',
+                  isDarkMode: isDarkMode,
                 ),
               ],
             ),
@@ -343,6 +393,7 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
     required Color iconColor,
     required String label,
     required String value,
+    required bool isDarkMode,
   }) {
     return Row(
       children: [
@@ -351,7 +402,10 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
         Flexible(
           child: Text(
             label,
-            style: TextStyle(color: Colors.white54, fontSize: 11),
+            style: TextStyle(
+              color: getSecondaryTextColor(isDarkMode),
+              fontSize: 11,
+            ),
             overflow: TextOverflow.ellipsis,
           ),
         ),
@@ -359,7 +413,7 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
         Text(
           value,
           style: TextStyle(
-            color: Colors.white,
+            color: getTextColor(isDarkMode),
             fontSize: 11,
             fontWeight: FontWeight.w600,
           ),
@@ -375,7 +429,7 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
     return AppTheme.accentBlue;
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(bool isDarkMode) {
     return Center(
       child: Padding(
         padding: EdgeInsets.all(32),
@@ -386,10 +440,15 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
               padding: EdgeInsets.all(24),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [
-                    AppTheme.primaryBlue.withOpacity(0.2),
-                    AppTheme.accentBlue.withOpacity(0.1),
-                  ],
+                  colors: isDarkMode
+                      ? [
+                          AppTheme.primaryBlue.withOpacity(0.2),
+                          AppTheme.accentBlue.withOpacity(0.1),
+                        ]
+                      : [
+                          AppTheme.primaryBlue.withOpacity(0.1),
+                          AppTheme.accentBlue.withOpacity(0.05),
+                        ],
                 ),
                 shape: BoxShape.circle,
               ),
@@ -403,7 +462,7 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
             Text(
               'No Study Plan Yet',
               style: TextStyle(
-                color: Colors.white,
+                color: getTextColor(isDarkMode),
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
@@ -413,7 +472,7 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
               'Your personalized study plan will appear here once your AI tutor creates one for you.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white54,
+                color: getSecondaryTextColor(isDarkMode),
                 fontSize: 14,
                 height: 1.5,
               ),
@@ -422,10 +481,14 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
             Container(
               padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: AppTheme.primaryBlue.withOpacity(0.1),
+                color: AppTheme.primaryBlue.withOpacity(
+                  isDarkMode ? 0.1 : 0.05,
+                ),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: AppTheme.primaryBlue.withOpacity(0.3),
+                  color: AppTheme.primaryBlue.withOpacity(
+                    isDarkMode ? 0.3 : 0.2,
+                  ),
                 ),
               ),
               child: Column(
@@ -464,18 +527,20 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
     );
   }
 
-  Widget _buildModulesList() {
+  Widget _buildModulesList(bool isDarkMode) {
     return Container(
       margin: EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            Colors.white.withOpacity(0.08),
-            Colors.white.withOpacity(0.04),
-          ],
+          colors: isDarkMode
+              ? [Colors.white.withOpacity(0.08), Colors.white.withOpacity(0.04)]
+              : [
+                  Color(0xFFF9FAFB).withOpacity(0.8),
+                  Color(0xFFF3F4F6).withOpacity(0.6),
+                ],
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+        border: Border.all(color: getCardBorder(isDarkMode), width: 1),
       ),
       child: Column(
         children: [
@@ -484,10 +549,15 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
             padding: EdgeInsets.all(16),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [
-                  AppTheme.accentBlue.withOpacity(0.2),
-                  AppTheme.primaryBlue.withOpacity(0.1),
-                ],
+                colors: isDarkMode
+                    ? [
+                        AppTheme.accentBlue.withOpacity(0.2),
+                        AppTheme.primaryBlue.withOpacity(0.1),
+                      ]
+                    : [
+                        AppTheme.accentBlue.withOpacity(0.1),
+                        AppTheme.primaryBlue.withOpacity(0.05),
+                      ],
               ),
               borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(20),
@@ -502,7 +572,7 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                   child: Text(
                     widget.planTitle ?? 'Study Plan',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: getTextColor(isDarkMode),
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
@@ -545,6 +615,7 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                         index,
                         isCompleted,
                         isCurrent,
+                        isDarkMode,
                       );
                     }).toList() ??
                     [],
@@ -815,6 +886,7 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
     int index,
     bool isCompleted,
     bool isCurrent,
+    bool isDarkMode,
   ) {
     return Container(
       margin: EdgeInsets.only(bottom: 12),
@@ -822,31 +894,52 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
       decoration: BoxDecoration(
         gradient: isCurrent
             ? LinearGradient(
-                colors: [
-                  AppTheme.primaryBlue.withOpacity(0.15),
-                  AppTheme.accentBlue.withOpacity(0.1),
-                ],
+                colors: isDarkMode
+                    ? [
+                        AppTheme.primaryBlue.withOpacity(0.15),
+                        AppTheme.accentBlue.withOpacity(0.1),
+                      ]
+                    : [
+                        AppTheme.primaryBlue.withOpacity(0.08),
+                        AppTheme.accentBlue.withOpacity(0.05),
+                      ],
               )
             : isCompleted
             ? LinearGradient(
-                colors: [
-                  AppTheme.success.withOpacity(0.1),
-                  AppTheme.success.withOpacity(0.05),
-                ],
+                colors: isDarkMode
+                    ? [
+                        AppTheme.success.withOpacity(0.1),
+                        AppTheme.success.withOpacity(0.05),
+                      ]
+                    : [
+                        AppTheme.success.withOpacity(0.08),
+                        AppTheme.success.withOpacity(0.04),
+                      ],
               )
             : LinearGradient(
-                colors: [
-                  Colors.white.withOpacity(0.05),
-                  Colors.white.withOpacity(0.02),
-                ],
+                colors: isDarkMode
+                    ? [
+                        Colors.white.withOpacity(0.05),
+                        Colors.white.withOpacity(0.02),
+                      ]
+                    : [
+                        Color(0xFFF9FAFB).withOpacity(0.5),
+                        Color(0xFFF3F4F6).withOpacity(0.3),
+                      ],
               ),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isCurrent
-              ? AppTheme.primaryBlue.withOpacity(0.4)
+              ? (isDarkMode
+                    ? AppTheme.primaryBlue.withOpacity(0.4)
+                    : AppTheme.primaryBlue.withOpacity(0.3))
               : isCompleted
-              ? AppTheme.success.withOpacity(0.3)
-              : Colors.white.withOpacity(0.1),
+              ? (isDarkMode
+                    ? AppTheme.success.withOpacity(0.3)
+                    : AppTheme.success.withOpacity(0.2))
+              : (isDarkMode
+                    ? Colors.white.withOpacity(0.1)
+                    : Color(0xFFE5E7EB)),
           width: isCurrent ? 2 : 1,
         ),
       ),
@@ -874,11 +967,18 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                       )
                     : null,
                 color: !isCompleted && !isCurrent
-                    ? Colors.white.withOpacity(0.2)
+                    ? (isDarkMode
+                          ? Colors.white.withOpacity(0.2)
+                          : Color(0xFF1F2937).withOpacity(0.1))
                     : null,
                 shape: BoxShape.circle,
                 border: !isCompleted && !isCurrent
-                    ? Border.all(color: Colors.white.withOpacity(0.3), width: 2)
+                    ? Border.all(
+                        color: isDarkMode
+                            ? Colors.white.withOpacity(0.3)
+                            : Color(0xFFD1D5DB),
+                        width: 2,
+                      )
                     : null,
               ),
               child: Center(
@@ -900,7 +1000,7 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                 Text(
                   toc.title,
                   style: TextStyle(
-                    color: Colors.white,
+                    color: getTextColor(isDarkMode),
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                     decoration: isCompleted ? TextDecoration.lineThrough : null,
@@ -914,7 +1014,9 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                   toc.description ??
                       'Complete this module to advance your learning',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.8),
+                    color: isDarkMode
+                        ? Colors.white.withOpacity(0.8)
+                        : Color(0xFF6B7280),
                     fontSize: 14,
                     height: 1.4,
                   ),
@@ -929,11 +1031,13 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                       toc.estimatedTime ?? '30 min',
                       Icons.access_time,
                       isCompleted,
+                      isDarkMode,
                     ),
                     _buildInfoChip(
                       toc.difficultyLevel ?? 'Medium',
                       Icons.signal_cellular_alt,
                       isCompleted,
+                      isDarkMode,
                     ),
                   ],
                 ),
@@ -947,7 +1051,9 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                 Icons.arrow_forward,
                 color: isCurrent
                     ? AppTheme.primaryBlue
-                    : Colors.white.withOpacity(0.5),
+                    : (isDarkMode
+                          ? Colors.white.withOpacity(0.5)
+                          : Color(0xFF9CA3AF)),
                 size: 20,
               ),
               onPressed: () {
@@ -960,18 +1066,27 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
     );
   }
 
-  Widget _buildInfoChip(String text, IconData icon, bool isCompleted) {
+  Widget _buildInfoChip(
+    String text,
+    IconData icon,
+    bool isCompleted,
+    bool isDarkMode,
+  ) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: isCompleted
             ? AppTheme.success.withOpacity(0.2)
-            : Colors.white.withOpacity(0.08),
+            : (isDarkMode
+                  ? Colors.white.withOpacity(0.08)
+                  : Color(0xFFE5E7EB).withOpacity(0.5)),
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
           color: isCompleted
               ? AppTheme.success.withOpacity(0.3)
-              : Colors.white.withOpacity(0.1),
+              : (isDarkMode
+                    ? Colors.white.withOpacity(0.1)
+                    : Color(0xFFE5E7EB)),
         ),
       ),
       child: Row(
@@ -981,7 +1096,9 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
             icon,
             color: isCompleted
                 ? AppTheme.success
-                : Colors.white.withOpacity(0.6),
+                : (isDarkMode
+                      ? Colors.white.withOpacity(0.6)
+                      : Color(0xFF6B7280)),
             size: 12,
           ),
           SizedBox(width: 4),
@@ -990,7 +1107,9 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
             style: TextStyle(
               color: isCompleted
                   ? AppTheme.success
-                  : Colors.white.withOpacity(0.8),
+                  : (isDarkMode
+                        ? Colors.white.withOpacity(0.8)
+                        : Color(0xFF6B7280)),
               fontSize: 11,
               fontWeight: FontWeight.w500,
             ),
@@ -1000,15 +1119,17 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
     );
   }
 
-  Widget _buildFooter() {
+  Widget _buildFooter(bool isDarkMode) {
     return Container(
       padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Colors.white.withOpacity(0.05), Colors.transparent],
+          colors: isDarkMode
+              ? [Colors.white.withOpacity(0.05), Colors.transparent]
+              : [Color(0xFFF9FAFB).withOpacity(0.5), Colors.transparent],
         ),
         border: Border(
-          top: BorderSide(color: Colors.white.withOpacity(0.1), width: 1),
+          top: BorderSide(color: getCardBorder(isDarkMode), width: 1),
         ),
       ),
       child: SafeArea(
@@ -1024,6 +1145,7 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                   Navigator.pop(context);
                 },
                 isPrimary: false,
+                isDarkMode: isDarkMode,
               ),
             ),
             SizedBox(width: 12),
@@ -1041,6 +1163,7 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                       }
                     : null,
                 isPrimary: true,
+                isDarkMode: isDarkMode,
               ),
             ),
           ],
@@ -1054,6 +1177,7 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
     required String label,
     required VoidCallback? onTap,
     required bool isPrimary,
+    required bool isDarkMode,
   }) {
     final isEnabled = onTap != null;
 
@@ -1071,13 +1195,21 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                   )
                 : null,
             color: !isPrimary
-                ? Colors.white.withOpacity(0.08)
+                ? (isDarkMode
+                      ? Colors.white.withOpacity(0.08)
+                      : Color(0xFFF3F4F6))
                 : !isEnabled
-                ? Colors.white.withOpacity(0.05)
+                ? (isDarkMode
+                      ? Colors.white.withOpacity(0.05)
+                      : Color(0xFFE5E7EB).withOpacity(0.5))
                 : null,
             borderRadius: BorderRadius.circular(12),
             border: !isPrimary
-                ? Border.all(color: Colors.white.withOpacity(0.2))
+                ? Border.all(
+                    color: isDarkMode
+                        ? Colors.white.withOpacity(0.2)
+                        : Color(0xFFD1D5DB),
+                  )
                 : null,
           ),
           child: Row(
@@ -1085,14 +1217,18 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
             children: [
               Icon(
                 icon,
-                color: isEnabled ? Colors.white : Colors.white38,
+                color: isEnabled
+                    ? (isPrimary ? Colors.white : getTextColor(isDarkMode))
+                    : (isDarkMode ? Colors.white38 : Color(0xFFC1C5CA)),
                 size: 18,
               ),
               SizedBox(width: 8),
               Text(
                 label,
                 style: TextStyle(
-                  color: isEnabled ? Colors.white : Colors.white38,
+                  color: isEnabled
+                      ? (isPrimary ? Colors.white : getTextColor(isDarkMode))
+                      : (isDarkMode ? Colors.white38 : Color(0xFFC1C5CA)),
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
                 ),

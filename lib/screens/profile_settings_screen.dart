@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../utils/theme.dart';
 import '../services/user_profile_service.dart';
-import '../services/auth_services.dart';
 
 class ProfileSettingsScreen extends StatefulWidget {
   const ProfileSettingsScreen({super.key});
@@ -13,17 +12,16 @@ class ProfileSettingsScreen extends StatefulWidget {
 
 class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
   final UserProfileService _userProfileService = UserProfileService.instance;
-  final AuthService _authService = AuthService();
-  
+
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  
+
   bool _isEditingUsername = false;
   bool _isEditingEmail = false;
   bool _isLoading = false;
   bool _showPasswordFields = false;
-  
+
   String? _originalUsername;
   String? _originalEmail;
 
@@ -35,10 +33,10 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
 
   Future<void> _loadUserData() async {
     await _userProfileService.init();
-    
+
     final user = FirebaseAuth.instance.currentUser;
     final username = await _userProfileService.getDisplayName();
-    
+
     setState(() {
       _usernameController.text = username;
       _emailController.text = user?.email ?? '';
@@ -56,8 +54,10 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final success = await _userProfileService.saveUsername(_usernameController.text.trim());
-      
+      final success = await _userProfileService.saveUsername(
+        _usernameController.text.trim(),
+      );
+
       if (success) {
         setState(() {
           _isEditingUsername = false;
@@ -76,7 +76,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
 
   Future<void> _saveEmail() async {
     final newEmail = _emailController.text.trim();
-    
+
     if (newEmail.isEmpty) {
       _showError('Email cannot be empty');
       return;
@@ -112,7 +112,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
 
       // Update email
       await user.updateEmail(newEmail);
-      
+
       // Send verification email
       await user.sendEmailVerification();
 
@@ -175,30 +175,42 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
     );
   }
 
-  Widget _buildSectionHeader(String text) => Padding(
-    padding: EdgeInsets.fromLTRB(
-      AppTheme.spaceMd,
-      AppTheme.spaceLg,
-      AppTheme.spaceMd,
-      AppTheme.spaceSm,
-    ),
-    child: Text(
-      text.toUpperCase(),
-      style: AppTheme.labelMedium.copyWith(
-        color: AppTheme.textTertiary,
-        letterSpacing: 1.5,
+  Widget _buildSectionHeader(String text) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        AppTheme.spaceMd,
+        AppTheme.spaceLg,
+        AppTheme.spaceMd,
+        AppTheme.spaceSm,
       ),
-    ),
-  );
+      child: Text(
+        text.toUpperCase(),
+        style: AppTheme.labelMedium.copyWith(
+          color: isDarkMode ? AppTheme.textTertiary : Color(0xFF6B7280),
+          letterSpacing: 1.5,
+        ),
+      ),
+    );
+  }
 
   Widget _buildCard({required List<Widget> children}) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       margin: EdgeInsets.symmetric(horizontal: AppTheme.spaceSm),
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: AppTheme.surfaceGradient),
+        gradient: LinearGradient(
+          colors: isDarkMode
+              ? AppTheme.surfaceGradient
+              : [Color(0xFFFAFAFA), Color(0xFFF5F5F5)],
+        ),
         borderRadius: BorderRadius.circular(AppTheme.radiusLg),
         border: Border.all(
-          color: AppTheme.surfaceElevated.withOpacity(0.5),
+          color: isDarkMode
+              ? AppTheme.surfaceElevated.withOpacity(0.5)
+              : Color(0xFFE5E7EB),
           width: 1,
         ),
         boxShadow: AppTheme.cardShadow,
@@ -209,15 +221,19 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            AppTheme.backgroundGradientStart,
-            AppTheme.backgroundGradientEnd,
-          ],
+          colors: isDarkMode
+              ? [
+                  AppTheme.backgroundGradientStart,
+                  AppTheme.backgroundGradientEnd,
+                ]
+              : [Color(0xFFFAFAFA), Color(0xFFF5F5F5)],
         ),
       ),
       child: Scaffold(
@@ -228,10 +244,16 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
           elevation: 0,
           flexibleSpace: Container(
             decoration: BoxDecoration(
-              gradient: LinearGradient(colors: AppTheme.glassGradient),
+              gradient: LinearGradient(
+                colors: isDarkMode
+                    ? AppTheme.glassGradient
+                    : [Color(0xFFFFFFFF), Color(0xFFFAFAFA)],
+              ),
               border: Border(
                 bottom: BorderSide(
-                  color: AppTheme.surfaceElevated.withOpacity(0.3),
+                  color: isDarkMode
+                      ? AppTheme.surfaceElevated.withOpacity(0.3)
+                      : Color(0xFFE5E7EB),
                   width: 0.5,
                 ),
               ),
@@ -320,38 +342,69 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Username',
-                          style: AppTheme.labelLarge.copyWith(
-                            color: AppTheme.textSecondary,
-                          ),
+                        Builder(
+                          builder: (context) {
+                            final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+                            return Text(
+                              'Username',
+                              style: AppTheme.labelLarge.copyWith(
+                                color: isDarkMode ? AppTheme.textSecondary : Color(0xFF6B7280),
+                              ),
+                            );
+                          },
                         ),
                         SizedBox(height: AppTheme.spaceSm),
-                        Text(
-                          'Used to greet you throughout the app',
-                          style: AppTheme.bodySmall.copyWith(
-                            color: AppTheme.textTertiary,
-                          ),
+                        Builder(
+                          builder: (context) {
+                            final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+                            return Text(
+                              'Used to greet you throughout the app',
+                              style: AppTheme.bodySmall.copyWith(
+                                color: isDarkMode ? AppTheme.textTertiary : Color(0xFF9CA3AF),
+                              ),
+                            );
+                          },
                         ),
                         SizedBox(height: AppTheme.spaceMd),
                         if (_isEditingUsername) ...[
-                          TextField(
-                            controller: _usernameController,
-                            style: AppTheme.bodyLarge.copyWith(
-                              color: AppTheme.textPrimary,
-                            ),
-                            decoration: InputDecoration(
-                              hintText: 'Enter username',
-                              hintStyle: AppTheme.bodyMedium.copyWith(
-                                color: AppTheme.textTertiary,
-                              ),
-                              filled: true,
-                              fillColor: AppTheme.surfaceElevated.withOpacity(0.3),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                                borderSide: BorderSide.none,
-                              ),
-                            ),
+                          Builder(
+                            builder: (context) {
+                              final isDarkMode =
+                                  Theme.of(context).brightness ==
+                                  Brightness.dark;
+                              return TextField(
+                                controller: _usernameController,
+                                style: AppTheme.bodyLarge.copyWith(
+                                  color: isDarkMode
+                                      ? AppTheme.textPrimary
+                                      : Color(0xFF000000),
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: 'Enter username',
+                                  hintStyle: AppTheme.bodyMedium.copyWith(
+                                    color: isDarkMode
+                                        ? AppTheme.textTertiary
+                                        : Color(0xFF9CA3AF),
+                                  ),
+                                  filled: true,
+                                  fillColor: isDarkMode
+                                      ? AppTheme.surfaceElevated.withOpacity(
+                                          0.3,
+                                        )
+                                      : Color(0xFFF3F4F6).withOpacity(0.8),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(
+                                      AppTheme.radiusMd,
+                                    ),
+                                    borderSide: BorderSide(
+                                      color: isDarkMode
+                                          ? AppTheme.surfaceElevated
+                                          : Color(0xFFE5E7EB),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                           SizedBox(height: AppTheme.spaceMd),
                           Row(
@@ -380,7 +433,9 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                                 child: OutlinedButton(
                                   onPressed: _cancelUsernameEdit,
                                   style: OutlinedButton.styleFrom(
-                                    side: BorderSide(color: AppTheme.textTertiary),
+                                    side: BorderSide(
+                                      color: AppTheme.textTertiary,
+                                    ),
                                   ),
                                   child: Text('Cancel'),
                                 ),
@@ -391,17 +446,26 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                           Row(
                             children: [
                               Expanded(
-                                child: Text(
-                                  _usernameController.text,
-                                  style: AppTheme.bodyLarge.copyWith(
-                                    color: AppTheme.textPrimary,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                                child: Builder(
+                                  builder: (context) {
+                                    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+                                    return Text(
+                                      _usernameController.text,
+                                      style: AppTheme.bodyLarge.copyWith(
+                                        color: isDarkMode ? AppTheme.textPrimary : Color(0xFF000000),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    );
+                                  },
                                 ),
                               ),
                               IconButton(
-                                onPressed: () => setState(() => _isEditingUsername = true),
-                                icon: Icon(Icons.edit, color: AppTheme.primaryBlue),
+                                onPressed: () =>
+                                    setState(() => _isEditingUsername = true),
+                                icon: Icon(
+                                  Icons.edit,
+                                  color: AppTheme.primaryBlue,
+                                ),
                               ),
                             ],
                           ),
@@ -421,66 +485,103 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Email Address',
-                          style: AppTheme.labelLarge.copyWith(
-                            color: AppTheme.textSecondary,
-                          ),
+                        Builder(
+                          builder: (context) {
+                            final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+                            return Text(
+                              'Email Address',
+                              style: AppTheme.labelLarge.copyWith(
+                                color: isDarkMode ? AppTheme.textSecondary : Color(0xFF6B7280),
+                              ),
+                            );
+                          },
                         ),
                         SizedBox(height: AppTheme.spaceSm),
-                        Text(
-                          'Email changes require re-authentication',
-                          style: AppTheme.bodySmall.copyWith(
-                            color: AppTheme.textTertiary,
-                          ),
+                        Builder(
+                          builder: (context) {
+                            final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+                            return Text(
+                              'Email changes require re-authentication',
+                              style: AppTheme.bodySmall.copyWith(
+                                color: isDarkMode ? AppTheme.textTertiary : Color(0xFF9CA3AF),
+                              ),
+                            );
+                          },
                         ),
                         SizedBox(height: AppTheme.spaceMd),
                         if (_isEditingEmail) ...[
-                          TextField(
-                            controller: _emailController,
-                            style: AppTheme.bodyLarge.copyWith(
-                              color: AppTheme.textPrimary,
-                            ),
-                            decoration: InputDecoration(
-                              hintText: 'Enter new email',
-                              hintStyle: AppTheme.bodyMedium.copyWith(
-                                color: AppTheme.textTertiary,
-                              ),
-                              filled: true,
-                              fillColor: AppTheme.surfaceElevated.withOpacity(0.3),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                                borderSide: BorderSide.none,
-                              ),
-                            ),
+                          Builder(
+                            builder: (context) {
+                              final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+                              return TextField(
+                                controller: _emailController,
+                                style: AppTheme.bodyLarge.copyWith(
+                                  color: isDarkMode ? AppTheme.textPrimary : Color(0xFF000000),
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: 'Enter new email',
+                                  hintStyle: AppTheme.bodyMedium.copyWith(
+                                    color: isDarkMode ? AppTheme.textTertiary : Color(0xFF9CA3AF),
+                                  ),
+                                  filled: true,
+                                  fillColor: isDarkMode
+                                      ? AppTheme.surfaceElevated.withOpacity(0.3)
+                                      : Color(0xFFF3F4F6).withOpacity(0.8),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(
+                                      AppTheme.radiusMd,
+                                    ),
+                                    borderSide: BorderSide(
+                                      color: isDarkMode ? AppTheme.surfaceElevated : Color(0xFFE5E7EB),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                           if (_showPasswordFields) ...[
                             SizedBox(height: AppTheme.spaceMd),
-                            Text(
-                              'Current Password',
-                              style: AppTheme.labelLarge.copyWith(
-                                color: AppTheme.textSecondary,
-                              ),
+                            Builder(
+                              builder: (context) {
+                                final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+                                return Text(
+                                  'Current Password',
+                                  style: AppTheme.labelLarge.copyWith(
+                                    color: isDarkMode ? AppTheme.textSecondary : Color(0xFF6B7280),
+                                  ),
+                                );
+                              },
                             ),
                             SizedBox(height: AppTheme.spaceSm),
-                            TextField(
-                              controller: _passwordController,
-                              obscureText: true,
-                              style: AppTheme.bodyLarge.copyWith(
-                                color: AppTheme.textPrimary,
-                              ),
-                              decoration: InputDecoration(
-                                hintText: 'Enter current password',
-                                hintStyle: AppTheme.bodyMedium.copyWith(
-                                  color: AppTheme.textTertiary,
-                                ),
-                                filled: true,
-                                fillColor: AppTheme.surfaceElevated.withOpacity(0.3),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                                  borderSide: BorderSide.none,
-                                ),
-                              ),
+                            Builder(
+                              builder: (context) {
+                                final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+                                return TextField(
+                                  controller: _passwordController,
+                                  obscureText: true,
+                                  style: AppTheme.bodyLarge.copyWith(
+                                    color: isDarkMode ? AppTheme.textPrimary : Color(0xFF000000),
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: 'Enter current password',
+                                    hintStyle: AppTheme.bodyMedium.copyWith(
+                                      color: isDarkMode ? AppTheme.textTertiary : Color(0xFF9CA3AF),
+                                    ),
+                                    filled: true,
+                                    fillColor: isDarkMode
+                                        ? AppTheme.surfaceElevated.withOpacity(0.3)
+                                        : Color(0xFFF3F4F6).withOpacity(0.8),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(
+                                        AppTheme.radiusMd,
+                                      ),
+                                      borderSide: BorderSide(
+                                        color: isDarkMode ? AppTheme.surfaceElevated : Color(0xFFE5E7EB),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
                           ],
                           SizedBox(height: AppTheme.spaceMd),
@@ -510,7 +611,9 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                                 child: OutlinedButton(
                                   onPressed: _cancelEmailEdit,
                                   style: OutlinedButton.styleFrom(
-                                    side: BorderSide(color: AppTheme.textTertiary),
+                                    side: BorderSide(
+                                      color: AppTheme.textTertiary,
+                                    ),
                                   ),
                                   child: Text('Cancel'),
                                 ),
@@ -521,17 +624,26 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                           Row(
                             children: [
                               Expanded(
-                                child: Text(
-                                  _emailController.text,
-                                  style: AppTheme.bodyLarge.copyWith(
-                                    color: AppTheme.textPrimary,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                                child: Builder(
+                                  builder: (context) {
+                                    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+                                    return Text(
+                                      _emailController.text,
+                                      style: AppTheme.bodyLarge.copyWith(
+                                        color: isDarkMode ? AppTheme.textPrimary : Color(0xFF000000),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    );
+                                  },
                                 ),
                               ),
                               IconButton(
-                                onPressed: () => setState(() => _isEditingEmail = true),
-                                icon: Icon(Icons.edit, color: AppTheme.primaryBlue),
+                                onPressed: () =>
+                                    setState(() => _isEditingEmail = true),
+                                icon: Icon(
+                                  Icons.edit,
+                                  color: AppTheme.primaryBlue,
+                                ),
                               ),
                             ],
                           ),

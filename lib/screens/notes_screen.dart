@@ -82,8 +82,8 @@ class _NotesScreenState extends State<NotesScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            AppTheme.backgroundGradientStart,
-            AppTheme.backgroundGradientEnd,
+            AppTheme.backgroundGradientStartFromContext(context),
+            AppTheme.backgroundGradientEndFromContext(context),
           ],
         ),
       ),
@@ -120,7 +120,7 @@ class _NotesScreenState extends State<NotesScreen> {
                           'Notes',
                           style: AppTheme.displayMedium.copyWith(
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            color: AppTheme.textPrimaryFromContext(context),
                           ),
                         ),
                       ),
@@ -136,7 +136,11 @@ class _NotesScreenState extends State<NotesScreen> {
                         boxShadow: AppTheme.glowShadow,
                       ),
                       child: IconButton(
-                        icon: Icon(Icons.add, color: Colors.black, size: 28),
+                        icon: Icon(
+                          Icons.add,
+                          color: AppTheme.textPrimaryFromContext(context),
+                          size: 28,
+                        ),
                         onPressed: _createNote,
                       ),
                     ),
@@ -207,7 +211,7 @@ class _NotesScreenState extends State<NotesScreen> {
                               padding: EdgeInsets.only(right: AppTheme.spaceLg),
                               child: Icon(
                                 Icons.delete_outline,
-                                color: Colors.white,
+                                color: AppTheme.textPrimaryFromContext(context),
                                 size: 28,
                               ),
                             ),
@@ -221,15 +225,17 @@ class _NotesScreenState extends State<NotesScreen> {
                                 padding: EdgeInsets.all(AppTheme.spaceMd),
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
-                                    colors: AppTheme.surfaceGradient,
+                                    colors: AppTheme.surfaceGradientFromContext(
+                                      context,
+                                    ),
                                   ),
                                   borderRadius: BorderRadius.circular(
                                     AppTheme.radiusLg,
                                   ),
                                   border: Border.all(
-                                    color: AppTheme.surfaceElevated.withOpacity(
-                                      0.5,
-                                    ),
+                                    color: AppTheme.surfaceElevatedFromContext(
+                                      context,
+                                    ).withOpacity(0.5),
                                     width: 1,
                                   ),
                                   boxShadow: AppTheme.cardShadow,
@@ -264,7 +270,10 @@ class _NotesScreenState extends State<NotesScreen> {
                                           ),
                                           child: Icon(
                                             Icons.edit,
-                                            color: Colors.white,
+                                            color:
+                                                AppTheme.textPrimaryFromContext(
+                                                  context,
+                                                ),
                                             size: 16,
                                           ),
                                         ),
@@ -370,8 +379,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            AppTheme.backgroundGradientStart,
-            AppTheme.backgroundGradientEnd,
+            AppTheme.backgroundGradientStartFromContext(context),
+            AppTheme.backgroundGradientEndFromContext(context),
           ],
         ),
       ),
@@ -383,7 +392,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           elevation: 0,
           flexibleSpace: Container(
             decoration: BoxDecoration(
-              gradient: LinearGradient(colors: AppTheme.glassGradient),
+              gradient: LinearGradient(
+                colors: AppTheme.glassGradientFromContext(context),
+              ),
               border: Border(
                 bottom: BorderSide(
                   color: AppTheme.surfaceElevated.withOpacity(0.3),
@@ -393,7 +404,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             ),
           ),
           leading: IconButton(
-            icon: Icon(Icons.arrow_back, color: AppTheme.textPrimary),
+            icon: Icon(
+              Icons.arrow_back,
+              color: AppTheme.textPrimaryFromContext(context),
+            ),
             onPressed: () => Navigator.pop(context),
           ),
           actions: [
@@ -413,7 +427,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 child: Text(
                   'Save',
                   style: AppTheme.labelLarge.copyWith(
-                    color: Colors.black,
+                    color: AppTheme.textPrimaryFromContext(context),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -434,12 +448,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                   child: TextField(
                     controller: _titleController,
                     style: AppTheme.headlineLarge.copyWith(
-                      color: AppTheme.textPrimary,
+                      color: AppTheme.textPrimaryFromContext(context),
                     ),
                     decoration: InputDecoration(
                       hintText: 'Note Title',
                       hintStyle: AppTheme.headlineLarge.copyWith(
-                        color: AppTheme.textTertiary,
+                        color: AppTheme.textTertiaryFromContext(context),
                       ),
                       border: InputBorder.none,
                       contentPadding: EdgeInsets.all(AppTheme.spaceMd),
@@ -499,12 +513,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                     child: TextField(
                       controller: _contentController,
                       style: AppTheme.bodyLarge.copyWith(
-                        color: AppTheme.textPrimary,
+                        color: AppTheme.textPrimaryFromContext(context),
                       ),
                       decoration: InputDecoration(
                         hintText: 'Start typing...',
                         hintStyle: AppTheme.bodyLarge.copyWith(
-                          color: AppTheme.textTertiary,
+                          color: AppTheme.textTertiaryFromContext(context),
                         ),
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.all(AppTheme.spaceMd),

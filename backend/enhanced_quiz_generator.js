@@ -3,6 +3,9 @@
  * Analyzes user's complete learning journey to generate personalized quizzes
  */
 
+const axios = require("axios");
+const { pool } = require("./db");
+
 /**
  * Fetch user's complete conversation history with the study bot
  * This provides deep context about what the user has learned

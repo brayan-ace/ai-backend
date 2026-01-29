@@ -28,6 +28,9 @@ import 'screens/study_plan_screen_phase1.dart';
 import 'services/push_notification_service.dart';
 import 'services/analytics_service.dart';
 import 'services/gamification_service.dart';
+import 'services/study_activity_service.dart';
+import 'services/study_notification_service.dart';
+import 'services/text_to_speech_service.dart';
 import 'utils/globals.dart';
 import 'utils/theme.dart';
 
@@ -60,6 +63,9 @@ void main() async {
     await PushNotificationService().initialize();
     await AnalyticsService().initialize();
     await GamificationService().initialize();
+    await StudyActivityService().initialize();
+    await StudyNotificationService().initialize();
+    await TextToSpeechService().initialize();
     print('[Main] ✅ Premium services initialized');
   } catch (e) {
     print('[Main] ⚠️ Premium services initialization failed: $e');

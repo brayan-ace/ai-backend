@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../utils/theme.dart';
 import 'study_plan_chat_screen.dart';
 
 // Premium color palette matching bot_creation_screen
@@ -193,7 +194,7 @@ class _BotProcessingScreenState extends State<BotProcessingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: PremiumColors.darkBg,
+      backgroundColor: AppTheme.backgroundGradientStartFromContext(context),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -211,7 +212,7 @@ class _BotProcessingScreenState extends State<BotProcessingScreen> {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w700,
-              color: Colors.white,
+              color: AppTheme.textPrimaryFromContext(context),
             ),
           ),
         ),
@@ -223,8 +224,10 @@ class _BotProcessingScreenState extends State<BotProcessingScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              PremiumColors.darkBg,
-              PremiumColors.darkBg2.withOpacity(0.5),
+              AppTheme.backgroundGradientStartFromContext(context),
+              AppTheme.backgroundGradientEndFromContext(
+                context,
+              ).withOpacity(0.5),
             ],
           ),
         ),
@@ -284,24 +287,24 @@ class _BotProcessingScreenState extends State<BotProcessingScreen> {
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
           colors: [
-            PremiumColors.accentGradient2.withOpacity(0.15),
-            PremiumColors.accentGradient1.withOpacity(0.1),
+            AppTheme.primaryBlue.withOpacity(0.15),
+            AppTheme.accentBlue.withOpacity(0.1),
           ],
         ),
         boxShadow: [
           BoxShadow(
-            color: PremiumColors.accentGradient2.withOpacity(0.2),
+            color: AppTheme.primaryBlue.withOpacity(0.2),
             blurRadius: 30,
             spreadRadius: 10,
           ),
           BoxShadow(
-            color: PremiumColors.accentGradient1.withOpacity(0.1),
+            color: AppTheme.accentBlue.withOpacity(0.1),
             blurRadius: 15,
             spreadRadius: 5,
           ),
         ],
         border: Border.all(
-          color: PremiumColors.accentGradient1.withOpacity(0.2),
+          color: AppTheme.accentBlue.withOpacity(0.2),
           width: 2,
         ),
       ),
@@ -311,14 +314,10 @@ class _BotProcessingScreenState extends State<BotProcessingScreen> {
           // Animated circular progress
           CircularProgressIndicator(
             valueColor: AlwaysStoppedAnimation(
-              Color.lerp(
-                PremiumColors.accentGradient2,
-                PremiumColors.accentGradient1,
-                0.5,
-              )!,
+              Color.lerp(AppTheme.primaryBlue, AppTheme.accentBlue, 0.5)!,
             ),
             strokeWidth: 3,
-            backgroundColor: PremiumColors.accentGradient1.withOpacity(0.1),
+            backgroundColor: AppTheme.accentBlue.withOpacity(0.1),
           ),
 
           // Center icon with gradient

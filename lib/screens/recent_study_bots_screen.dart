@@ -236,22 +236,53 @@ class _RecentStudyBotsScreenState extends State<RecentStudyBotsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.backgroundDeep,
-      appBar: AppBar(
-        title: const Text(
-          'My Study Bots',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDarkMode
+              ? [
+                  AppTheme.backgroundGradientStart,
+                  AppTheme.backgroundGradientEnd,
+                ]
+              : [Color(0xFFFAFAFA), Color(0xFFF5F5F5)],
+        ),
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          title: Text(
+            'My Study Bots',
+            style: TextStyle(
+              color: isDarkMode ? Colors.white : Color(0xFF000000),
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          backgroundColor: isDarkMode
+              ? AppTheme.primaryBlue
+              : Color(0xFFFFFFFF),
+          elevation: 0,
+          iconTheme: IconThemeData(
+            color: isDarkMode ? Colors.white : Color(0xFF1F2937),
+          ),
+          flexibleSpace: Container(
+            decoration: BoxDecoration(
+              color: isDarkMode ? AppTheme.primaryBlue : Color(0xFFFFFFFF),
+              border: Border(
+                bottom: BorderSide(
+                  color: isDarkMode ? Colors.transparent : Color(0xFFE5E7EB),
+                  width: 0.5,
+                ),
+              ),
+            ),
           ),
         ),
-        backgroundColor: AppTheme.primaryBlue,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        body: _buildBody(),
       ),
-      body: _buildBody(),
     );
   }
 
@@ -272,20 +303,26 @@ class _RecentStudyBotsScreenState extends State<RecentStudyBotsScreen> {
             Icon(
               Icons.error_outline,
               size: 64,
-              color: AppTheme.primaryBlue.withOpacity(0.5),
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? AppTheme.primaryBlue.withOpacity(0.5)
+                  : AppTheme.primaryBlue.withOpacity(0.4),
             ),
             const SizedBox(height: 16),
             Text(
               'Error loading bots',
               style: AppTheme.headlineMedium.copyWith(
-                color: AppTheme.primaryBlue,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? AppTheme.primaryBlue
+                    : Color(0xFF1F2937),
               ),
             ),
             const SizedBox(height: 8),
             Text(
               _errorMessage,
               style: AppTheme.bodyMedium.copyWith(
-                color: AppTheme.textSecondary,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? AppTheme.textSecondary
+                    : Color(0xFF6B7280),
               ),
               textAlign: TextAlign.center,
             ),
@@ -314,20 +351,26 @@ class _RecentStudyBotsScreenState extends State<RecentStudyBotsScreen> {
             Icon(
               Icons.school_outlined,
               size: 64,
-              color: AppTheme.primaryBlue.withOpacity(0.5),
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? AppTheme.primaryBlue.withOpacity(0.5)
+                  : AppTheme.primaryBlue.withOpacity(0.4),
             ),
             const SizedBox(height: 16),
             Text(
               'No Study Bots Yet',
               style: AppTheme.headlineMedium.copyWith(
-                color: AppTheme.primaryBlue,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? AppTheme.primaryBlue
+                    : Color(0xFF1F2937),
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'Create your first study bot to get started!',
               style: AppTheme.bodyMedium.copyWith(
-                color: AppTheme.textSecondary,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? AppTheme.textSecondary
+                    : Color(0xFF6B7280),
               ),
             ),
           ],
@@ -347,6 +390,7 @@ class _RecentStudyBotsScreenState extends State<RecentStudyBotsScreen> {
   }
 
   Widget _buildBotCard(Map<String, dynamic> bot, int index) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final lastMessage = bot['last_message'] as String?;
     final lastMessageTime = bot['last_message_time'] as Timestamp?;
     final progressPercentage =
@@ -371,8 +415,15 @@ class _RecentStudyBotsScreenState extends State<RecentStudyBotsScreen> {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 0,
+      color: isDarkMode ? null : Color(0xFFFFFFFF),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: isDarkMode ? AppTheme.surfaceElevated : Color(0xFFE5E7EB),
+          width: 1,
+        ),
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () => _resumeBot(bot),
@@ -403,7 +454,9 @@ class _RecentStudyBotsScreenState extends State<RecentStudyBotsScreen> {
                         Text(
                           bot['name'] ?? 'Untitled Bot',
                           style: AppTheme.headlineSmall.copyWith(
-                            color: AppTheme.textPrimary,
+                            color: isDarkMode
+                                ? AppTheme.textPrimary
+                                : Color(0xFF000000),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -411,14 +464,21 @@ class _RecentStudyBotsScreenState extends State<RecentStudyBotsScreen> {
                         Text(
                           bot['topic'] ?? 'No topic',
                           style: AppTheme.bodySmall.copyWith(
-                            color: AppTheme.textSecondary,
+                            color: isDarkMode
+                                ? AppTheme.textSecondary
+                                : Color(0xFF6B7280),
                           ),
                         ),
                       ],
                     ),
                   ),
                   PopupMenuButton<String>(
-                    icon: Icon(Icons.more_vert, color: AppTheme.textSecondary),
+                    icon: Icon(
+                      Icons.more_vert,
+                      color: isDarkMode
+                          ? AppTheme.textSecondary
+                          : Color(0xFF6B7280),
+                    ),
                     onSelected: (value) {
                       if (value == 'rename') {
                         _renameBot(bot, index);
@@ -456,13 +516,15 @@ class _RecentStudyBotsScreenState extends State<RecentStudyBotsScreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.grey[50],
+                    color: isDarkMode ? Color(0xFF2A2A2A) : Color(0xFFF3F4F6),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     lastMessage,
                     style: AppTheme.bodySmall.copyWith(
-                      color: AppTheme.textSecondary,
+                      color: isDarkMode
+                          ? AppTheme.textSecondary
+                          : Color(0xFF6B7280),
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -508,18 +570,21 @@ class _RecentStudyBotsScreenState extends State<RecentStudyBotsScreen> {
                       Text(
                         '$messageCount messages',
                         style: AppTheme.bodySmall.copyWith(
-                          color: AppTheme.textSecondary,
+                          color: isDarkMode
+                              ? AppTheme.textSecondary
+                              : Color(0xFF6B7280),
                         ),
                       ),
-                      if (timeText.isNotEmpty) ...[
-                        const SizedBox(height: 2),
+                      if (timeText.isNotEmpty) const SizedBox(height: 2),
+                      if (timeText.isNotEmpty)
                         Text(
                           timeText,
                           style: AppTheme.bodySmall.copyWith(
-                            color: AppTheme.textSecondary,
+                            color: isDarkMode
+                                ? AppTheme.textSecondary
+                                : Color(0xFF9CA3AF),
                           ),
                         ),
-                      ],
                     ],
                   ),
                 ],

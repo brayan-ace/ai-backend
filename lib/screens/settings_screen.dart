@@ -100,7 +100,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     child: Text(
       text.toUpperCase(),
       style: AppTheme.labelMedium.copyWith(
-        color: AppTheme.textTertiary,
+        color: Theme.of(context).brightness == Brightness.dark
+            ? AppTheme.textTertiary
+            : Color(0xFF6B7280),
         letterSpacing: 1.5,
       ),
     ),
@@ -115,6 +117,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     Widget? trailing,
     List<Color>? gradient,
   }) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return ListTile(
       leading: Container(
         width: 44,
@@ -136,41 +140,69 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ]
               : null,
         ),
-        child: Icon(icon, color: AppTheme.textPrimary, size: 22),
+        child: Icon(
+          icon,
+          color: isDarkMode ? AppTheme.textPrimary : Color(0xFF1F2937),
+          size: 22,
+        ),
       ),
       title: Text(
         title,
-        style: AppTheme.bodyLarge.copyWith(color: AppTheme.textPrimary),
+        style: AppTheme.bodyLarge.copyWith(
+          color: isDarkMode ? AppTheme.textPrimary : Color(0xFF000000),
+        ),
       ),
       subtitle: subtitle != null
           ? Text(
               subtitle,
-              style: AppTheme.bodySmall.copyWith(color: AppTheme.textTertiary),
+              style: AppTheme.bodySmall.copyWith(
+                color: isDarkMode ? AppTheme.textTertiary : Color(0xFF6B7280),
+              ),
             )
           : null,
-      trailing:
-          trailing ??
-          Icon(Icons.chevron_right, color: AppTheme.textTertiary, size: 20),
+      trailing: Icon(
+        Icons.chevron_right,
+        color: isDarkMode ? AppTheme.textTertiary : Color(0xFF9CA3AF),
+        size: 20,
+      ),
       onTap: onTap,
       contentPadding: EdgeInsets.symmetric(
         horizontal: AppTheme.spaceMd,
         vertical: AppTheme.spaceSm,
       ),
+      tileColor: isDarkMode ? Colors.transparent : Colors.transparent,
+      selectedTileColor: isDarkMode
+          ? AppTheme.surfaceElevated.withOpacity(0.5)
+          : Color(0xFFF0F0F0),
+      hoverColor: isDarkMode
+          ? AppTheme.surfaceElevated.withOpacity(0.3)
+          : Color(0xFFF5F5F5),
+      splashColor: isDarkMode
+          ? AppTheme.primaryBlue.withOpacity(0.2)
+          : Color(0xFFBFDBFE).withOpacity(0.5),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppTheme.backgroundGradientStart,
-            AppTheme.backgroundGradientEnd,
-          ],
-        ),
+        gradient: isDarkMode
+            ? LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppTheme.backgroundGradientStart,
+                  AppTheme.backgroundGradientEnd,
+                ],
+              )
+            : LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFFFAFAFA), Color(0xFFF5F5F5)],
+              ),
       ),
       child: Scaffold(
         backgroundColor: Colors.transparent,
@@ -180,10 +212,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
           elevation: 0,
           flexibleSpace: Container(
             decoration: BoxDecoration(
-              gradient: LinearGradient(colors: AppTheme.glassGradient),
+              gradient: isDarkMode
+                  ? LinearGradient(colors: AppTheme.glassGradient)
+                  : LinearGradient(
+                      colors: [Color(0xFFFFFFFF), Color(0xFFFAFAFA)],
+                    ),
               border: Border(
                 bottom: BorderSide(
-                  color: AppTheme.surfaceElevated.withOpacity(0.3),
+                  color: isDarkMode
+                      ? AppTheme.surfaceElevated.withOpacity(0.3)
+                      : Color(0xFFE5E7EB),
                   width: 0.5,
                 ),
               ),
@@ -490,15 +528,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showDialog(
       context: context,
       builder: (context) {
+        final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
         return AlertDialog(
-          backgroundColor: AppTheme.surfaceElevated,
+          backgroundColor: isDarkMode
+              ? AppTheme.surfaceElevated
+              : Color(0xFFFFFFFF),
+          surfaceTintColor: isDarkMode ? null : Color(0xFFFFFFFF),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+            side: BorderSide(
+              color: isDarkMode ? AppTheme.surfaceElevated : Color(0xFFE5E7EB),
+              width: 1,
+            ),
           ),
           title: Text(
             'Theme Mode',
             style: AppTheme.headlineMedium.copyWith(
-              color: AppTheme.textPrimary,
+              color: isDarkMode ? AppTheme.textPrimary : Color(0xFF000000),
             ),
           ),
           content: Column(
@@ -522,6 +569,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildThemeOption(String label, String value, IconData icon) {
     final isSelected = _themeMode == value;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return InkWell(
       onTap: () {
         _saveThemeMode(value);
@@ -533,10 +582,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
         decoration: BoxDecoration(
           gradient: isSelected
               ? LinearGradient(colors: AppTheme.primaryGradient)
-              : LinearGradient(colors: AppTheme.surfaceGradient),
+              : LinearGradient(
+                  colors: isDarkMode
+                      ? AppTheme.surfaceGradient
+                      : [Color(0xFFF3F4F6), Color(0xFFF9FAFB)],
+                ),
           borderRadius: BorderRadius.circular(AppTheme.radiusMd),
           border: Border.all(
-            color: isSelected ? AppTheme.primaryBlue : AppTheme.surfaceElevated,
+            color: isSelected
+                ? AppTheme.primaryBlue
+                : (isDarkMode ? AppTheme.surfaceElevated : Color(0xFFE5E7EB)),
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -544,14 +599,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             Icon(
               icon,
-              color: isSelected ? Colors.black : AppTheme.textPrimary,
+              color: isSelected
+                  ? Colors.black
+                  : (isDarkMode ? AppTheme.textPrimary : Color(0xFF1F2937)),
               size: 24,
             ),
             SizedBox(width: AppTheme.spaceMd),
             Text(
               label,
               style: AppTheme.bodyLarge.copyWith(
-                color: isSelected ? Colors.black : AppTheme.textPrimary,
+                color: isSelected
+                    ? Colors.black
+                    : (isDarkMode ? AppTheme.textPrimary : Color(0xFF000000)),
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
             ),
@@ -565,13 +624,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showComingSoonDialog(String feature) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: AppTheme.surfaceElevated,
+          backgroundColor: isDarkMode
+              ? AppTheme.surfaceElevated
+              : Color(0xFFFFFFFF),
+          surfaceTintColor: isDarkMode ? null : Color(0xFFFFFFFF),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+            side: BorderSide(
+              color: isDarkMode ? AppTheme.surfaceElevated : Color(0xFFE5E7EB),
+              width: 1,
+            ),
           ),
           title: Row(
             children: [
@@ -580,21 +648,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Text(
                 'Coming Soon',
                 style: AppTheme.headlineMedium.copyWith(
-                  color: AppTheme.textPrimary,
+                  color: isDarkMode ? AppTheme.textPrimary : Color(0xFF000000),
                 ),
               ),
             ],
           ),
           content: Text(
             '$feature will be available in a future update. Stay tuned!',
-            style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
+            style: AppTheme.bodyMedium.copyWith(
+              color: isDarkMode ? AppTheme.textSecondary : Color(0xFF6B7280),
+            ),
           ),
           actions: [
             ElevatedButton(
               onPressed: () => Navigator.pop(context),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryBlue,
-                foregroundColor: Colors.black,
+                foregroundColor: isDarkMode ? Color(0xFF1E1E1E) : Colors.black,
               ),
               child: Text('Got it'),
             ),
@@ -605,13 +675,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _resetOnboarding() async {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: AppTheme.surfaceElevated,
+          backgroundColor: isDarkMode
+              ? AppTheme.surfaceElevated
+              : Color(0xFFFFFFFF),
+          surfaceTintColor: isDarkMode ? null : Color(0xFFFFFFFF),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+            side: BorderSide(
+              color: isDarkMode ? AppTheme.surfaceElevated : Color(0xFFE5E7EB),
+              width: 1,
+            ),
           ),
           title: Row(
             children: [
@@ -620,14 +699,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Text(
                 'Reset Onboarding',
                 style: AppTheme.headlineMedium.copyWith(
-                  color: AppTheme.textPrimary,
+                  color: isDarkMode ? AppTheme.textPrimary : Color(0xFF000000),
                 ),
               ),
             ],
           ),
           content: Text(
             'This will show the welcome tutorial again the next time you open the app. Continue?',
-            style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
+            style: AppTheme.bodyMedium.copyWith(
+              color: isDarkMode ? AppTheme.textSecondary : Color(0xFF6B7280),
+            ),
           ),
           actions: [
             TextButton(
@@ -635,7 +716,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Text(
                 'Cancel',
                 style: AppTheme.labelLarge.copyWith(
-                  color: AppTheme.textSecondary,
+                  color: isDarkMode
+                      ? AppTheme.textSecondary
+                      : Color(0xFF6B7280),
                 ),
               ),
             ),
@@ -643,7 +726,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onPressed: () => Navigator.pop(context, true),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryBlue,
-                foregroundColor: Colors.black,
+                foregroundColor: isDarkMode ? Color(0xFF1E1E1E) : Colors.black,
               ),
               child: Text('Reset'),
             ),
@@ -669,18 +752,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showDataManagementDialog() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: AppTheme.surfaceElevated,
+          backgroundColor: isDarkMode
+              ? AppTheme.surfaceElevated
+              : Color(0xFFFFFFFF),
+          surfaceTintColor: isDarkMode ? null : Color(0xFFFFFFFF),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+            side: BorderSide(
+              color: isDarkMode ? AppTheme.surfaceElevated : Color(0xFFE5E7EB),
+              width: 1,
+            ),
           ),
           title: Text(
             'Data & Storage',
             style: AppTheme.headlineMedium.copyWith(
-              color: AppTheme.textPrimary,
+              color: isDarkMode ? AppTheme.textPrimary : Color(0xFF000000),
             ),
           ),
           content: Column(
@@ -690,7 +782,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Text(
                 'Manage your app data',
                 style: AppTheme.bodyMedium.copyWith(
-                  color: AppTheme.textSecondary,
+                  color: isDarkMode
+                      ? AppTheme.textSecondary
+                      : Color(0xFF6B7280),
                 ),
               ),
               SizedBox(height: AppTheme.spaceLg),
@@ -720,7 +814,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text('Close'),
+              child: Text(
+                'Close',
+                style: AppTheme.labelLarge.copyWith(
+                  color: isDarkMode
+                      ? AppTheme.textSecondary
+                      : Color(0xFF6B7280),
+                ),
+              ),
             ),
           ],
         );
@@ -735,15 +836,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
     List<Color> gradient,
     VoidCallback onTap,
   ) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppTheme.radiusMd),
       child: Container(
         padding: EdgeInsets.all(AppTheme.spaceMd),
         decoration: BoxDecoration(
-          gradient: LinearGradient(colors: AppTheme.surfaceGradient),
+          gradient: LinearGradient(
+            colors: isDarkMode
+                ? [Color(0xFF2A2A2A), Color(0xFF1F1F1F)]
+                : [Color(0xFFFAFAFA), Color(0xFFF5F5F5)],
+          ),
           borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-          border: Border.all(color: AppTheme.surfaceElevated, width: 1),
+          border: Border.all(
+            color: isDarkMode ? AppTheme.surfaceElevated : Color(0xFFE5E7EB),
+            width: 1,
+          ),
         ),
         child: Row(
           children: [
@@ -763,7 +873,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Text(
                     title,
                     style: AppTheme.bodyLarge.copyWith(
-                      color: AppTheme.textPrimary,
+                      color: isDarkMode
+                          ? AppTheme.textPrimary
+                          : Color(0xFF000000),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -771,7 +883,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Text(
                     subtitle,
                     style: AppTheme.bodySmall.copyWith(
-                      color: AppTheme.textTertiary,
+                      color: isDarkMode
+                          ? AppTheme.textTertiary
+                          : Color(0xFF6B7280),
                     ),
                   ),
                 ],
@@ -784,13 +898,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showAboutDialog() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: AppTheme.surfaceElevated,
+          backgroundColor: isDarkMode
+              ? AppTheme.surfaceElevated
+              : Color(0xFFFFFFFF),
+          surfaceTintColor: isDarkMode ? null : Color(0xFFFFFFFF),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+            side: BorderSide(
+              color: isDarkMode ? AppTheme.surfaceElevated : Color(0xFFE5E7EB),
+              width: 1,
+            ),
           ),
           title: Column(
             children: [
@@ -800,13 +923,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   gradient: LinearGradient(colors: AppTheme.primaryGradient),
                   borderRadius: BorderRadius.circular(AppTheme.radiusMd),
                 ),
-                child: Icon(Icons.psychology, size: 40, color: Colors.black),
+                child: Icon(
+                  Icons.psychology,
+                  size: 40,
+                  color: isDarkMode ? Color(0xFF1E1E1E) : Colors.black,
+                ),
               ),
               SizedBox(height: AppTheme.spaceMd),
               Text(
                 'MyAI',
                 style: AppTheme.headlineLarge.copyWith(
-                  color: AppTheme.textPrimary,
+                  color: isDarkMode ? AppTheme.textPrimary : Color(0xFF000000),
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -826,7 +953,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Text(
                 'Your intelligent AI assistant powered by advanced language models.',
                 style: AppTheme.bodyMedium.copyWith(
-                  color: AppTheme.textSecondary,
+                  color: isDarkMode
+                      ? AppTheme.textSecondary
+                      : Color(0xFF6B7280),
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -834,7 +963,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Container(
                 padding: EdgeInsets.all(AppTheme.spaceMd),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: AppTheme.surfaceGradient),
+                  gradient: LinearGradient(
+                    colors: isDarkMode
+                        ? [Color(0xFF2A2A2A), Color(0xFF1F1F1F)]
+                        : [Color(0xFFF3F4F6), Color(0xFFF9FAFB)],
+                  ),
                   borderRadius: BorderRadius.circular(AppTheme.radiusMd),
                 ),
                 child: Column(
@@ -854,7 +987,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Text(
                 '© 2024 MyAI. All rights reserved.',
                 style: AppTheme.bodySmall.copyWith(
-                  color: AppTheme.textTertiary,
+                  color: isDarkMode ? AppTheme.textTertiary : Color(0xFF9CA3AF),
                 ),
               ),
             ],
@@ -862,7 +995,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text('Close'),
+              child: Text(
+                'Close',
+                style: AppTheme.labelLarge.copyWith(
+                  color: isDarkMode
+                      ? AppTheme.textSecondary
+                      : Color(0xFF6B7280),
+                ),
+              ),
             ),
           ],
         );
@@ -871,13 +1011,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildInfoRow(IconData icon, String text) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Row(
       children: [
         Icon(icon, color: AppTheme.primaryBlue, size: 18),
         SizedBox(width: AppTheme.spaceSm),
         Text(
           text,
-          style: AppTheme.bodySmall.copyWith(color: AppTheme.textSecondary),
+          style: AppTheme.bodySmall.copyWith(
+            color: isDarkMode ? AppTheme.textSecondary : Color(0xFF6B7280),
+          ),
         ),
       ],
     );
@@ -917,11 +1061,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showClearDataConfirmation() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: AppTheme.surfaceElevated,
+          backgroundColor: isDarkMode
+              ? AppTheme.surfaceElevated
+              : Color(0xFFFFFFFF),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppTheme.radiusLg),
           ),
@@ -932,19 +1080,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Text(
                 'Clear All Data?',
                 style: AppTheme.headlineMedium.copyWith(
-                  color: AppTheme.textPrimary,
+                  color: isDarkMode ? AppTheme.textPrimary : Color(0xFF000000),
                 ),
               ),
             ],
           ),
           content: Text(
             'This will delete all your chats, settings, and data. This action cannot be undone.',
-            style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
+            style: AppTheme.bodyMedium.copyWith(
+              color: isDarkMode ? AppTheme.textSecondary : Color(0xFF6B7280),
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text('Cancel'),
+              child: Text(
+                'Cancel',
+                style: AppTheme.labelLarge.copyWith(
+                  color: isDarkMode
+                      ? AppTheme.textSecondary
+                      : Color(0xFF6B7280),
+                ),
+              ),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -970,13 +1127,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildCard({required List<Widget> children}) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       margin: EdgeInsets.symmetric(horizontal: AppTheme.spaceSm),
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: AppTheme.surfaceGradient),
+        gradient: isDarkMode
+            ? LinearGradient(colors: AppTheme.surfaceGradient)
+            : LinearGradient(colors: [Color(0xFFFFFFFF), Color(0xFFFAFAFA)]),
         borderRadius: BorderRadius.circular(AppTheme.radiusLg),
         border: Border.all(
-          color: AppTheme.surfaceElevated.withOpacity(0.5),
+          color: isDarkMode
+              ? AppTheme.surfaceElevated.withOpacity(0.5)
+              : Color(0xFFE5E7EB),
           width: 1,
         ),
         boxShadow: AppTheme.cardShadow,
@@ -986,10 +1149,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildDivider() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Divider(
       height: 1,
       thickness: 1,
-      color: AppTheme.surfaceElevated.withOpacity(0.3),
+      color: isDarkMode
+          ? AppTheme.surfaceElevated.withOpacity(0.3)
+          : Color(0xFFE5E7EB),
       indent: AppTheme.spaceMd,
       endIndent: AppTheme.spaceMd,
     );

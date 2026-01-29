@@ -24,10 +24,10 @@ class _CapabilitiesScreenState extends State<CapabilitiesScreen> {
 
   Future<void> _loadCapabilities() async {
     await _settingsService.init();
-    
+
     final webSearch = await _settingsService.getWebSearchCapability();
     final quizArtifact = await _settingsService.getQuizArtifactCapability();
-    
+
     setState(() {
       _webSearchEnabled = webSearch;
       _quizArtifactEnabled = quizArtifact;
@@ -36,14 +36,14 @@ class _CapabilitiesScreenState extends State<CapabilitiesScreen> {
 
   Future<void> _toggleWebSearch(bool value) async {
     setState(() => _isLoading = true);
-    
+
     try {
       await _settingsService.setWebSearchCapability(value);
       setState(() {
         _webSearchEnabled = value;
         _isLoading = false;
       });
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Web Search ${value ? 'enabled' : 'disabled'}'),
@@ -65,14 +65,14 @@ class _CapabilitiesScreenState extends State<CapabilitiesScreen> {
 
   Future<void> _toggleQuizArtifact(bool value) async {
     setState(() => _isLoading = true);
-    
+
     try {
       await _settingsService.setQuizArtifactCapability(value);
       setState(() {
         _quizArtifactEnabled = value;
         _isLoading = false;
       });
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Quiz Artifact ${value ? 'enabled' : 'disabled'}'),
@@ -92,30 +92,42 @@ class _CapabilitiesScreenState extends State<CapabilitiesScreen> {
     }
   }
 
-  Widget _buildSectionHeader(String text) => Padding(
-    padding: EdgeInsets.fromLTRB(
-      AppTheme.spaceMd,
-      AppTheme.spaceLg,
-      AppTheme.spaceMd,
-      AppTheme.spaceSm,
-    ),
-    child: Text(
-      text.toUpperCase(),
-      style: AppTheme.labelMedium.copyWith(
-        color: AppTheme.textTertiary,
-        letterSpacing: 1.5,
+  Widget _buildSectionHeader(String text) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        AppTheme.spaceMd,
+        AppTheme.spaceLg,
+        AppTheme.spaceMd,
+        AppTheme.spaceSm,
       ),
-    ),
-  );
+      child: Text(
+        text.toUpperCase(),
+        style: AppTheme.labelMedium.copyWith(
+          color: isDarkMode ? AppTheme.textTertiary : Color(0xFF6B7280),
+          letterSpacing: 1.5,
+        ),
+      ),
+    );
+  }
 
   Widget _buildCard({required List<Widget> children}) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       margin: EdgeInsets.symmetric(horizontal: AppTheme.spaceSm),
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: AppTheme.surfaceGradient),
+        gradient: LinearGradient(
+          colors: isDarkMode
+              ? AppTheme.surfaceGradient
+              : [Color(0xFFFAFAFA), Color(0xFFF5F5F5)],
+        ),
         borderRadius: BorderRadius.circular(AppTheme.radiusLg),
         border: Border.all(
-          color: AppTheme.surfaceElevated.withOpacity(0.5),
+          color: isDarkMode
+              ? AppTheme.surfaceElevated.withOpacity(0.5)
+              : Color(0xFFE5E7EB),
           width: 1,
         ),
         boxShadow: AppTheme.cardShadow,
@@ -125,10 +137,14 @@ class _CapabilitiesScreenState extends State<CapabilitiesScreen> {
   }
 
   Widget _buildDivider() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Divider(
       height: 1,
       thickness: 1,
-      color: AppTheme.surfaceElevated.withOpacity(0.3),
+      color: isDarkMode
+          ? AppTheme.surfaceElevated.withOpacity(0.3)
+          : Color(0xFFE5E7EB),
       indent: AppTheme.spaceMd,
       endIndent: AppTheme.spaceMd,
     );
@@ -142,6 +158,8 @@ class _CapabilitiesScreenState extends State<CapabilitiesScreen> {
     required ValueChanged<bool> onChanged,
     List<Color>? gradient,
   }) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Padding(
       padding: EdgeInsets.all(AppTheme.spaceMd),
       child: Row(
@@ -166,7 +184,11 @@ class _CapabilitiesScreenState extends State<CapabilitiesScreen> {
                     ]
                   : null,
             ),
-            child: Icon(icon, color: AppTheme.textPrimary, size: 24),
+            child: Icon(
+              icon,
+              color: isDarkMode ? AppTheme.textPrimary : Colors.black,
+              size: 24,
+            ),
           ),
           SizedBox(width: AppTheme.spaceMd),
           Expanded(
@@ -176,7 +198,9 @@ class _CapabilitiesScreenState extends State<CapabilitiesScreen> {
                 Text(
                   title,
                   style: AppTheme.bodyLarge.copyWith(
-                    color: AppTheme.textPrimary,
+                    color: isDarkMode
+                        ? AppTheme.textPrimary
+                        : Color(0xFF000000),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -184,7 +208,9 @@ class _CapabilitiesScreenState extends State<CapabilitiesScreen> {
                 Text(
                   description,
                   style: AppTheme.bodySmall.copyWith(
-                    color: AppTheme.textTertiary,
+                    color: isDarkMode
+                        ? AppTheme.textTertiary
+                        : Color(0xFF6B7280),
                   ),
                 ),
               ],
@@ -194,8 +220,12 @@ class _CapabilitiesScreenState extends State<CapabilitiesScreen> {
             value: isEnabled,
             onChanged: _isLoading ? null : onChanged,
             activeColor: AppTheme.primaryBlue,
-            inactiveThumbColor: AppTheme.surfaceElevated,
-            inactiveTrackColor: AppTheme.surfaceElevated.withOpacity(0.5),
+            inactiveThumbColor: isDarkMode
+                ? AppTheme.surfaceElevated
+                : Color(0xFFCBD5E1),
+            inactiveTrackColor: isDarkMode
+                ? AppTheme.surfaceElevated.withOpacity(0.5)
+                : Color(0xFFE2E8F0),
           ),
         ],
       ),
@@ -204,15 +234,19 @@ class _CapabilitiesScreenState extends State<CapabilitiesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            AppTheme.backgroundGradientStart,
-            AppTheme.backgroundGradientEnd,
-          ],
+          colors: isDarkMode
+              ? [
+                  AppTheme.backgroundGradientStart,
+                  AppTheme.backgroundGradientEnd,
+                ]
+              : [Color(0xFFFAFAFA), Color(0xFFF5F5F5)],
         ),
       ),
       child: Scaffold(
@@ -223,10 +257,16 @@ class _CapabilitiesScreenState extends State<CapabilitiesScreen> {
           elevation: 0,
           flexibleSpace: Container(
             decoration: BoxDecoration(
-              gradient: LinearGradient(colors: AppTheme.glassGradient),
+              gradient: LinearGradient(
+                colors: isDarkMode
+                    ? AppTheme.glassGradient
+                    : [Color(0xFFFFFFFF), Color(0xFFFAFAFA)],
+              ),
               border: Border(
                 bottom: BorderSide(
-                  color: AppTheme.surfaceElevated.withOpacity(0.3),
+                  color: isDarkMode
+                      ? AppTheme.surfaceElevated.withOpacity(0.3)
+                      : Color(0xFFE5E7EB),
                   width: 0.5,
                 ),
               ),
@@ -316,7 +356,8 @@ class _CapabilitiesScreenState extends State<CapabilitiesScreen> {
                         _capabilityTile(
                           icon: Icons.search,
                           title: 'Web Search',
-                          description: 'Allow AI to search the web for current information',
+                          description:
+                              'Allow AI to search the web for current information',
                           isEnabled: _webSearchEnabled,
                           onChanged: _toggleWebSearch,
                           gradient: AppTheme.accentGradient,
@@ -325,7 +366,8 @@ class _CapabilitiesScreenState extends State<CapabilitiesScreen> {
                         _capabilityTile(
                           icon: Icons.quiz,
                           title: 'Quiz Artifact',
-                          description: 'Generate quizzes and learning materials',
+                          description:
+                              'Generate quizzes and learning materials',
                           isEnabled: _quizArtifactEnabled,
                           onChanged: _toggleQuizArtifact,
                           gradient: AppTheme.primaryGradient,
@@ -342,31 +384,49 @@ class _CapabilitiesScreenState extends State<CapabilitiesScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.info_outline,
-                                    color: AppTheme.primaryBlue,
-                                    size: 20,
-                                  ),
-                                  SizedBox(width: AppTheme.spaceSm),
-                                  Text(
-                                    'How Capabilities Work',
-                                    style: AppTheme.labelLarge.copyWith(
-                                      color: AppTheme.textSecondary,
-                                    ),
-                                  ),
-                                ],
+                              Builder(
+                                builder: (context) {
+                                  final isDarkMode =
+                                      Theme.of(context).brightness ==
+                                      Brightness.dark;
+                                  return Row(
+                                    children: [
+                                      Icon(
+                                        Icons.info_outline,
+                                        color: AppTheme.primaryBlue,
+                                        size: 20,
+                                      ),
+                                      SizedBox(width: AppTheme.spaceSm),
+                                      Text(
+                                        'How Capabilities Work',
+                                        style: AppTheme.labelLarge.copyWith(
+                                          color: isDarkMode
+                                              ? AppTheme.textSecondary
+                                              : Color(0xFF4B5563),
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
                               ),
                               SizedBox(height: AppTheme.spaceMd),
-                              Text(
-                                '• When enabled, capabilities are available to the AI immediately\n'
-                                '• Changes are saved automatically and persist across app restarts\n'
-                                '• Some features may require additional permissions or setup',
-                                style: AppTheme.bodySmall.copyWith(
-                                  color: AppTheme.textTertiary,
-                                  height: 1.5,
-                                ),
+                              Builder(
+                                builder: (context) {
+                                  final isDarkMode =
+                                      Theme.of(context).brightness ==
+                                      Brightness.dark;
+                                  return Text(
+                                    '• When enabled, capabilities are available to the AI immediately\n'
+                                    '• Changes are saved automatically and persist across app restarts\n'
+                                    '• Some features may require additional permissions or setup',
+                                    style: AppTheme.bodySmall.copyWith(
+                                      color: isDarkMode
+                                          ? AppTheme.textTertiary
+                                          : Color(0xFF6B7280),
+                                      height: 1.5,
+                                    ),
+                                  );
+                                },
                               ),
                             ],
                           ),

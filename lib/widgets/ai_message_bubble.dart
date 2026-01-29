@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import '../utils/theme.dart';
 import 'professional_message_widget.dart';
+import 'tts_speaker_icon.dart';
 
 class AiMessageBubble extends StatefulWidget {
   final String text;
@@ -11,6 +12,9 @@ class AiMessageBubble extends StatefulWidget {
   final List<Color> gradientColors;
   final String? imagePath; // Add image path support
   final bool detailedByDefault;
+  final Color? textColor;
+  final Function()? onRegenerate;
+  final int? messageIndex;
 
   const AiMessageBubble({
     super.key,
@@ -19,6 +23,9 @@ class AiMessageBubble extends StatefulWidget {
     required this.gradientColors,
     this.imagePath,
     this.detailedByDefault = false,
+    this.textColor,
+    this.onRegenerate,
+    this.messageIndex,
   });
 
   @override
@@ -87,28 +94,35 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
       child: InkWell(
         onTap: () => _toggleReaction(emoji),
         borderRadius: BorderRadius.circular(8),
-        child: AnimatedContainer(
-          duration: Duration(milliseconds: 150),
-          padding: EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? AppTheme.primaryBlue.withOpacity(0.25)
-                : Color(0xFF1E2530),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: isSelected
-                  ? AppTheme.primaryBlue.withOpacity(0.5)
-                  : Colors.transparent,
-              width: 1,
-            ),
-          ),
-          child: Icon(
-            icon,
-            size: 16,
-            color: isSelected
-                ? AppTheme.primaryBlue
-                : AppTheme.textSecondary.withOpacity(0.7),
-          ),
+        child: Builder(
+          builder: (context) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            return AnimatedContainer(
+              duration: Duration(milliseconds: 150),
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppTheme.primaryBlue.withOpacity(0.25)
+                    : (isDark ? Color(0xFF1E2530) : Color(0xFFF0F1F3)),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isSelected
+                      ? AppTheme.primaryBlue.withOpacity(0.5)
+                      : Colors.transparent,
+                  width: 1,
+                ),
+              ),
+              child: Icon(
+                icon,
+                size: 16,
+                color: isSelected
+                    ? AppTheme.primaryBlue
+                    : (isDark
+                          ? AppTheme.textSecondary.withOpacity(0.7)
+                          : Color(0xFF6B7280)),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -117,6 +131,7 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
   Widget _buildCopyButton() {
     return StatefulBuilder(
       builder: (context, setLocalState) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         return Material(
           color: Colors.transparent,
           child: InkWell(
@@ -130,13 +145,15 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
             child: Container(
               padding: EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Color(0xFF1E2530),
+                color: isDark ? Color(0xFF1E2530) : Color(0xFFF0F1F3),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
                 Icons.content_copy_rounded,
                 size: 16,
-                color: AppTheme.textSecondary.withOpacity(0.7),
+                color: isDark
+                    ? AppTheme.textSecondary.withOpacity(0.7)
+                    : Color(0xFF6B7280),
               ),
             ),
           ),
@@ -149,28 +166,26 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () {
-          // TODO: Implement regenerate functionality
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Regenerate coming soon'),
-              duration: Duration(seconds: 1),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        },
+        onTap: widget.onRegenerate,
         borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Color(0xFF1E2530),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            Icons.refresh_rounded,
-            size: 16,
-            color: AppTheme.textSecondary.withOpacity(0.7),
-          ),
+        child: Builder(
+          builder: (context) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            return Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isDark ? Color(0xFF1E2530) : Color(0xFFF0F1F3),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.refresh_rounded,
+                size: 16,
+                color: isDark
+                    ? AppTheme.textSecondary.withOpacity(0.7)
+                    : Color(0xFF6B7280),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -181,24 +196,30 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
 
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => Scaffold(
-          backgroundColor: Colors.black,
-          appBar: AppBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            leading: IconButton(
-              icon: Icon(Icons.close, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
+        builder: (context) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          return Scaffold(
+            backgroundColor: isDark ? Colors.black : Colors.white,
+            appBar: AppBar(
+              backgroundColor: isDark ? Colors.black87 : Colors.white,
+              elevation: 0,
+              leading: IconButton(
+                icon: Icon(
+                  Icons.close,
+                  color: isDark ? Colors.white : Colors.black,
+                ),
+                onPressed: () => Navigator.pop(context),
+              ),
             ),
-          ),
-          body: Center(
-            child: InteractiveViewer(
-              minScale: 0.5,
-              maxScale: 4.0,
-              child: Image.file(File(widget.imagePath!), fit: BoxFit.contain),
+            body: Center(
+              child: InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 4.0,
+                child: Image.file(File(widget.imagePath!), fit: BoxFit.contain),
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -208,6 +229,7 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
   Widget build(BuildContext context) {
     final formattedText = _formatAiResponse(widget.text);
     final isWelcomeMessage = widget.text.contains('Welcome');
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Welcome message: centered and large
     if (isWelcomeMessage) {
@@ -221,7 +243,7 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
                 widget.text,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: AppTheme.textPrimary,
+                  color: isDark ? AppTheme.textPrimary : Color(0xFF1F2937),
                   fontSize: 28,
                   fontWeight: FontWeight.w300,
                   height: 1.6,
@@ -295,7 +317,9 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
                         Text(
                           widget.text,
                           style: TextStyle(
-                            color: Colors.white,
+                            color: isDark
+                                ? (widget.textColor ?? Colors.white)
+                                : Colors.white,
                             fontSize: 15,
                             height: 1.5,
                           ),
@@ -349,6 +373,12 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
+                TTSSpeakerIcon(
+                  messageId: widget.text.hashCode.toString(),
+                  messageText: widget.text,
+                  isAiMessage: true,
+                ),
+                SizedBox(width: 6),
                 _buildCopyButton(),
                 SizedBox(width: 6),
                 _buildReactionButton('👍', Icons.thumb_up_rounded),

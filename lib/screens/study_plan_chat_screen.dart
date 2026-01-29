@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:math';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/study_bot_state.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -20,6 +21,9 @@ import '../widgets/quiz_artifact_widget.dart';
 import '../widgets/premium_study_plan_menu.dart';
 import '../widgets/premium_typing_indicator.dart';
 import '../widgets/premium_message_bubble.dart';
+import '../services/study_activity_service.dart';
+import '../services/study_notification_service.dart';
+import '../services/text_to_speech_service.dart';
 
 // Premium color palette matching bot creation and processing screens
 class PremiumColors {
@@ -203,6 +207,8 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   late ProgressTrackingService _progressService;
   late GamificationService _gamificationService;
   late AnalyticsService _analyticsService;
+  late StudyActivityService _studyActivityService;
+  late StudyNotificationService _studyNotificationService;
 
   bool _isPhase1 = false;
   bool _isPhase2 = false;
@@ -260,6 +266,8 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     _progressService = ProgressTrackingService();
     _gamificationService = GamificationService();
     _analyticsService = AnalyticsService();
+    _studyActivityService = StudyActivityService();
+    _studyNotificationService = StudyNotificationService();
     _storageService = StudyBotStorageService();
     _firebaseService = StudyBotFirebaseService();
 
@@ -696,6 +704,14 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   }
 
   Future<void> _addUserMessage(String text) async {
+    // Stop any active speech when user sends a new message
+    try {
+      await TextToSpeechService().stop();
+      print('[ChatScreen] 🔇 Stopped active speech on new user message');
+    } catch (e) {
+      print('[ChatScreen] ⚠️ Error stopping speech: $e');
+    }
+
     final message = StudyBotMessage(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       senderType: 'user',
@@ -851,6 +867,35 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
           print('[ChatScreen]    - Concept completed: $conceptCompleted');
           print('[ChatScreen]    - Module completed: $moduleCompleted');
           print('[ChatScreen]    - Trigger quiz: $triggerQuiz');
+
+          // 🔥 RECORD STUDY ACTIVITY - Track this message as a study interaction
+          try {
+            final streakData = await _studyActivityService.recordStudyActivity(
+              activityType: 'message',
+              botId: widget.botId,
+              metadata:
+                  'Message: ${userMessage.substring(0, min(userMessage.length, 50))}',
+            );
+
+            print('[ChatScreen] 📊 Study activity recorded:');
+            print('[ChatScreen]    - Streak: ${streakData.currentStreak}');
+            print(
+              '[ChatScreen]    - Incremented: ${streakData.streakIncremented}',
+            );
+
+            // Check if milestone should be notified
+            if (streakData.streakIncremented) {
+              final currentStreak = streakData.currentStreak;
+              if (_studyActivityService.shouldNotifyMilestone(currentStreak)) {
+                // Notify milestone
+                await _studyNotificationService.notifyStreakMilestone(
+                  currentStreak,
+                );
+              }
+            }
+          } catch (e) {
+            print('[ChatScreen] ⚠️ Could not record study activity: $e');
+          }
 
           setState(() {
             _botCurrentState = newState;
@@ -1726,18 +1771,29 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         child: Row(
           children: [
             // Attachment button
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: IconButton(
-                icon: Icon(Icons.add, color: Colors.white54),
-                onPressed: () {
-                  HapticFeedback.lightImpact();
-                  _showAttachmentOptions();
-                },
-              ),
+            Builder(
+              builder: (context) {
+                final isDarkMode =
+                    Theme.of(context).brightness == Brightness.dark;
+                return Container(
+                  decoration: BoxDecoration(
+                    color: isDarkMode
+                        ? Colors.white.withOpacity(0.08)
+                        : Color(0xFF1F2937).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: IconButton(
+                    icon: Icon(
+                      Icons.add,
+                      color: isDarkMode ? Colors.white54 : Color(0xFF6B7280),
+                    ),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      _showAttachmentOptions();
+                    },
+                  ),
+                );
+              },
             ),
             SizedBox(width: 12),
             // Text input
@@ -1758,28 +1814,41 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: TextField(
-                        controller: _inputController,
-                        enabled: !_isLoading,
-                        style: TextStyle(color: Colors.white, fontSize: 15),
-                        maxLines: 4,
-                        minLines: 1,
-                        decoration: InputDecoration(
-                          hintText: 'Message ${widget.botName ?? "AI"}...',
-                          hintStyle: TextStyle(
-                            color: Colors.white38,
-                            fontSize: 15,
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 12,
-                          ),
-                        ),
-                        onSubmitted: (text) {
-                          if (text.isNotEmpty && !_isLoading) {
-                            _addUserMessage(text);
-                          }
+                      child: Builder(
+                        builder: (context) {
+                          final isDarkMode =
+                              Theme.of(context).brightness == Brightness.dark;
+                          return TextField(
+                            controller: _inputController,
+                            enabled: !_isLoading,
+                            style: TextStyle(
+                              color: isDarkMode
+                                  ? Colors.white
+                                  : Color(0xFF000000),
+                              fontSize: 15,
+                            ),
+                            maxLines: 4,
+                            minLines: 1,
+                            decoration: InputDecoration(
+                              hintText: 'Message ${widget.botName ?? "AI"}...',
+                              hintStyle: TextStyle(
+                                color: isDarkMode
+                                    ? Colors.white38
+                                    : Color(0xFF9CA3AF),
+                                fontSize: 15,
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 12,
+                              ),
+                            ),
+                            onSubmitted: (text) {
+                              if (text.isNotEmpty && !_isLoading) {
+                                _addUserMessage(text);
+                              }
+                            },
+                          );
                         },
                       ),
                     ),
@@ -1811,25 +1880,39 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                       ]
                     : [],
               ),
-              child: IconButton(
-                icon: _isLoading
-                    ? SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation(Colors.white),
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : Icon(Icons.arrow_upward, color: Colors.white, size: 22),
-                onPressed: _isLoading
-                    ? null
-                    : () {
-                        if (_inputController.text.isNotEmpty) {
-                          HapticFeedback.mediumImpact();
-                          _addUserMessage(_inputController.text);
-                        }
-                      },
+              child: Builder(
+                builder: (context) {
+                  final isDarkMode =
+                      Theme.of(context).brightness == Brightness.dark;
+                  return IconButton(
+                    icon: _isLoading
+                        ? SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation(
+                                isDarkMode ? Colors.white : Color(0xFF000000),
+                              ),
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : Icon(
+                            Icons.arrow_upward,
+                            color: isDarkMode
+                                ? Colors.white
+                                : Color(0xFF6B7280),
+                            size: 22,
+                          ),
+                    onPressed: _isLoading
+                        ? null
+                        : () {
+                            if (_inputController.text.isNotEmpty) {
+                              HapticFeedback.mediumImpact();
+                              _addUserMessage(_inputController.text);
+                            }
+                          },
+                  );
+                },
               ),
             ),
           ],
@@ -3124,18 +3207,23 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
+        final isDarkMode = Theme.of(context).brightness == Brightness.dark;
         return AlertDialog(
-          backgroundColor: AppTheme.backgroundDeep,
+          backgroundColor: isDarkMode
+              ? AppTheme.backgroundDeep
+              : Color(0xFFFAFAFA),
           title: Text(
             '📝 Ready for a Quiz?',
             style: AppTheme.headlineSmall.copyWith(
-              color: AppTheme.textPrimary,
+              color: isDarkMode ? AppTheme.textPrimary : Color(0xFF1F2937),
               fontWeight: FontWeight.bold,
             ),
           ),
           content: Text(
             'Do you want to take a quiz now to test your knowledge, or would you prefer to do it later?',
-            style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
+            style: AppTheme.bodyMedium.copyWith(
+              color: isDarkMode ? AppTheme.textSecondary : Color(0xFF6B7280),
+            ),
           ),
           actions: [
             TextButton(
@@ -3146,7 +3234,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
               child: Text(
                 'Later',
                 style: AppTheme.bodyMedium.copyWith(
-                  color: AppTheme.textSecondary,
+                  color: isDarkMode
+                      ? AppTheme.textSecondary
+                      : Color(0xFF6B7280),
                 ),
               ),
             ),

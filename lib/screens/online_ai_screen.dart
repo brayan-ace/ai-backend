@@ -191,7 +191,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
           builder: (BuildContext context, StateSetter setModalState) {
             return Container(
               decoration: BoxDecoration(
-                color: AppTheme.backgroundDeep,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? AppTheme.backgroundDeep
+                    : Color(0xFFFFFFFF),
                 borderRadius: BorderRadius.only(
                   topLeft: Radius.circular(AppTheme.radiusLg),
                   topRight: Radius.circular(AppTheme.radiusLg),
@@ -208,7 +210,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                         width: 36,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: AppTheme.textTertiary.withValues(alpha: 0.4),
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? AppTheme.textTertiary.withValues(alpha: 0.4)
+                              : Color(0xFFD1D5DB),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -221,7 +225,11 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                             IconButton(
                               icon: Icon(
                                 Icons.close,
-                                color: AppTheme.textPrimary,
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? AppTheme.textPrimary
+                                    : Color(0xFF1F2937),
                                 size: 24,
                               ),
                               onPressed: () => Navigator.pop(context),
@@ -233,7 +241,11 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                 'Add to chat',
                                 textAlign: TextAlign.center,
                                 style: AppTheme.headlineMedium.copyWith(
-                                  color: AppTheme.textPrimary,
+                                  color:
+                                      Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? AppTheme.textPrimary
+                                      : Color(0xFF000000),
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -275,7 +287,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                       SizedBox(height: 28),
 
                       Divider(
-                        color: AppTheme.surfaceElevated.withValues(alpha: 0.3),
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? AppTheme.surfaceElevated.withValues(alpha: 0.3)
+                            : Color(0xFFE5E7EB),
                         height: 1,
                         thickness: 1,
                       ),
@@ -297,14 +311,22 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                             children: [
                               Icon(
                                 Icons.language,
-                                color: AppTheme.textPrimary,
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? AppTheme.textPrimary
+                                    : Color(0xFF1F2937),
                                 size: 24,
                               ),
                               SizedBox(width: 12),
                               Text(
                                 'Web search',
                                 style: AppTheme.bodyLarge.copyWith(
-                                  color: AppTheme.textPrimary,
+                                  color:
+                                      Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? AppTheme.textPrimary
+                                      : Color(0xFF000000),
                                   fontWeight: FontWeight.w400,
                                 ),
                               ),
@@ -328,7 +350,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                       ),
 
                       Divider(
-                        color: AppTheme.surfaceElevated.withValues(alpha: 0.3),
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? AppTheme.surfaceElevated.withValues(alpha: 0.3)
+                            : Color(0xFFE5E7EB),
                         height: 1,
                         thickness: 1,
                       ),
@@ -347,14 +371,22 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                             children: [
                               Icon(
                                 Icons.edit_outlined,
-                                color: AppTheme.textPrimary,
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? AppTheme.textPrimary
+                                    : Color(0xFF1F2937),
                                 size: 24,
                               ),
                               SizedBox(width: 12),
                               Text(
                                 'Use style',
                                 style: AppTheme.bodyLarge.copyWith(
-                                  color: AppTheme.textPrimary,
+                                  color:
+                                      Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? AppTheme.textPrimary
+                                      : Color(0xFF000000),
                                   fontWeight: FontWeight.w400,
                                 ),
                               ),
@@ -364,13 +396,21 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                     ? 'Detailed'
                                     : 'Normal',
                                 style: AppTheme.bodyMedium.copyWith(
-                                  color: AppTheme.textSecondary,
+                                  color:
+                                      Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? AppTheme.textSecondary
+                                      : Color(0xFF6B7280),
                                 ),
                               ),
                               SizedBox(width: 8),
                               Icon(
                                 Icons.chevron_right,
-                                color: AppTheme.textSecondary,
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? AppTheme.textSecondary
+                                    : Color(0xFF6B7280),
                                 size: 20,
                               ),
                             ],
@@ -401,22 +441,34 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
       child: Container(
         padding: EdgeInsets.symmetric(vertical: 32),
         decoration: BoxDecoration(
-          color: AppTheme.surfaceCard,
+          color: Theme.of(context).brightness == Brightness.dark
+              ? AppTheme.surfaceCard
+              : Color(0xFFF3F4F6),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: AppTheme.surfaceElevated.withValues(alpha: 0.5),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? AppTheme.surfaceElevated.withValues(alpha: 0.5)
+                : Color(0xFFE5E7EB),
             width: 1,
           ),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: AppTheme.textPrimary, size: 36),
+            Icon(
+              icon,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? AppTheme.textPrimary
+                  : Color(0xFF1F2937),
+              size: 36,
+            ),
             SizedBox(height: 14),
             Text(
               label,
               style: AppTheme.bodyMedium.copyWith(
-                color: AppTheme.textPrimary,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? AppTheme.textPrimary
+                    : Color(0xFF000000),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -433,7 +485,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
       builder: (BuildContext context) {
         return Container(
           decoration: BoxDecoration(
-            color: AppTheme.backgroundDeep,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? AppTheme.backgroundDeep
+                : Color(0xFFFFFFFF),
             borderRadius: BorderRadius.only(
               topLeft: Radius.circular(AppTheme.radiusLg),
               topRight: Radius.circular(AppTheme.radiusLg),
@@ -448,7 +502,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                   width: 36,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: AppTheme.textTertiary.withValues(alpha: 0.4),
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? AppTheme.textTertiary.withValues(alpha: 0.4)
+                        : Color(0xFFD1D5DB),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -457,7 +513,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                 Text(
                   'Use style',
                   style: AppTheme.headlineMedium.copyWith(
-                    color: AppTheme.textPrimary,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? AppTheme.textPrimary
+                        : Color(0xFF000000),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -479,7 +537,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                           Icons.flash_on_outlined,
                           color: _responseMode == 'normal'
                               ? AppTheme.primaryBlue
-                              : AppTheme.textPrimary,
+                              : (Theme.of(context).brightness == Brightness.dark
+                                    ? AppTheme.textPrimary
+                                    : Color(0xFF1F2937)),
                           size: 24,
                         ),
                         SizedBox(width: 12),
@@ -492,7 +552,10 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                 style: AppTheme.bodyLarge.copyWith(
                                   color: _responseMode == 'normal'
                                       ? AppTheme.primaryBlue
-                                      : AppTheme.textPrimary,
+                                      : (Theme.of(context).brightness ==
+                                                Brightness.dark
+                                            ? AppTheme.textPrimary
+                                            : Color(0xFF000000)),
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -500,7 +563,11 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                               Text(
                                 'Natural and conversational responses',
                                 style: AppTheme.bodySmall.copyWith(
-                                  color: AppTheme.textSecondary,
+                                  color:
+                                      Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? AppTheme.textSecondary
+                                      : Color(0xFF6B7280),
                                 ),
                               ),
                             ],
@@ -532,7 +599,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                           Icons.article_outlined,
                           color: _responseMode == 'detailed'
                               ? AppTheme.primaryBlue
-                              : AppTheme.textPrimary,
+                              : (Theme.of(context).brightness == Brightness.dark
+                                    ? AppTheme.textPrimary
+                                    : Color(0xFF1F2937)),
                           size: 24,
                         ),
                         SizedBox(width: 12),
@@ -545,7 +614,10 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                 style: AppTheme.bodyLarge.copyWith(
                                   color: _responseMode == 'detailed'
                                       ? AppTheme.primaryBlue
-                                      : AppTheme.textPrimary,
+                                      : (Theme.of(context).brightness ==
+                                                Brightness.dark
+                                            ? AppTheme.textPrimary
+                                            : Color(0xFF000000)),
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -553,7 +625,11 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                               Text(
                                 'Complete explanations and context',
                                 style: AppTheme.bodySmall.copyWith(
-                                  color: AppTheme.textSecondary,
+                                  color:
+                                      Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? AppTheme.textSecondary
+                                      : Color(0xFF6B7280),
                                 ),
                               ),
                             ],
@@ -586,13 +662,21 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
       builder: (BuildContext context) {
         return Container(
           decoration: BoxDecoration(
-            gradient: LinearGradient(colors: AppTheme.surfaceGradient),
+            gradient: Theme.of(context).brightness == Brightness.dark
+                ? LinearGradient(colors: AppTheme.surfaceGradient)
+                : LinearGradient(
+                    colors: [Color(0xFFFFFFFF), Color(0xFFFAFAFA)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
             borderRadius: BorderRadius.only(
               topLeft: Radius.circular(AppTheme.radiusXl),
               topRight: Radius.circular(AppTheme.radiusXl),
             ),
             border: Border.all(
-              color: AppTheme.surfaceElevated.withValues(alpha: 0.3),
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? AppTheme.surfaceElevated.withValues(alpha: 0.3)
+                  : Color(0xFFE5E7EB),
               width: 1,
             ),
           ),
@@ -606,7 +690,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: AppTheme.textTertiary.withValues(alpha: 0.3),
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? AppTheme.textTertiary.withValues(alpha: 0.3)
+                          : Color(0xFFD1D5DB),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -615,7 +701,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                   Text(
                     'Select AI Model',
                     style: AppTheme.headlineSmall.copyWith(
-                      color: AppTheme.textPrimary,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? AppTheme.textPrimary
+                          : Color(0xFF000000),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -675,16 +763,24 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
       child: Container(
         padding: EdgeInsets.all(AppTheme.spaceMd),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: isSelected
-                ? gradient.map((c) => c.withValues(alpha: 0.2)).toList()
-                : AppTheme.glassGradient,
-          ),
+          gradient: Theme.of(context).brightness == Brightness.dark
+              ? LinearGradient(
+                  colors: isSelected
+                      ? gradient.map((c) => c.withValues(alpha: 0.2)).toList()
+                      : AppTheme.glassGradient,
+                )
+              : LinearGradient(
+                  colors: isSelected
+                      ? [Color(0xFFF0F4FF), Color(0xFFF9FAFB)]
+                      : [Color(0xFFFAFAFA), Color(0xFFF5F5F5)],
+                ),
           borderRadius: BorderRadius.circular(AppTheme.radiusMd),
           border: Border.all(
-            color: isSelected
-                ? gradient[0]
-                : AppTheme.surfaceElevated.withValues(alpha: 0.5),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? (isSelected
+                      ? gradient[0]
+                      : AppTheme.surfaceElevated.withValues(alpha: 0.5))
+                : (isSelected ? gradient[0] : Color(0xFFE5E7EB)),
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -719,7 +815,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                   Text(
                     name,
                     style: AppTheme.bodyLarge.copyWith(
-                      color: AppTheme.textPrimary,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? AppTheme.textPrimary
+                          : Color(0xFF000000),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -727,7 +825,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                   Text(
                     description,
                     style: AppTheme.bodySmall.copyWith(
-                      color: AppTheme.textSecondary,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? AppTheme.textSecondary
+                          : Color(0xFF6B7280),
                     ),
                   ),
                 ],
@@ -1098,6 +1198,117 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
           );
         } catch (e) {
           _showSnackBar('Error saving AI response: $e', isError: true);
+        }
+      }
+    } else {
+      _logAndAddAiMessage('No response');
+    }
+  }
+
+  /// Regenerate the response for an AI message by resending the previous user message
+  Future<void> _regenerateResponse(int aiMessageIndex) async {
+    // Find the previous user message
+    int? userMessageIndex;
+    for (int i = aiMessageIndex - 1; i >= 0; i--) {
+      if (_messages[i].fromUser) {
+        userMessageIndex = i;
+        break;
+      }
+    }
+
+    if (userMessageIndex == null) {
+      _showSnackBar('Could not find previous message', isError: true);
+      return;
+    }
+
+    final userMessage = _messages[userMessageIndex];
+    final userText = userMessage.text;
+    final userImage = userMessage.imagePath;
+
+    if (userText.isEmpty) {
+      _showSnackBar('Previous message is empty', isError: true);
+      return;
+    }
+
+    // Remove the old AI response
+    setState(() {
+      if (aiMessageIndex < _messages.length) {
+        _messages.removeAt(aiMessageIndex);
+      }
+      _currentStatusMessage = userImage != null
+          ? 'Analyzing image...'
+          : 'Regenerating response...';
+      _messages.add(_Message(text: '', fromUser: false, isTyping: true));
+    });
+
+    String? response;
+
+    // Handle image if present
+    if (userImage != null && userImage.isNotEmpty) {
+      try {
+        final imageFile = File(userImage);
+        var bytes = await imageFile.readAsBytes();
+
+        if (bytes.length > 300000) {
+          bytes = await _compressImage(bytes, quality: 50);
+        }
+
+        final base64Image = base64Encode(bytes);
+
+        String mimeType = 'image/jpeg';
+        if (imageFile.path.toLowerCase().endsWith('.png')) {
+          mimeType = 'image/png';
+        } else if (imageFile.path.toLowerCase().endsWith('.gif')) {
+          mimeType = 'image/gif';
+        } else if (imageFile.path.toLowerCase().endsWith('.webp')) {
+          mimeType = 'image/webp';
+        }
+
+        response = await _geminiService.generateContentWithImage(
+          prompt: userText,
+          base64Image: base64Image,
+          mimeType: mimeType,
+        );
+      } catch (e, stackTrace) {
+        _showSnackBar('Error processing image: $e', isError: true);
+        print('Stack trace: $stackTrace');
+        response = '⚠️ Error processing image: $e';
+      }
+    } else {
+      // Regular text message - resend to backend
+      try {
+        final fullResp = await ApiService.sendRaw('chat', {
+          'message': userText,
+        });
+
+        final reply = fullResp['reply'] ?? fullResp['response'] ?? '';
+        print(
+          '🔍 [REGENERATE RAW AI RESPONSE] length=${reply.toString().length}',
+        );
+        response = reply.isEmpty ? null : reply.toString();
+      } catch (e) {
+        response = '⚠️ Regeneration failed: $e';
+      }
+    }
+
+    setState(() {
+      if (_messages.isNotEmpty && _messages.last.isTyping) {
+        _messages.removeLast();
+      }
+    });
+
+    if (response != null) {
+      await _streamResponse(response);
+
+      if (_isSavingEnabled && _currentChatId != null) {
+        try {
+          await _chatStorage.saveMessage(
+            chatId: _currentChatId!,
+            text: response,
+            fromUser: false,
+          );
+        } catch (e) {
+          _showSnackBar('Error saving regenerated response: $e', isError: true);
         }
       }
     } else {
@@ -1744,7 +1955,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
       builder: (ctx) {
         return Container(
           decoration: BoxDecoration(
-            color: AppTheme.surfaceElevated.withOpacity(0.95),
+            color: Theme.of(ctx).brightness == Brightness.dark
+                ? AppTheme.surfaceElevated.withOpacity(0.95)
+                : Color(0xFFFFFFFF),
             borderRadius: BorderRadius.only(
               topLeft: Radius.circular(24),
               topRight: Radius.circular(24),
@@ -1773,7 +1986,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: AppTheme.textTertiary,
+                      color: Theme.of(ctx).brightness == Brightness.dark
+                          ? AppTheme.textTertiary
+                          : Color(0xFFD1D5DB),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -1788,13 +2003,20 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
-                          color: AppTheme.textPrimary,
+                          color: Theme.of(ctx).brightness == Brightness.dark
+                              ? AppTheme.textPrimary
+                              : Color(0xFF000000),
                           letterSpacing: 0.3,
                         ),
                       ),
                       Spacer(),
                       IconButton(
-                        icon: Icon(Icons.close, color: AppTheme.textTertiary),
+                        icon: Icon(
+                          Icons.close,
+                          color: Theme.of(ctx).brightness == Brightness.dark
+                              ? AppTheme.textTertiary
+                              : Color(0xFF6B7280),
+                        ),
                         onPressed: () => Navigator.pop(ctx),
                       ),
                     ],
@@ -1802,7 +2024,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                 ),
 
                 Divider(
-                  color: AppTheme.surfaceElevated.withOpacity(0.5),
+                  color: Theme.of(ctx).brightness == Brightness.dark
+                      ? AppTheme.surfaceElevated.withOpacity(0.5)
+                      : Color(0xFFE5E7EB),
                   height: 20,
                   thickness: 0.5,
                 ),
@@ -1981,10 +2205,14 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
         child: Container(
           padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: AppTheme.surfaceElevated.withOpacity(0.3),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? AppTheme.surfaceElevated.withOpacity(0.3)
+                : Color(0xFFF3F4F6),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: AppTheme.primaryBlue.withOpacity(0.1),
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? AppTheme.primaryBlue.withOpacity(0.1)
+                  : Color(0xFFE5E7EB),
               width: 0.5,
             ),
           ),
@@ -2020,7 +2248,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: AppTheme.textPrimary,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? AppTheme.textPrimary
+                            : Color(0xFF000000),
                         letterSpacing: 0.2,
                       ),
                     ),
@@ -2029,7 +2259,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                       subtitle,
                       style: TextStyle(
                         fontSize: 12,
-                        color: AppTheme.textSecondary,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? AppTheme.textSecondary
+                            : Color(0xFF6B7280),
                         letterSpacing: 0.1,
                       ),
                     ),
@@ -2039,7 +2271,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
               Icon(
                 Icons.arrow_forward_ios_rounded,
                 size: 14,
-                color: AppTheme.textTertiary,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? AppTheme.textTertiary
+                    : Color(0xFFD1D5DB),
               ),
             ],
           ),
@@ -2062,15 +2296,21 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
           return Container(
             padding: EdgeInsets.all(16),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppTheme.primaryBlue.withOpacity(0.1),
-                  AppTheme.primaryBlue.withOpacity(0.05),
-                ],
-              ),
+              gradient: Theme.of(context).brightness == Brightness.dark
+                  ? LinearGradient(
+                      colors: [
+                        AppTheme.primaryBlue.withOpacity(0.1),
+                        AppTheme.primaryBlue.withOpacity(0.05),
+                      ],
+                    )
+                  : LinearGradient(
+                      colors: [Color(0xFFEFF6FF), Color(0xFFF0F9FF)],
+                    ),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: AppTheme.primaryBlue.withOpacity(0.2),
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? AppTheme.primaryBlue.withOpacity(0.2)
+                    : Color(0xFFBFDBFE),
                 width: 1,
               ),
             ),
@@ -2108,7 +2348,11 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                           Text(
                             displayName,
                             style: TextStyle(
-                              color: AppTheme.textPrimary,
+                              color:
+                                  Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? AppTheme.textPrimary
+                                  : Color(0xFF000000),
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                             ),
@@ -2117,7 +2361,11 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                             Text(
                               email,
                               style: TextStyle(
-                                color: AppTheme.textSecondary,
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? AppTheme.textSecondary
+                                    : Color(0xFF6B7280),
                                 fontSize: 13,
                               ),
                               overflow: TextOverflow.ellipsis,
@@ -2138,9 +2386,14 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                     icon: Icon(Icons.logout, size: 18),
                     label: Text('Sign Out'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.textSecondary,
+                      foregroundColor:
+                          Theme.of(context).brightness == Brightness.dark
+                          ? AppTheme.textSecondary
+                          : Color(0xFF6B7280),
                       side: BorderSide(
-                        color: AppTheme.textTertiary.withOpacity(0.3),
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? AppTheme.textTertiary.withOpacity(0.3)
+                            : Color(0xFFD1D5DB),
                       ),
                       padding: EdgeInsets.symmetric(vertical: 10),
                       shape: RoundedRectangleBorder(
@@ -2637,44 +2890,76 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                                 ),
                                               ),
                                             Expanded(
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    chatTitle,
-                                                    style: AppTheme.bodyLarge
-                                                        .copyWith(
-                                                          color: AppTheme
-                                                              .textPrimary,
-                                                          fontWeight:
-                                                              FontWeight.w500,
-                                                        ),
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                  ),
-                                                  Text(
-                                                    '${chat['messageCount']} messages',
-                                                    style: AppTheme.bodySmall
-                                                        .copyWith(
-                                                          color: AppTheme
-                                                              .textTertiary,
-                                                        ),
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                  ),
-                                                ],
+                                              child: Builder(
+                                                builder: (context) {
+                                                  final isDarkMode =
+                                                      Theme.of(
+                                                        context,
+                                                      ).brightness ==
+                                                      Brightness.dark;
+                                                  return Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Text(
+                                                        chatTitle,
+                                                        style: AppTheme
+                                                            .bodyLarge
+                                                            .copyWith(
+                                                              color: isDarkMode
+                                                                  ? AppTheme
+                                                                        .textPrimary
+                                                                  : Color(
+                                                                      0xFF000000,
+                                                                    ),
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w500,
+                                                            ),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                      ),
+                                                      Text(
+                                                        '${chat['messageCount']} messages',
+                                                        style: AppTheme
+                                                            .bodySmall
+                                                            .copyWith(
+                                                              color: isDarkMode
+                                                                  ? AppTheme
+                                                                        .textTertiary
+                                                                  : Color(
+                                                                      0xFF6B7280,
+                                                                    ),
+                                                            ),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                      ),
+                                                    ],
+                                                  );
+                                                },
                                               ),
                                             ),
-                                            Text(
-                                              timeStr,
-                                              style: AppTheme.bodySmall
-                                                  .copyWith(
-                                                    color:
-                                                        AppTheme.textTertiary,
-                                                  ),
+                                            Builder(
+                                              builder: (context) {
+                                                final isDarkMode =
+                                                    Theme.of(
+                                                      context,
+                                                    ).brightness ==
+                                                    Brightness.dark;
+                                                return Text(
+                                                  timeStr,
+                                                  style: AppTheme.bodySmall
+                                                      .copyWith(
+                                                        color: isDarkMode
+                                                            ? AppTheme
+                                                                  .textTertiary
+                                                            : Color(0xFF9CA3AF),
+                                                      ),
+                                                );
+                                              },
                                             ),
                                           ],
                                         ),
@@ -2839,45 +3124,85 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                                           ),
                                                         ),
                                                       Expanded(
-                                                        child: Text(
-                                                          chatTitle,
-                                                          style: AppTheme
-                                                              .bodyLarge
-                                                              .copyWith(
-                                                                color: AppTheme
-                                                                    .textPrimary,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w500,
-                                                              ),
-                                                          maxLines: 1,
-                                                          overflow: TextOverflow
-                                                              .ellipsis,
+                                                        child: Builder(
+                                                          builder: (context) {
+                                                            final isDarkMode =
+                                                                Theme.of(
+                                                                  context,
+                                                                ).brightness ==
+                                                                Brightness.dark;
+                                                            return Text(
+                                                              chatTitle,
+                                                              style: AppTheme
+                                                                  .bodyLarge
+                                                                  .copyWith(
+                                                                    color:
+                                                                        isDarkMode
+                                                                        ? AppTheme
+                                                                              .textPrimary
+                                                                        : Color(
+                                                                            0xFF000000,
+                                                                          ),
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w500,
+                                                                  ),
+                                                              maxLines: 1,
+                                                              overflow:
+                                                                  TextOverflow
+                                                                      .ellipsis,
+                                                            );
+                                                          },
                                                         ),
                                                       ),
                                                     ],
                                                   ),
-                                                  Text(
-                                                    '${chat['messageCount']} messages',
-                                                    style: AppTheme.bodySmall
-                                                        .copyWith(
-                                                          color: AppTheme
-                                                              .textTertiary,
-                                                        ),
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
+                                                  Builder(
+                                                    builder: (context) {
+                                                      final isDarkMode =
+                                                          Theme.of(
+                                                            context,
+                                                          ).brightness ==
+                                                          Brightness.dark;
+                                                      return Text(
+                                                        '${chat['messageCount']} messages',
+                                                        style: AppTheme
+                                                            .bodySmall
+                                                            .copyWith(
+                                                              color: isDarkMode
+                                                                  ? AppTheme
+                                                                        .textTertiary
+                                                                  : Color(
+                                                                      0xFF6B7280,
+                                                                    ),
+                                                            ),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                      );
+                                                    },
                                                   ),
                                                 ],
                                               ),
                                             ),
-                                            Text(
-                                              timeStr,
-                                              style: AppTheme.bodySmall
-                                                  .copyWith(
-                                                    color:
-                                                        AppTheme.textTertiary,
-                                                  ),
+                                            Builder(
+                                              builder: (context) {
+                                                final isDarkMode =
+                                                    Theme.of(
+                                                      context,
+                                                    ).brightness ==
+                                                    Brightness.dark;
+                                                return Text(
+                                                  timeStr,
+                                                  style: AppTheme.bodySmall
+                                                      .copyWith(
+                                                        color: isDarkMode
+                                                            ? AppTheme
+                                                                  .textTertiary
+                                                            : Color(0xFF9CA3AF),
+                                                      ),
+                                                );
+                                              },
                                             ),
                                           ],
                                         ),
@@ -2970,17 +3295,25 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
               preferredSize: Size.fromHeight(60),
               child: Container(
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      AppTheme.backgroundDeep.withOpacity(0.95),
-                      AppTheme.backgroundDeep.withOpacity(0.9),
-                    ],
-                  ),
+                  gradient: Theme.of(context).brightness == Brightness.dark
+                      ? LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            AppTheme.backgroundDeep.withOpacity(0.95),
+                            AppTheme.backgroundDeep.withOpacity(0.9),
+                          ],
+                        )
+                      : LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Color(0xFFFAFAFA), Color(0xFFF5F5F5)],
+                        ),
                   border: Border(
                     bottom: BorderSide(
-                      color: AppTheme.surfaceElevated.withOpacity(0.1),
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? AppTheme.surfaceElevated.withOpacity(0.1)
+                          : Color(0xFFE5E7EB),
                       width: 0.5,
                     ),
                   ),
@@ -2999,9 +3332,13 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                     margin: EdgeInsets.only(left: 16),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: AppTheme.surfaceCard.withOpacity(0.8),
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? AppTheme.surfaceCard.withOpacity(0.8)
+                          : Color(0xFFFFFFFF),
                       border: Border.all(
-                        color: AppTheme.surfaceElevated.withOpacity(0.2),
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? AppTheme.surfaceElevated.withOpacity(0.2)
+                            : Color(0xFFE5E7EB),
                         width: 1,
                       ),
                     ),
@@ -3009,7 +3346,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                       key: OnboardingConfig.hamburgerMenuKey,
                       icon: Icon(
                         Icons.menu,
-                        color: AppTheme.textPrimary,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? AppTheme.textPrimary
+                            : Color(0xFF1F2937),
                         size: 20,
                       ),
                       onPressed: () => _scaffoldKey.currentState?.openDrawer(),
@@ -3026,10 +3365,14 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: AppTheme.surfaceCard.withOpacity(0.6),
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? AppTheme.surfaceCard.withOpacity(0.6)
+                            : Color(0xFFF3F4F6),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: AppTheme.surfaceElevated.withOpacity(0.3),
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? AppTheme.surfaceElevated.withOpacity(0.3)
+                              : Color(0xFFE5E7EB),
                           width: 1,
                         ),
                       ),
@@ -3052,7 +3395,10 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                           SizedBox(width: 6),
                           Icon(
                             Icons.keyboard_arrow_down,
-                            color: AppTheme.textSecondary,
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                ? AppTheme.textSecondary
+                                : Color(0xFF6B7280),
                             size: 18,
                           ),
                         ],
@@ -3065,9 +3411,13 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                       margin: EdgeInsets.only(right: 16),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: AppTheme.surfaceCard.withOpacity(0.8),
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? AppTheme.surfaceCard.withOpacity(0.8)
+                            : Color(0xFFFFFFFF),
                         border: Border.all(
-                          color: AppTheme.surfaceElevated.withOpacity(0.2),
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? AppTheme.surfaceElevated.withOpacity(0.2)
+                              : Color(0xFFE5E7EB),
                           width: 1,
                         ),
                       ),
@@ -3076,7 +3426,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                           _responseMode == 'detailed'
                               ? Icons.menu_book
                               : Icons.flash_on,
-                          color: AppTheme.textPrimary,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? AppTheme.textPrimary
+                              : Color(0xFF1F2937),
                           size: 20,
                         ),
                         tooltip: _responseMode == 'detailed'
@@ -3095,16 +3447,22 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                       margin: EdgeInsets.only(right: 16),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: AppTheme.surfaceCard.withOpacity(0.8),
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? AppTheme.surfaceCard.withOpacity(0.8)
+                            : Color(0xFFFFFFFF),
                         border: Border.all(
-                          color: AppTheme.surfaceElevated.withOpacity(0.2),
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? AppTheme.surfaceElevated.withOpacity(0.2)
+                              : Color(0xFFE5E7EB),
                           width: 1,
                         ),
                       ),
                       child: IconButton(
                         icon: Icon(
                           Icons.more_vert,
-                          color: AppTheme.textPrimary,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? AppTheme.textPrimary
+                              : Color(0xFF1F2937),
                           size: 20,
                         ),
                         onPressed: _openMenu,
@@ -3196,6 +3554,11 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                                     AppTheme.surfaceGradient,
                                                 detailedByDefault:
                                                     _responseMode == 'detailed',
+                                                messageIndex: i,
+                                                onRegenerate: !m.fromUser
+                                                    ? () =>
+                                                          _regenerateResponse(i)
+                                                    : null,
                                               ),
                                             ),
                                             Padding(
@@ -3225,8 +3588,17 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                                 Colors.grey.shade800,
                                               ]
                                             : AppTheme.surfaceGradient,
+                                        textColor:
+                                            Theme.of(context).brightness ==
+                                                Brightness.light
+                                            ? Colors.white
+                                            : AppTheme.textPrimary,
                                         detailedByDefault:
                                             _responseMode == 'detailed',
+                                        messageIndex: i,
+                                        onRegenerate: !m.fromUser
+                                            ? () => _regenerateResponse(i)
+                                            : null,
                                       ),
                                     );
                                   },
@@ -3240,10 +3612,16 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                     if (!_isFullScreen)
                       Container(
                         decoration: BoxDecoration(
-                          color: AppTheme.backgroundDeep,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? AppTheme.backgroundDeep
+                              : Color(0xFFFAFAFA),
                           border: Border(
                             top: BorderSide(
-                              color: AppTheme.surfaceElevated.withOpacity(0.1),
+                              color:
+                                  Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? AppTheme.surfaceElevated.withOpacity(0.1)
+                                  : Color(0xFFE5E7EB),
                               width: 0.5,
                             ),
                           ),
@@ -3262,12 +3640,20 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                 margin: EdgeInsets.only(bottom: 16),
                                 padding: EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.surfaceCard,
+                                  color:
+                                      Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? AppTheme.surfaceCard
+                                      : Color(0xFFF3F4F6),
                                   borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
-                                    color: AppTheme.surfaceElevated.withOpacity(
-                                      0.3,
-                                    ),
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? AppTheme.surfaceElevated.withOpacity(
+                                            0.3,
+                                          )
+                                        : Color(0xFFE5E7EB),
                                     width: 1,
                                   ),
                                 ),
@@ -3294,7 +3680,13 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                             _selectedFileName ??
                                                 'Image selected',
                                             style: AppTheme.bodyMedium.copyWith(
-                                              color: AppTheme.textPrimary,
+                                              color:
+                                                  Theme.of(
+                                                        context,
+                                                      ).brightness ==
+                                                      Brightness.dark
+                                                  ? AppTheme.textPrimary
+                                                  : Color(0xFF000000),
                                               fontWeight: FontWeight.w500,
                                             ),
                                             maxLines: 2,
@@ -3304,7 +3696,13 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                           Text(
                                             'Attached to message',
                                             style: AppTheme.bodySmall.copyWith(
-                                              color: AppTheme.textTertiary,
+                                              color:
+                                                  Theme.of(
+                                                        context,
+                                                      ).brightness ==
+                                                      Brightness.dark
+                                                  ? AppTheme.textTertiary
+                                                  : Color(0xFF6B7280),
                                             ),
                                           ),
                                         ],
@@ -3313,7 +3711,11 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                     IconButton(
                                       icon: Icon(
                                         Icons.close,
-                                        color: AppTheme.textTertiary,
+                                        color:
+                                            Theme.of(context).brightness ==
+                                                Brightness.dark
+                                            ? AppTheme.textTertiary
+                                            : Color(0xFF6B7280),
                                         size: 20,
                                       ),
                                       onPressed: () {
@@ -3336,12 +3738,12 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                 maxHeight: 120,
                               ),
                               decoration: BoxDecoration(
-                                color: AppTheme.surfaceCard,
+                                color: AppTheme.surfaceCardFromContext(context),
                                 borderRadius: BorderRadius.circular(28),
                                 border: Border.all(
-                                  color: AppTheme.surfaceElevated.withOpacity(
-                                    0.2,
-                                  ),
+                                  color: AppTheme.surfaceElevatedFromContext(
+                                    context,
+                                  ).withOpacity(0.2),
                                   width: 1,
                                 ),
                                 boxShadow: [
@@ -3361,7 +3763,10 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                     child: IconButton(
                                       icon: Icon(
                                         Icons.add,
-                                        color: AppTheme.textSecondary,
+                                        color:
+                                            AppTheme.textSecondaryFromContext(
+                                              context,
+                                            ),
                                         size: 22,
                                       ),
                                       onPressed: _showInputOptionsBottomSheet,
@@ -3382,7 +3787,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                       maxLines: null,
                                       keyboardType: TextInputType.multiline,
                                       style: AppTheme.bodyLarge.copyWith(
-                                        color: AppTheme.textPrimary,
+                                        color: AppTheme.textPrimaryFromContext(
+                                          context,
+                                        ),
                                         fontSize: 16,
                                         height: 1.4,
                                       ),
@@ -3392,7 +3799,10 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                       decoration: InputDecoration(
                                         hintText: 'Message $_selectedModel...',
                                         hintStyle: AppTheme.bodyMedium.copyWith(
-                                          color: AppTheme.textTertiary,
+                                          color:
+                                              AppTheme.textTertiaryFromContext(
+                                                context,
+                                              ),
                                           fontSize: 16,
                                         ),
                                         border: InputBorder.none,
@@ -3414,7 +3824,10 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                     child: IconButton(
                                       icon: Icon(
                                         Icons.mic_none,
-                                        color: AppTheme.textSecondary,
+                                        color:
+                                            AppTheme.textSecondaryFromContext(
+                                              context,
+                                            ),
                                         size: 22,
                                       ),
                                       onPressed: _toggleListening,
@@ -3473,7 +3886,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                     greeting,
                     textAlign: TextAlign.center,
                     style: AppTheme.displayMedium.copyWith(
-                      color: AppTheme.textPrimary,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white
+                          : Color(0xFF000000),
                       fontWeight: FontWeight.w600,
                       fontSize: 36,
                       height: 1.2,
@@ -3488,10 +3903,18 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 24, vertical: 20),
                 decoration: BoxDecoration(
-                  color: AppTheme.surfaceCard.withOpacity(0.6),
+                  color: Theme.of(context).brightness == Brightness.light
+                      ? AppTheme.surfaceCardFromContext(
+                          context,
+                        ).withOpacity(0.6)
+                      : AppTheme.surfaceCard.withOpacity(0.6),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: AppTheme.surfaceElevated.withOpacity(0.3),
+                    color: Theme.of(context).brightness == Brightness.light
+                        ? AppTheme.surfaceElevatedFromContext(
+                            context,
+                          ).withOpacity(0.3)
+                        : AppTheme.surfaceElevated.withOpacity(0.3),
                     width: 1,
                   ),
                 ),

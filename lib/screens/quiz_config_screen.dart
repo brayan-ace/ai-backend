@@ -30,8 +30,10 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Dialog(
-      backgroundColor: AppTheme.backgroundDeep,
+      backgroundColor: isDarkMode ? AppTheme.backgroundDeep : Color(0xFFFAFAFA),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppTheme.radiusMd),
       ),
@@ -45,14 +47,16 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
             Text(
               '🎯 Quiz Configuration',
               style: AppTheme.headlineSmall.copyWith(
-                color: AppTheme.textPrimary,
+                color: isDarkMode ? AppTheme.textPrimary : Color(0xFF1F2937),
                 fontWeight: FontWeight.bold,
               ),
             ),
             SizedBox(height: AppTheme.spaceSm),
             Text(
               'Module: ${widget.moduleName}',
-              style: AppTheme.bodySmall.copyWith(color: AppTheme.textSecondary),
+              style: AppTheme.bodySmall.copyWith(
+                color: isDarkMode ? AppTheme.textSecondary : Color(0xFF6B7280),
+              ),
             ),
             SizedBox(height: AppTheme.spaceMd),
 
@@ -60,7 +64,7 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
             Text(
               'Question Types',
               style: AppTheme.labelMedium.copyWith(
-                color: AppTheme.textPrimary,
+                color: isDarkMode ? AppTheme.textPrimary : Color(0xFF1F2937),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -74,6 +78,7 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
               onChanged: (value) {
                 setState(() => _questionType = value!);
               },
+              isDarkMode: isDarkMode,
             ),
             SizedBox(height: AppTheme.spaceSm),
             _buildRadioTile(
@@ -83,6 +88,7 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
               onChanged: (value) {
                 setState(() => _questionType = value!);
               },
+              isDarkMode: isDarkMode,
             ),
             SizedBox(height: AppTheme.spaceSm),
             _buildRadioTile(
@@ -92,6 +98,7 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
               onChanged: (value) {
                 setState(() => _questionType = value!);
               },
+              isDarkMode: isDarkMode,
             ),
 
             SizedBox(height: AppTheme.spaceMd),
@@ -101,7 +108,7 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
               Text(
                 'MCQ Questions',
                 style: AppTheme.labelMedium.copyWith(
-                  color: AppTheme.textPrimary,
+                  color: isDarkMode ? AppTheme.textPrimary : Color(0xFF1F2937),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -122,7 +129,7 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
               Text(
                 'Text Questions',
                 style: AppTheme.labelMedium.copyWith(
-                  color: AppTheme.textPrimary,
+                  color: isDarkMode ? AppTheme.textPrimary : Color(0xFF1F2937),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -143,7 +150,7 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
             Container(
               padding: EdgeInsets.all(AppTheme.spaceSm),
               decoration: BoxDecoration(
-                color: AppTheme.surfaceCard,
+                color: isDarkMode ? AppTheme.surfaceCard : Color(0xFFF3F4F6),
                 borderRadius: BorderRadius.circular(AppTheme.radiusSm),
                 border: Border.all(
                   color: AppTheme.primaryBlue.withOpacity(0.2),
@@ -159,7 +166,9 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
                         Text(
                           '🔍 Web Search for Context',
                           style: AppTheme.bodyMedium.copyWith(
-                            color: AppTheme.textPrimary,
+                            color: isDarkMode
+                                ? AppTheme.textPrimary
+                                : Color(0xFF1F2937),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -167,7 +176,9 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
                         Text(
                           'Enhance questions with latest information',
                           style: AppTheme.bodySmall.copyWith(
-                            color: AppTheme.textSecondary,
+                            color: isDarkMode
+                                ? AppTheme.textSecondary
+                                : Color(0xFF6B7280),
                           ),
                         ),
                       ],
@@ -191,7 +202,9 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
             Container(
               padding: EdgeInsets.all(AppTheme.spaceSm),
               decoration: BoxDecoration(
-                color: AppTheme.primaryBlue.withOpacity(0.1),
+                color: AppTheme.primaryBlue.withOpacity(
+                  isDarkMode ? 0.1 : 0.05,
+                ),
                 borderRadius: BorderRadius.circular(AppTheme.radiusSm),
               ),
               child: Column(
@@ -200,7 +213,9 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
                   Text(
                     '📊 Quiz Summary',
                     style: AppTheme.bodyMedium.copyWith(
-                      color: AppTheme.textPrimary,
+                      color: isDarkMode
+                          ? AppTheme.textPrimary
+                          : Color(0xFF1F2937),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -209,21 +224,27 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
                     Text(
                       '• $_mcqCount multiple choice questions',
                       style: AppTheme.bodySmall.copyWith(
-                        color: AppTheme.textSecondary,
+                        color: isDarkMode
+                            ? AppTheme.textSecondary
+                            : Color(0xFF6B7280),
                       ),
                     ),
                   ] else if (_questionType == 'text') ...[
                     Text(
                       '• $_textCount text questions',
                       style: AppTheme.bodySmall.copyWith(
-                        color: AppTheme.textSecondary,
+                        color: isDarkMode
+                            ? AppTheme.textSecondary
+                            : Color(0xFF6B7280),
                       ),
                     ),
                   ] else ...[
                     Text(
                       '• $_mcqCount MCQ + $_textCount text questions',
                       style: AppTheme.bodySmall.copyWith(
-                        color: AppTheme.textSecondary,
+                        color: isDarkMode
+                            ? AppTheme.textSecondary
+                            : Color(0xFF6B7280),
                       ),
                     ),
                   ],
@@ -233,7 +254,9 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
                         ? '• Enhanced with web search'
                         : '• Using module content only',
                     style: AppTheme.bodySmall.copyWith(
-                      color: AppTheme.textSecondary,
+                      color: isDarkMode
+                          ? AppTheme.textSecondary
+                          : Color(0xFF6B7280),
                     ),
                   ),
                 ],
@@ -249,7 +272,9 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
                   child: ElevatedButton(
                     onPressed: () => Navigator.pop(context),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.surfaceCard,
+                      backgroundColor: isDarkMode
+                          ? AppTheme.surfaceCard
+                          : Color(0xFFF3F4F6),
                       padding: EdgeInsets.symmetric(vertical: AppTheme.spaceMd),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(AppTheme.radiusMd),
@@ -258,7 +283,9 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
                     child: Text(
                       'Cancel',
                       style: AppTheme.labelMedium.copyWith(
-                        color: AppTheme.textPrimary,
+                        color: isDarkMode
+                            ? AppTheme.textPrimary
+                            : Color(0xFF1F2937),
                       ),
                     ),
                   ),
@@ -310,6 +337,7 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
     required String value,
     required String groupValue,
     required ValueChanged<String?> onChanged,
+    required bool isDarkMode,
   }) {
     return InkWell(
       onTap: () => onChanged(value),
@@ -317,8 +345,8 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
         padding: EdgeInsets.all(AppTheme.spaceSm),
         decoration: BoxDecoration(
           color: groupValue == value
-              ? AppTheme.primaryBlue.withOpacity(0.15)
-              : AppTheme.surfaceCard,
+              ? AppTheme.primaryBlue.withOpacity(isDarkMode ? 0.15 : 0.1)
+              : (isDarkMode ? AppTheme.surfaceCard : Color(0xFFF3F4F6)),
           borderRadius: BorderRadius.circular(AppTheme.radiusSm),
           border: Border.all(
             color: groupValue == value
@@ -339,7 +367,7 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
               child: Text(
                 title,
                 style: AppTheme.bodyMedium.copyWith(
-                  color: AppTheme.textPrimary,
+                  color: isDarkMode ? AppTheme.textPrimary : Color(0xFF1F2937),
                   fontWeight: groupValue == value
                       ? FontWeight.w600
                       : FontWeight.normal,

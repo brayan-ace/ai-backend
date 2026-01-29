@@ -85,15 +85,19 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            AppTheme.backgroundGradientStart,
-            AppTheme.backgroundGradientEnd,
-          ],
+          colors: isDarkMode
+              ? [
+                  AppTheme.backgroundGradientStart,
+                  AppTheme.backgroundGradientEnd,
+                ]
+              : [Color(0xFFFAFAFA), Color(0xFFF5F5F5)],
         ),
       ),
       child: Scaffold(
@@ -103,17 +107,26 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
           elevation: 0,
           flexibleSpace: Container(
             decoration: BoxDecoration(
-              gradient: LinearGradient(colors: AppTheme.glassGradient),
+              gradient: LinearGradient(
+                colors: isDarkMode
+                    ? AppTheme.glassGradient
+                    : [Color(0xFFFFFFFF), Color(0xFFFAFAFA)],
+              ),
               border: Border(
                 bottom: BorderSide(
-                  color: AppTheme.surfaceElevated.withOpacity(0.15),
+                  color: isDarkMode
+                      ? AppTheme.surfaceElevated.withOpacity(0.15)
+                      : Color(0xFFE5E7EB),
                   width: 0.5,
                 ),
               ),
             ),
           ),
           leading: IconButton(
-            icon: Icon(Icons.arrow_back, color: AppTheme.textPrimary),
+            icon: Icon(
+              Icons.arrow_back,
+              color: isDarkMode ? AppTheme.textPrimary : Color(0xFF1F2937),
+            ),
             onPressed: () => Navigator.pop(context),
           ),
           title: ShaderMask(
@@ -135,36 +148,52 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
               // Search Bar
               Padding(
                 padding: EdgeInsets.all(AppTheme.spaceMd),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: AppTheme.surfaceCard,
-                    borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-                    border: Border.all(
-                      color: AppTheme.surfaceElevated.withOpacity(0.3),
-                      width: 1,
-                    ),
-                  ),
-                  child: TextField(
-                    onChanged: _filterChats,
-                    style: AppTheme.bodyMedium.copyWith(
-                      color: AppTheme.textPrimary,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'Search chats...',
-                      hintStyle: AppTheme.bodyMedium.copyWith(
-                        color: AppTheme.textTertiary,
+                child: Builder(
+                  builder: (context) {
+                    final isDarkMode =
+                        Theme.of(context).brightness == Brightness.dark;
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: isDarkMode
+                            ? AppTheme.surfaceCard
+                            : Color(0xFFFFFFFF),
+                        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                        border: Border.all(
+                          color: isDarkMode
+                              ? AppTheme.surfaceElevated.withOpacity(0.3)
+                              : Color(0xFFE5E7EB),
+                          width: 1,
+                        ),
                       ),
-                      prefixIcon: Icon(
-                        Icons.search,
-                        color: AppTheme.textSecondary,
+                      child: TextField(
+                        onChanged: _filterChats,
+                        style: AppTheme.bodyMedium.copyWith(
+                          color: isDarkMode
+                              ? AppTheme.textPrimary
+                              : Color(0xFF000000),
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'Search chats...',
+                          hintStyle: AppTheme.bodyMedium.copyWith(
+                            color: isDarkMode
+                                ? AppTheme.textTertiary
+                                : Color(0xFF9CA3AF),
+                          ),
+                          prefixIcon: Icon(
+                            Icons.search,
+                            color: isDarkMode
+                                ? AppTheme.textSecondary
+                                : Color(0xFF6B7280),
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: AppTheme.spaceMd,
+                            vertical: AppTheme.spaceMd,
+                          ),
+                        ),
                       ),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: AppTheme.spaceMd,
-                        vertical: AppTheme.spaceMd,
-                      ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
               ),
 
@@ -187,7 +216,11 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
                               padding: EdgeInsets.all(AppTheme.spaceLg),
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
-                                  colors: AppTheme.surfaceGradient,
+                                  colors:
+                                      Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? AppTheme.surfaceGradient
+                                      : [Color(0xFFF3F4F6), Color(0xFFF9FAFB)],
                                 ),
                                 shape: BoxShape.circle,
                               ),
@@ -196,7 +229,11 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
                                     ? Icons.chat_bubble_outline
                                     : Icons.search_off,
                                 size: 64,
-                                color: AppTheme.textTertiary,
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? AppTheme.textTertiary
+                                    : Color(0xFF9CA3AF),
                               ),
                             ),
                             SizedBox(height: AppTheme.spaceLg),
@@ -205,7 +242,11 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
                                   ? 'No chats yet'
                                   : 'No results found',
                               style: AppTheme.headlineMedium.copyWith(
-                                color: AppTheme.textSecondary,
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? AppTheme.textSecondary
+                                    : Color(0xFF1F2937),
                               ),
                             ),
                             SizedBox(height: AppTheme.spaceSm),
@@ -214,7 +255,11 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
                                   ? 'Start a conversation to see it here'
                                   : 'Try a different search term',
                               style: AppTheme.bodyMedium.copyWith(
-                                color: AppTheme.textTertiary,
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? AppTheme.textTertiary
+                                    : Color(0xFF6B7280),
                               ),
                             ),
                           ],
@@ -228,20 +273,24 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
                         itemBuilder: (context, index) {
                           final chat = _filteredChats[index];
                           final isStarred = chat['isStarred'] ?? false;
+                          final isDarkMode =
+                              Theme.of(context).brightness == Brightness.dark;
 
                           return Container(
                             margin: EdgeInsets.only(bottom: AppTheme.spaceMd),
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
-                                colors: AppTheme.surfaceGradient,
+                                colors: isDarkMode
+                                    ? AppTheme.surfaceGradient
+                                    : [Color(0xFFFAFAFA), Color(0xFFF5F5F5)],
                               ),
                               borderRadius: BorderRadius.circular(
                                 AppTheme.radiusLg,
                               ),
                               border: Border.all(
-                                color: AppTheme.surfaceElevated.withOpacity(
-                                  0.5,
-                                ),
+                                color: isDarkMode
+                                    ? AppTheme.surfaceElevated.withOpacity(0.5)
+                                    : Color(0xFFE5E7EB),
                                 width: 1,
                               ),
                               boxShadow: AppTheme.cardShadow,
@@ -288,7 +337,9 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
                                             chat['title'] ?? 'Untitled Chat',
                                             style: AppTheme.headlineSmall
                                                 .copyWith(
-                                                  color: AppTheme.textPrimary,
+                                                  color: isDarkMode
+                                                      ? AppTheme.textPrimary
+                                                      : Color(0xFF000000),
                                                   fontWeight: FontWeight.bold,
                                                 ),
                                             maxLines: 1,
@@ -298,7 +349,9 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
                                           Text(
                                             chat['lastMessage'] ?? '',
                                             style: AppTheme.bodySmall.copyWith(
-                                              color: AppTheme.textSecondary,
+                                              color: isDarkMode
+                                                  ? AppTheme.textSecondary
+                                                  : Color(0xFF6B7280),
                                             ),
                                             maxLines: 2,
                                             overflow: TextOverflow.ellipsis,
@@ -315,13 +368,17 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
                                         Text(
                                           _formatTimestamp(chat['timestamp']),
                                           style: AppTheme.bodySmall.copyWith(
-                                            color: AppTheme.textTertiary,
+                                            color: isDarkMode
+                                                ? AppTheme.textTertiary
+                                                : Color(0xFF9CA3AF),
                                           ),
                                         ),
                                         SizedBox(height: 4),
                                         Icon(
                                           Icons.chevron_right,
-                                          color: AppTheme.textTertiary,
+                                          color: isDarkMode
+                                              ? AppTheme.textTertiary
+                                              : Color(0xFFD1D5DB),
                                           size: 20,
                                         ),
                                       ],
