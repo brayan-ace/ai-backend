@@ -245,6 +245,11 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   // Quiz tracking
   int? _currentQuizId;
 
+  // Artifact tracking - for persistent artifacts like quizzes
+  Map<String, Map<String, dynamic>> _artifacts =
+      {}; // Map of artifactId -> artifact data
+  String? _lastQuizArtifactId; // Track the last quiz artifact for reopening
+
   // Backend URL
   static const String _backendUrl = String.fromEnvironment(
     'BACKEND_URL',
@@ -1597,7 +1602,13 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
 
                           final msg = _messages[index];
                           final isBot = msg.senderType == 'bot';
+                          final isArtifact = msg.senderType == 'artifact';
                           final isLastMessage = index == _messages.length - 1;
+
+                          // Handle artifact messages
+                          if (isArtifact) {
+                            return _buildArtifactCard(msg);
+                          }
 
                           return PremiumMessageBubble(
                             message: msg.text,
@@ -1663,6 +1674,100 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                 _buildPremiumInputArea(),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Quick Action Chips for common responses
+  Widget _buildArtifactCard(StudyBotMessage message) {
+    final artifactId = message.metadata?['artifactId'] as String?;
+    final artifactType = message.metadata?['type'] as String? ?? 'quiz';
+
+    if (artifactId == null) {
+      return SizedBox.shrink();
+    }
+
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: GestureDetector(
+        onTap: () {
+          if (artifactType == 'quiz') {
+            _openQuizArtifact(artifactId);
+          }
+        },
+        child: Container(
+          margin: EdgeInsets.only(bottom: 12),
+          padding: EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDarkMode ? Color(0xFF1E1E2E) : Color(0xFFF5F5F7),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: AppTheme.primaryBlue.withOpacity(0.3),
+              width: 2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primaryBlue.withOpacity(0.1),
+                blurRadius: 8,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryBlue.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.quiz,
+                      color: AppTheme.primaryBlue,
+                      size: 20,
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Quiz Artifact',
+                          style: AppTheme.labelMedium.copyWith(
+                            color: isDarkMode
+                                ? Colors.white
+                                : Color(0xFF1F2937),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Tap to review or retake the quiz',
+                          style: AppTheme.bodySmall.copyWith(
+                            color: isDarkMode
+                                ? Color(0xFFA0A0A0)
+                                : Color(0xFF6B7280),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    color: AppTheme.primaryBlue,
+                    size: 16,
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
@@ -3466,6 +3571,26 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     // Track quiz start
     _analyticsService.trackQuizStart(quiz);
 
+    // Generate artifact ID and store the quiz
+    final artifactId = 'quiz_${DateTime.now().millisecondsSinceEpoch}';
+    _lastQuizArtifactId = artifactId;
+    _artifacts[artifactId] = quiz;
+
+    // Add artifact card to messages to show it can be reopened
+    setState(() {
+      _messages.add(
+        StudyBotMessage(
+          id: artifactId,
+          text: 'Quiz Artifact',
+          senderType: 'artifact',
+          timestamp: DateTime.now(),
+          metadata: {'type': 'quiz', 'artifactId': artifactId},
+        ),
+      );
+    });
+
+    _scrollToBottom();
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -3494,6 +3619,57 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                     await _recordMilestone('Quiz completed', 'quiz_completion');
 
                     _sendMessageToBackend('I\'ve completed the quiz review.');
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryBlue,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppTheme.spaceLg,
+                      vertical: AppTheme.spaceMd,
+                    ),
+                  ),
+                  child: Text(
+                    'Close Quiz',
+                    style: AppTheme.labelMedium.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Show quiz artifact from the message list
+  void _openQuizArtifact(String artifactId) {
+    final quiz = _artifacts[artifactId];
+    if (quiz == null) return;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.all(AppTheme.spaceMd),
+          child: Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.85,
+            ),
+            child: Column(
+              children: [
+                Expanded(
+                  child: QuizArtifactWidget(
+                    quizData: quiz,
+                    onExplainAnswer: _handleExplainAnswer,
+                  ),
+                ),
+                SizedBox(height: AppTheme.spaceMd),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primaryBlue,

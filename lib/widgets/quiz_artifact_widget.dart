@@ -9,14 +9,19 @@ typedef ExplanationRequestCallback =
       String currentExplanation,
     );
 
+typedef ScoreUpdateCallback =
+    void Function(int correctAnswers, int totalQuestions, double percentage);
+
 class QuizArtifactWidget extends StatefulWidget {
   final Map<String, dynamic> quizData;
   final ExplanationRequestCallback? onExplainAnswer;
+  final ScoreUpdateCallback? onScoreUpdate;
 
   const QuizArtifactWidget({
     Key? key,
     required this.quizData,
     this.onExplainAnswer,
+    this.onScoreUpdate,
   }) : super(key: key);
 
   @override
@@ -27,6 +32,7 @@ class _QuizArtifactWidgetState extends State<QuizArtifactWidget> {
   int _currentTab = 0;
   final PageController _pageController = PageController();
   late Map<int, String> _currentExplanations = {};
+  late Map<int, String> _selectedAnswers = {}; // Track user's selected answers
 
   @override
   void initState() {
@@ -36,6 +42,11 @@ class _QuizArtifactWidgetState extends State<QuizArtifactWidget> {
       final answer = answers[i] as Map<String, dynamic>? ?? {};
       final explanation = answer['explanation'] as String? ?? '';
       _currentExplanations[i] = explanation;
+    }
+    // Initialize selected answers map
+    final questions = widget.quizData['questions'] as List<dynamic>? ?? [];
+    for (int i = 0; i < questions.length; i++) {
+      _selectedAnswers[i] = '';
     }
   }
 
@@ -47,21 +58,26 @@ class _QuizArtifactWidgetState extends State<QuizArtifactWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final questions = widget.quizData['questions'] as List<dynamic>? ?? [];
     final answers = widget.quizData['answers'] as List<dynamic>? ?? [];
 
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.surfaceCard,
+        color: isDarkMode ? AppTheme.surfaceCard : Color(0xFFFAFAFA),
         borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-        border: Border.all(color: AppTheme.primaryBlue.withOpacity(0.2)),
+        border: Border.all(
+          color: isDarkMode
+              ? AppTheme.primaryBlue.withOpacity(0.2)
+              : Color(0xFFE5E7EB),
+        ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
             decoration: BoxDecoration(
-              color: AppTheme.backgroundDeep,
+              color: isDarkMode ? AppTheme.backgroundDeep : Color(0xFFF3F4F6),
               borderRadius: BorderRadius.vertical(
                 top: Radius.circular(AppTheme.radiusMd),
               ),
@@ -73,10 +89,16 @@ class _QuizArtifactWidgetState extends State<QuizArtifactWidget> {
                     label: 'Questions',
                     index: 0,
                     icon: '❓',
+                    isDarkMode: isDarkMode,
                   ),
                 ),
                 Expanded(
-                  child: _buildTabButton(label: 'Answers', index: 1, icon: '✅'),
+                  child: _buildTabButton(
+                    label: 'Answers',
+                    index: 1,
+                    icon: '✅',
+                    isDarkMode: isDarkMode,
+                  ),
                 ),
               ],
             ),
@@ -93,8 +115,8 @@ class _QuizArtifactWidgetState extends State<QuizArtifactWidget> {
                 });
               },
               children: [
-                _buildQuestionsTab(questions),
-                _buildAnswersTab(answers),
+                _buildQuestionsTab(questions, isDarkMode),
+                _buildAnswersTab(answers, isDarkMode),
               ],
             ),
           ),
@@ -107,10 +129,26 @@ class _QuizArtifactWidgetState extends State<QuizArtifactWidget> {
     required String label,
     required int index,
     required String icon,
+    required bool isDarkMode,
   }) {
     final isActive = _currentTab == index;
     return GestureDetector(
       onTap: () {
+        // Prevent navigation to answers tab if questions not answered
+        if (index == 1 && !_allQuestionsAnswered()) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Please answer all questions first'),
+              backgroundColor: AppTheme.error,
+              duration: Duration(seconds: 2),
+            ),
+          );
+          return;
+        }
+        // Calculate and send score when navigating to answers
+        if (index == 1 && _allQuestionsAnswered()) {
+          _calculateAndSendScore();
+        }
         _pageController.animateToPage(
           index,
           duration: Duration(milliseconds: 300),
@@ -141,7 +179,9 @@ class _QuizArtifactWidgetState extends State<QuizArtifactWidget> {
                 style: AppTheme.labelMedium.copyWith(
                   color: isActive
                       ? AppTheme.primaryBlue
-                      : AppTheme.textSecondary,
+                      : (isDarkMode
+                            ? AppTheme.textSecondary
+                            : Color(0xFF6B7280)),
                   fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
@@ -152,12 +192,50 @@ class _QuizArtifactWidgetState extends State<QuizArtifactWidget> {
     );
   }
 
-  Widget _buildQuestionsTab(List<dynamic> questions) {
+  bool _allQuestionsAnswered() {
+    final questions = widget.quizData['questions'] as List<dynamic>? ?? [];
+    for (int i = 0; i < questions.length; i++) {
+      if ((_selectedAnswers[i] ?? '').isEmpty) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  void _calculateAndSendScore() {
+    final questions = widget.quizData['questions'] as List<dynamic>? ?? [];
+    final answers = widget.quizData['answers'] as List<dynamic>? ?? [];
+    
+    int correctCount = 0;
+    for (int i = 0; i < questions.length; i++) {
+      final answer = answers[i] as Map<String, dynamic>?;
+      if (answer == null) continue;
+      
+      final correctAnswer = (answer['correct_answer'] as String?) ?? (answer['answer'] as String?) ?? '';
+      final userAnswer = _selectedAnswers[i] ?? '';
+      
+      if (correctAnswer.isNotEmpty && userAnswer.isNotEmpty && correctAnswer.toLowerCase() == userAnswer.toLowerCase()) {
+        correctCount++;
+      }
+    }
+    
+    final total = questions.length;
+    final percentage = total > 0 ? (correctCount / total * 100).round() : 0;
+    
+    // Call the score update callback
+    widget.onScoreUpdate?.call(correctCount, total, percentage.toDouble());
+    
+    print('[QuizArtifactWidget] Quiz Score: $correctCount/$total (${percentage}%)');
+  }
+
+  Widget _buildQuestionsTab(List<dynamic> questions, bool isDarkMode) {
     if (questions.isEmpty) {
       return Center(
         child: Text(
           'No questions available',
-          style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
+          style: AppTheme.bodyMedium.copyWith(
+            color: isDarkMode ? AppTheme.textSecondary : Color(0xFF6B7280),
+          ),
         ),
       );
     }
@@ -186,7 +264,7 @@ class _QuizArtifactWidgetState extends State<QuizArtifactWidget> {
         return Padding(
           padding: EdgeInsets.only(bottom: AppTheme.spaceMd),
           child: Card(
-            color: AppTheme.surfaceElevated,
+            color: isDarkMode ? AppTheme.surfaceElevated : Color(0xFFFAFAFA),
             margin: EdgeInsets.zero,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppTheme.radiusMd),
@@ -222,7 +300,9 @@ class _QuizArtifactWidgetState extends State<QuizArtifactWidget> {
                         child: Text(
                           type.toUpperCase(),
                           style: AppTheme.bodySmall.copyWith(
-                            color: AppTheme.textSecondary,
+                            color: isDarkMode
+                                ? AppTheme.textSecondary
+                                : Color(0xFF6B7280),
                             fontStyle: FontStyle.italic,
                           ),
                         ),
@@ -233,7 +313,9 @@ class _QuizArtifactWidgetState extends State<QuizArtifactWidget> {
                   Text(
                     text,
                     style: AppTheme.bodyMedium.copyWith(
-                      color: AppTheme.textPrimary,
+                      color: isDarkMode
+                          ? AppTheme.textPrimary
+                          : Color(0xFF1F2937),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -245,10 +327,52 @@ class _QuizArtifactWidgetState extends State<QuizArtifactWidget> {
                         for (int i = 0; i < options.length; i++)
                           Padding(
                             padding: EdgeInsets.only(bottom: AppTheme.spaceSm),
-                            child: Text(
-                              '${String.fromCharCode(65 + i)}. ${options[i]}',
-                              style: AppTheme.bodySmall.copyWith(
-                                color: AppTheme.textSecondary,
+                            child: GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _selectedAnswers[index] = options[i];
+                                });
+                              },
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: AppTheme.spaceMd,
+                                  vertical: AppTheme.spaceSm,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _selectedAnswers[index] == options[i]
+                                      ? AppTheme.primaryBlue.withOpacity(0.2)
+                                      : (isDarkMode
+                                            ? AppTheme.surfaceCard
+                                            : Color(0xFFFFFFFF)),
+                                  borderRadius: BorderRadius.circular(
+                                    AppTheme.radiusSm,
+                                  ),
+                                  border: Border.all(
+                                    color: _selectedAnswers[index] == options[i]
+                                        ? AppTheme.primaryBlue
+                                        : (isDarkMode
+                                              ? AppTheme.textSecondary
+                                                    .withOpacity(0.3)
+                                              : Color(0xFFE5E7EB)),
+                                    width: _selectedAnswers[index] == options[i]
+                                        ? 2
+                                        : 1,
+                                  ),
+                                ),
+                                child: Text(
+                                  '${String.fromCharCode(65 + i)}. ${options[i]}',
+                                  style: AppTheme.bodySmall.copyWith(
+                                    color: _selectedAnswers[index] == options[i]
+                                        ? AppTheme.primaryBlue
+                                        : (isDarkMode
+                                              ? AppTheme.textSecondary
+                                              : Color(0xFF6B7280)),
+                                    fontWeight:
+                                        _selectedAnswers[index] == options[i]
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -264,12 +388,14 @@ class _QuizArtifactWidgetState extends State<QuizArtifactWidget> {
     );
   }
 
-  Widget _buildAnswersTab(List<dynamic> answers) {
+  Widget _buildAnswersTab(List<dynamic> answers, bool isDarkMode) {
     if (answers.isEmpty) {
       return Center(
         child: Text(
           'No answers available',
-          style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
+          style: AppTheme.bodyMedium.copyWith(
+            color: isDarkMode ? AppTheme.textSecondary : Color(0xFF6B7280),
+          ),
         ),
       );
     }
@@ -300,7 +426,7 @@ class _QuizArtifactWidgetState extends State<QuizArtifactWidget> {
         return Padding(
           padding: EdgeInsets.only(bottom: AppTheme.spaceMd),
           child: Card(
-            color: AppTheme.surfaceElevated,
+            color: isDarkMode ? AppTheme.surfaceElevated : Color(0xFFFAFAFA),
             margin: EdgeInsets.zero,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppTheme.radiusMd),
@@ -336,7 +462,9 @@ class _QuizArtifactWidgetState extends State<QuizArtifactWidget> {
                         child: Text(
                           type.toUpperCase(),
                           style: AppTheme.bodySmall.copyWith(
-                            color: AppTheme.textSecondary,
+                            color: isDarkMode
+                                ? AppTheme.textSecondary
+                                : Color(0xFF6B7280),
                             fontStyle: FontStyle.italic,
                           ),
                         ),
@@ -367,7 +495,9 @@ class _QuizArtifactWidgetState extends State<QuizArtifactWidget> {
                         Text(
                           answerText,
                           style: AppTheme.bodySmall.copyWith(
-                            color: AppTheme.textPrimary,
+                            color: isDarkMode
+                                ? AppTheme.textPrimary
+                                : Color(0xFF1F2937),
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -387,7 +517,9 @@ class _QuizArtifactWidgetState extends State<QuizArtifactWidget> {
                     Text(
                       _currentExplanations[index] ?? explanation,
                       style: AppTheme.bodySmall.copyWith(
-                        color: AppTheme.textSecondary,
+                        color: isDarkMode
+                            ? AppTheme.textSecondary
+                            : Color(0xFF6B7280),
                         height: 1.5,
                       ),
                     ),

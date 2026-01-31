@@ -2317,7 +2317,8 @@ app.post("/api/generate-quiz", async (req, res) => {
         questionType,
         mcqCount,
         textCount,
-        useWebSearch: false, // Disable web search for now to avoid external dependency issues
+        useWebSearch: useWebSearch !== false, // Enable web search to fetch relevant context online
+        topic: topic, // Pass topic for web search queries
       });
     } catch (promptErr) {
       console.error(

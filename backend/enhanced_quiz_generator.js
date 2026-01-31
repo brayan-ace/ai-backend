@@ -200,6 +200,80 @@ async function getUserStudyPlan(botId, userId) {
 }
 
 /**
+ * Fetch relevant context from web search to enhance quiz generation
+ * Ensures questions are based on current, meaningful information
+ */
+async function getWebSearchContext(topic, gradeLevel) {
+  try {
+    console.log(
+      `[EnhancedQuiz] Searching web for: "${topic}" at ${gradeLevel} level`,
+    );
+
+    const searchQuery = `${topic} ${gradeLevel} education key concepts`;
+
+    // Use Groq's web search capability through their API
+    const groqApiKey = process.env.GROQ_API_KEY;
+    if (!groqApiKey) {
+      console.warn("[EnhancedQuiz] Cannot perform web search - no API key");
+      return "";
+    }
+
+    // Build search context prompt
+    const searchPrompt = `Search for and summarize key facts and concepts about "${topic}" at the ${gradeLevel} education level.
+    
+Focus on:
+1. Core concepts and definitions
+2. Real-world applications
+3. Common misconceptions
+4. Key facts that would make good quiz questions
+5. Recent developments or examples
+
+Provide a brief summary (2-3 sentences) of the most important information that would help create meaningful quiz questions.`;
+
+    const response = await axios.post(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        model: "openai/gpt-oss-20b",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a research assistant. Provide factual, educational information suitable for quiz generation. Be concise but thorough.",
+          },
+          {
+            role: "user",
+            content: searchPrompt,
+          },
+        ],
+        max_tokens: 500,
+        temperature: 0.5,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${groqApiKey}`,
+        },
+        timeout: 15000,
+      },
+    );
+
+    const searchContext = response.data?.choices?.[0]?.message?.content || "";
+    console.log(
+      "[EnhancedQuiz] Web search context retrieved:",
+      !!searchContext,
+    );
+
+    return searchContext;
+  } catch (error) {
+    console.warn(
+      "[EnhancedQuiz] Web search failed (non-critical):",
+      error.message || error,
+    );
+    return ""; // Return empty string - quiz generation will proceed without web context
+  }
+}
+
+/**
  * Generate enhanced quiz prompt based on deep learning analysis
  */
 async function generateEnhancedQuizPrompt({
@@ -211,6 +285,7 @@ async function generateEnhancedQuizPrompt({
   mcqCount,
   textCount,
   useWebSearch,
+  topic,
 }) {
   console.log("[EnhancedQuiz] Starting deep analysis for quiz generation...");
   console.log("[EnhancedQuiz] Input params:", {
@@ -222,6 +297,7 @@ async function generateEnhancedQuizPrompt({
     mcqCount,
     textCount,
     useWebSearch,
+    topic,
   });
 
   // 1. Get conversation history
@@ -248,14 +324,15 @@ async function generateEnhancedQuizPrompt({
   console.log("[EnhancedQuiz] Study plan context retrieved:", !!studyPlan);
 
   // 4. Get web search context if enabled
-  // Note: Web search is disabled in the generator module to avoid external dependencies
-  // If web search is needed, it should be handled in the main server.js file
   let searchContext = "";
-  if (useWebSearch) {
+  if (useWebSearch && topic) {
     console.log(
-      "[EnhancedQuiz] Web search requested but handled separately in main endpoint",
+      `[EnhancedQuiz] Fetching online context for meaningful quiz generation about "${topic}"`,
     );
-    // Web search context would be added here if available
+    searchContext = await getWebSearchContext(topic, gradeLevel);
+    if (searchContext) {
+      console.log("[EnhancedQuiz] ✅ Online context retrieved for quiz");
+    }
   }
 
   // 5. Build comprehensive quiz prompt
@@ -268,9 +345,9 @@ STUDENT PROFILE:
 - Difficulty Level: ${learningAnalysis.difficultyLevel || "Medium"}
 - Progress: ${studyPlan?.progressPercentage || 0}% complete
 
-CONCEPTS DISCUSSED: ${learningAnalysis.conceptsDiscussed.join(", ")}
+CONCEPTS DISCUSSED: ${learningAnalysis.conceptsDiscussed.join(", ") || "General concepts"}
 
-STUDENT INTERESTS: ${learningAnalysis.userInterests.join(", ")}
+STUDENT INTERESTS: ${learningAnalysis.userInterests.join(", ") || "General interests"}
 
 STRENGTHS: ${learningAnalysis.strengths?.join(", ") || "None identified"}
 
@@ -291,7 +368,14 @@ ${
     : ""
 }
 
-${searchContext ? `\n${searchContext}` : ""}
+${
+  searchContext
+    ? `ONLINE RESEARCH CONTEXT (for meaningful, current questions):
+${searchContext}
+
+Note: The questions below should incorporate current, relevant information from online sources while remaining grounded in the student's learning journey.`
+    : ""
+}
 
 RECENT LEARNING CONVERSATION SAMPLE:
 ${conversationHistory
@@ -301,6 +385,13 @@ ${conversationHistory
 
 GENERATION REQUIREMENTS:
 1. Focus on concepts the student has actually discussed
+2. Base questions on current, relevant information (especially from online research context if provided)
+3. Address their identified weaknesses and misconceptions
+4. Match their learning style and difficulty level
+5. Include questions that test their understanding of discussed topics
+6. Challenge them appropriately based on their progress
+7. Use real-world examples and current information to make questions meaningful
+8. Ensure questions are appropriate for their grade level
 2. Address their identified weaknesses and misconceptions
 3. Match their learning style and difficulty level
 4. Include questions that test their understanding of discussed topics
