@@ -62,7 +62,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
   late final WebSearchService _webSearchService;
   late final ChatStorageService _chatStorage;
 
-  String _selectedModel = 'Groq';
+  String _selectedModel = 'Groq Pro';
   String _searchQuery = '';
 
   late ScrollController _messageScrollController;
@@ -146,6 +146,18 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
     _messageScrollController.removeListener(_onScrollListener);
     _messageScrollController.dispose();
     super.dispose();
+  }
+
+  /// Convert display model name to backend API name
+  String _getBackendModelName(String displayName) {
+    if (displayName == 'Sonnet 3.5') {
+      return 'claude-sonnet';
+    } else if (displayName == 'Gemini 2.0') {
+      return 'gemini';
+    } else if (displayName == 'Groq Pro') {
+      return 'groq';
+    }
+    return displayName.toLowerCase();
   }
 
   /// Helper: log AI message details and add to UI state
@@ -710,34 +722,34 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                   SizedBox(height: AppTheme.spaceLg),
 
                   _buildModelOption(
-                    name: 'Claude Sonnet',
+                    name: 'Sonnet 3.5',
                     description: 'Fast & intelligent for everyday tasks',
-                    isSelected: _selectedModel == 'Claude Sonnet',
+                    isSelected: _selectedModel == 'Sonnet 3.5',
                     gradient: AppTheme.primaryGradient,
                     onTap: () {
-                      setState(() => _selectedModel = 'Claude Sonnet');
+                      setState(() => _selectedModel = 'Sonnet 3.5');
                       Navigator.pop(context);
                     },
                   ),
                   SizedBox(height: AppTheme.spaceSm),
                   _buildModelOption(
-                    name: 'Gemini',
+                    name: 'Gemini 2.0',
                     description: 'Google Gemini — conversational text model',
-                    isSelected: _selectedModel == 'Gemini',
+                    isSelected: _selectedModel == 'Gemini 2.0',
                     gradient: AppTheme.accentGradient,
                     onTap: () {
-                      setState(() => _selectedModel = 'Gemini');
+                      setState(() => _selectedModel = 'Gemini 2.0');
                       Navigator.pop(context);
                     },
                   ),
                   SizedBox(height: AppTheme.spaceSm),
                   _buildModelOption(
-                    name: 'Groq',
+                    name: 'Groq Pro',
                     description: 'Ultra-fast reasoning with LLaMA 3.3',
-                    isSelected: _selectedModel == 'Groq',
+                    isSelected: _selectedModel == 'Groq Pro',
                     gradient: [AppTheme.primaryBlue, AppTheme.accentBlue],
                     onTap: () {
-                      setState(() => _selectedModel = 'Groq');
+                      setState(() => _selectedModel = 'Groq Pro');
                       Navigator.pop(context);
                     },
                   ),
@@ -1485,7 +1497,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
         'messages': convo,
         'message': prompt,
         'mode': _responseMode,
-        'model': _selectedModel.toLowerCase(),
+        'model': _getBackendModelName(_selectedModel),
         'systemPrompt': AiConstants.systemPrompt,
         if (instructions != null) 'instructions': instructions,
       };
@@ -1521,15 +1533,43 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
       }
 
       final reply = fullResp['reply'] ?? fullResp['response'] ?? '';
+
+      // If reply is empty or shows error, try to extract from fullResponse
+      String finalReply = reply.toString();
+      if (finalReply.isEmpty ||
+          finalReply.contains('Oops') ||
+          finalReply.contains('went wrong')) {
+        // Try to extract from fullResponse structure (when backend returns structured response)
+        if (fullResp['fullResponse'] != null) {
+          final fullResponse = fullResp['fullResponse'];
+          if (fullResponse is Map && fullResponse['choices'] is List) {
+            final choices = fullResponse['choices'] as List;
+            if (choices.isNotEmpty) {
+              final firstChoice = choices[0];
+              if (firstChoice is Map && firstChoice['message'] is Map) {
+                final message = firstChoice['message'] as Map;
+                final content = message['content'];
+                if (content != null && content.toString().isNotEmpty) {
+                  finalReply = content.toString();
+                  print(
+                    '🔍 [EXTRACTED FROM fullResponse] Using content from fullResponse',
+                  );
+                }
+              }
+            }
+          }
+        }
+      }
+
       print(
-        '🔍 [RAW AI RESPONSE] length=${reply.toString().length} hasNewlines=${reply.toString().contains('\n')}',
+        '🔍 [RAW AI RESPONSE] length=${finalReply.toString().length} hasNewlines=${finalReply.toString().contains('\n')}',
       );
-      final replyStr = reply.toString();
+      final replyStr = finalReply.toString();
       final previewStr = replyStr.runes.length > 400
           ? String.fromCharCodes(replyStr.runes.take(400)) + '...'
           : replyStr;
       print('🔍 [RAW AI RESPONSE PREVIEW] $previewStr');
-      return reply.isEmpty ? null : reply.toString();
+      return finalReply.isEmpty ? null : finalReply.toString();
     } catch (e) {
       return '⚠️ All AI services are currently unavailable. ($e)';
     }
@@ -3234,14 +3274,19 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                       children: [
                         Icon(
                           Icons.settings,
-                          color: AppTheme.textSecondary,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? AppTheme.textSecondary
+                              : Color(0xFF000000),
                           size: 20,
                         ),
                         SizedBox(width: AppTheme.spaceSm),
                         Text(
                           'Settings',
                           style: AppTheme.bodyMedium.copyWith(
-                            color: AppTheme.textSecondary,
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                ? AppTheme.textSecondary
+                                : Color(0xFF000000),
                           ),
                         ),
                       ],
@@ -3890,7 +3935,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                           ? Colors.white
                           : Color(0xFF000000),
                       fontWeight: FontWeight.w600,
-                      fontSize: 36,
+                      fontSize: 28,
                       height: 1.2,
                       letterSpacing: -0.5,
                     ),

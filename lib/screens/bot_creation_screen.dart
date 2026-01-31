@@ -826,17 +826,33 @@ class _BotCreationScreenState extends State<BotCreationScreen>
                                     .withOpacity(0.6),
                               ),
                             ),
-                            dropdownColor: PremiumColors.cardBg,
-                            style: const TextStyle(
+                            dropdownColor:
+                                Theme.of(context).brightness == Brightness.dark
+                                ? PremiumColors.cardBg
+                                : Colors.white,
+                            style: TextStyle(
                               fontSize: 15,
-                              color: Colors.white,
+                              color:
+                                  Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? Colors.white
+                                  : Colors.black87,
                               letterSpacing: 0.2,
                             ),
                             items: educationLevels
                                 .map<DropdownMenuItem<String>>((String value) {
                                   return DropdownMenuItem<String>(
                                     value: value,
-                                    child: Text(value),
+                                    child: Text(
+                                      value,
+                                      style: TextStyle(
+                                        color:
+                                            Theme.of(context).brightness ==
+                                                Brightness.dark
+                                            ? Colors.white
+                                            : Colors.black87,
+                                      ),
+                                    ),
                                   );
                                 })
                                 .toList(),

@@ -580,30 +580,48 @@ class ProfessionalMessageWidget extends StatelessWidget {
           fontWeight: isInline ? FontWeight.w400 : FontWeight.w500,
         ),
         onErrorFallback: (error) {
-          // Graceful fallback: render as monospace text when LaTeX parsing fails
-          // This prevents crashes on malformed or complex LaTeX
+          // Graceful fallback: render as code box when LaTeX parsing fails
+          // This prevents crashes on malformed LaTeX while showing formatted content
           return SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Container(
               padding: EdgeInsets.symmetric(
-                horizontal: isInline ? 4 : 12,
-                vertical: isInline ? 2 : 8,
+                horizontal: isInline ? 6 : 14,
+                vertical: isInline ? 3 : 10,
               ),
               decoration: BoxDecoration(
                 color: isDark
-                    ? AppTheme.surfaceElevated.withOpacity(0.15)
-                    : Color(0xFFEEF2FF),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                // Show the raw math content in monospace for debugging
-                isInline ? mathContent : '\$\$\n$mathContent\n\$\$',
-                style: TextStyle(
-                  fontSize: fontSize - 1,
-                  color: isDark ? AppTheme.textSecondary : Color(0xFF6B7280),
-                  fontFamily: 'monospace',
-                  letterSpacing: 0.3,
+                    ? AppTheme.surfaceElevated.withOpacity(0.2)
+                    : Color(0xFFF0F9FF),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isDark
+                      ? AppTheme.primaryBlue.withOpacity(0.2)
+                      : Color(0xFF93C5FD),
+                  width: 1,
                 ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.calculate_outlined,
+                    size: isInline ? 14 : 16,
+                    color: AppTheme.primaryBlue,
+                  ),
+                  SizedBox(width: isInline ? 4 : 8),
+                  Text(
+                    '[Math: Formula too complex to display]',
+                    style: TextStyle(
+                      fontSize: isInline ? 12 : 14,
+                      color: isDark
+                          ? AppTheme.textSecondary
+                          : Color(0xFF1E40AF),
+                      fontFamily: 'monospace',
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ],
               ),
             ),
           );
@@ -616,29 +634,40 @@ class ProfessionalMessageWidget extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         child: Container(
           padding: EdgeInsets.symmetric(
-            horizontal: isInline ? 4 : 12,
-            vertical: isInline ? 2 : 8,
+            horizontal: isInline ? 6 : 14,
+            vertical: isInline ? 3 : 10,
           ),
           decoration: BoxDecoration(
             color: isDark
-                ? AppTheme.surfaceElevated.withOpacity(0.1)
-                : Color(0xFFFEE2E2),
+                ? Color(0xFF7F1D1D).withOpacity(0.2)
+                : Color(0xFFFEF2F2),
             border: Border.all(
               color: isDark
-                  ? Color(0xFF7F1D1D).withOpacity(0.3)
+                  ? Color(0xFFDC2626).withOpacity(0.3)
                   : Color(0xFFFECACA),
               width: 1,
             ),
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(8),
           ),
-          child: Text(
-            isInline ? mathContent : '\$\$\n$mathContent\n\$\$',
-            style: TextStyle(
-              fontSize: fontSize - 1,
-              color: isDark ? Color(0xFFFCA5A5) : Color(0xFFDC2626),
-              fontFamily: 'monospace',
-              letterSpacing: 0.3,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.warning_outlined,
+                size: isInline ? 14 : 16,
+                color: isDark ? Color(0xFFFCA5A5) : Color(0xFFDC2626),
+              ),
+              SizedBox(width: isInline ? 4 : 8),
+              Text(
+                '[Math rendering error]',
+                style: TextStyle(
+                  fontSize: isInline ? 12 : 14,
+                  color: isDark ? Color(0xFFFCA5A5) : Color(0xFFDC2626),
+                  fontFamily: 'monospace',
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ],
           ),
         ),
       );

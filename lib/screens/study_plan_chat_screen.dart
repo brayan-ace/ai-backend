@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:math';
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/study_bot_state.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -3202,6 +3203,60 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     );
   }
 
+  /// Validate quiz data structure
+  bool _isValidQuizData(Map<String, dynamic> quiz) {
+    try {
+      final questions = quiz['questions'] as List<dynamic>? ?? [];
+      final answers = quiz['answers'] as List<dynamic>? ?? [];
+
+      if (questions.isEmpty) {
+        print('[ChatScreen] Invalid quiz: no questions');
+        return false;
+      }
+
+      if (answers.isEmpty) {
+        print('[ChatScreen] Invalid quiz: no answers');
+        return false;
+      }
+
+      // Validate each question has required fields
+      for (int i = 0; i < questions.length; i++) {
+        final q = questions[i];
+        if (q is! Map<String, dynamic>) {
+          print('[ChatScreen] Question $i is not a valid map');
+          return false;
+        }
+
+        // Check for either 'question' or 'text' field
+        final questionText = q['question'] as String? ?? q['text'] as String?;
+        if (questionText == null || questionText.isEmpty) {
+          print('[ChatScreen] Question $i missing text');
+          return false;
+        }
+      }
+
+      // Validate answers have required fields
+      for (int i = 0; i < answers.length; i++) {
+        final a = answers[i];
+        if (a is! Map<String, dynamic>) {
+          print('[ChatScreen] Answer $i is not a valid map');
+          return false;
+        }
+
+        final answer = a['answer'] as String? ?? '';
+        if (answer.isEmpty) {
+          print('[ChatScreen] Answer $i missing answer text');
+          return false;
+        }
+      }
+
+      return true;
+    } catch (e) {
+      print('[ChatScreen] Quiz validation error: $e');
+      return false;
+    }
+  }
+
   /// Show quiz popup asking if user wants to take quiz now or later
   void _showQuizPopup() {
     showDialog(
@@ -3288,12 +3343,20 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       final userId = currentUser?.uid ?? 'anonymous';
 
       final uri = Uri.parse('$_backendUrl/api/generate-quiz');
+      final moduleContext = _getModuleContext();
+      print('[ChatScreen] Module context length: ${moduleContext.length}');
+      if (moduleContext.isNotEmpty) {
+        print(
+          '[ChatScreen] Module context preview: ${moduleContext.substring(0, min(moduleContext.length, 100))}',
+        );
+      }
+
       final payload = {
         'botId': widget.botId,
         'userId': userId,
         'moduleName':
             'Module ${((_botState?.chatHistory?.length) ?? 0) ~/ 5 + 1}',
-        'moduleContent': _getModuleContext(),
+        'moduleContent': moduleContext,
         'questionType': config['questionType'] ?? 'both',
         'mcqCount': config['mcqCount'] ?? 5,
         'textCount': config['textCount'] ?? 3,
@@ -3309,7 +3372,14 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode(payload),
           )
-          .timeout(Duration(seconds: 45));
+          .timeout(
+            Duration(seconds: 45),
+            onTimeout: () {
+              throw TimeoutException(
+                'Quiz generation took too long. Please try again.',
+              );
+            },
+          );
 
       if (resp.statusCode >= 200 && resp.statusCode < 300) {
         final body = jsonDecode(resp.body) as Map<String, dynamic>;
@@ -3317,22 +3387,75 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         final quizId = body['quizId'] as int?;
 
         print('[ChatScreen] Quiz generated successfully');
+        print('[ChatScreen] Quiz data: ${quiz?.keys.toList()}');
+        print(
+          '[ChatScreen] Quiz questions count: ${(quiz?['questions'] as List?)?.length ?? 0}',
+        );
+        print(
+          '[ChatScreen] Quiz answers count: ${(quiz?['answers'] as List?)?.length ?? 0}',
+        );
 
-        if (quiz != null) {
+        if (quiz != null && quiz.isNotEmpty && _isValidQuizData(quiz)) {
           // Store quiz ID for explanation callbacks
           _currentQuizId = quizId;
+          print('[ChatScreen] Showing quiz artifact with ID: $quizId');
           // Show quiz artifact
-          _showQuizArtifact(quiz);
+          if (mounted) {
+            _showQuizArtifact(quiz);
+          }
+        } else {
+          print('[ChatScreen] Quiz is invalid: $quiz');
+          if (mounted) {
+            _addBotMessage(
+              '📝 Quiz generation completed, but the quiz structure seems invalid. Let me regenerate it for you.',
+            );
+          }
+        }
+      } else if (resp.statusCode == 408 || resp.statusCode == 504) {
+        print('[ChatScreen] Quiz generation timeout: ${resp.statusCode}');
+        if (mounted) {
+          _addBotMessage(
+            '⏱️ The quiz generation is taking longer than expected. Please try again in a moment, and I\'ll create a personalized quiz based on our conversation.',
+          );
+        }
+      } else if (resp.statusCode == 400) {
+        print('[ChatScreen] Invalid quiz request: ${resp.body}');
+        if (mounted) {
+          _addBotMessage(
+            '❌ I couldn\'t generate the quiz with those parameters. Let me try with different settings.',
+          );
+        }
+      } else if (resp.statusCode >= 500) {
+        print('[ChatScreen] Backend error: ${resp.statusCode} - ${resp.body}');
+        if (mounted) {
+          _addBotMessage(
+            '🔧 Our quiz generator is having trouble right now. Please try again in a few moments!',
+          );
         }
       } else {
-        print('[ChatScreen] Quiz generation failed: ${resp.statusCode}');
+        print(
+          '[ChatScreen] Unexpected error: ${resp.statusCode} - ${resp.body}',
+        );
+        if (mounted) {
+          _addBotMessage(
+            '❓ Something unexpected happened while generating the quiz. Want to try again?',
+          );
+        }
+      }
+    } on TimeoutException catch (e) {
+      print('[ChatScreen] Timeout: $e');
+      if (mounted) {
         _addBotMessage(
-          'Sorry, I had trouble generating the quiz. Let\'s try again later!',
+          '⏱️ The quiz generation took too long. Please try again with fewer questions or simpler content.',
         );
       }
     } catch (e) {
       print('[ChatScreen] Error: $e');
-      _addBotMessage('Network error while generating quiz: $e');
+      if (mounted) {
+        _addBotMessage(
+          '⚠️ I had trouble generating the quiz. Please check your internet connection and try again.',
+        );
+      }
     } finally {
       setState(() => _isLoading = false);
     }

@@ -31,10 +31,12 @@ class _RecentStudyBotsScreenState extends State<RecentStudyBotsScreen> {
     try {
       final user = _auth.currentUser;
       if (user == null) {
-        setState(() {
-          _errorMessage = 'Not authenticated';
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _errorMessage = 'Not authenticated';
+            _isLoading = false;
+          });
+        }
         return;
       }
 
@@ -49,6 +51,9 @@ class _RecentStudyBotsScreenState extends State<RecentStudyBotsScreen> {
 
       botsStream.listen(
         (snapshot) {
+          // Only update state if widget is still mounted
+          if (!mounted) return;
+
           final bots = snapshot.docs.map((doc) {
             final data = doc.data();
             return {
@@ -75,6 +80,9 @@ class _RecentStudyBotsScreenState extends State<RecentStudyBotsScreen> {
           });
         },
         onError: (error) {
+          // Only update state if widget is still mounted
+          if (!mounted) return;
+
           setState(() {
             _errorMessage = 'Error loading bots: $error';
             _isLoading = false;
@@ -82,10 +90,12 @@ class _RecentStudyBotsScreenState extends State<RecentStudyBotsScreen> {
         },
       );
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Error: $e';
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Error: $e';
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -116,11 +126,11 @@ class _RecentStudyBotsScreenState extends State<RecentStudyBotsScreen> {
           .doc(botId)
           .delete();
 
-      setState(() {
-        _bots.removeAt(index);
-      });
-
       if (mounted) {
+        setState(() {
+          _bots.removeAt(index);
+        });
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Bot deleted successfully'),
@@ -184,11 +194,11 @@ class _RecentStudyBotsScreenState extends State<RecentStudyBotsScreen> {
                           'updatedAt': FieldValue.serverTimestamp(),
                         });
 
-                    setState(() {
-                      _bots[index]['name'] = newName;
-                    });
-
                     if (mounted) {
+                      setState(() {
+                        _bots[index]['name'] = newName;
+                      });
+
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text('Bot renamed to "$newName"'),

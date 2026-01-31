@@ -845,7 +845,12 @@ async function ensureTables() {
     `);
     console.log("[DB] quiz_mastery table ensured");
   } catch (err) {
-    console.error("[DB] Failed to ensure tables:", err.message);
+    console.error(
+      "[DB] Failed to ensure tables:",
+      err?.message || JSON.stringify(err),
+    );
+    if (err?.detail) console.error("[DB] Error detail:", err.detail);
+    if (err?.code) console.error("[DB] Error code:", err.code);
   }
 }
 
@@ -875,7 +880,12 @@ async function ensureUserStudyStateTable() {
     `);
     console.log("[DB] user_study_state table ensured");
   } catch (err) {
-    console.error("[DB] Failed to ensure user_study_state table:", err.message);
+    console.error(
+      "[DB] Failed to ensure user_study_state table:",
+      err?.message || JSON.stringify(err),
+    );
+    if (err?.detail) console.error("[DB] Error detail:", err.detail);
+    if (err?.code) console.error("[DB] Error code:", err.code);
   }
 }
 
@@ -898,8 +908,10 @@ async function ensureConversationMemoryTable() {
   } catch (err) {
     console.error(
       "[DB] Failed to ensure conversation_memory table:",
-      err.message,
+      err?.message || JSON.stringify(err),
     );
+    if (err?.detail) console.error("[DB] Error detail:", err.detail);
+    if (err?.code) console.error("[DB] Error code:", err.code);
   }
 }
 
@@ -2295,16 +2307,27 @@ app.post("/api/generate-quiz", async (req, res) => {
     );
 
     // Generate enhanced quiz prompt based on comprehensive analysis
-    const quizPrompt = await generateEnhancedQuizPrompt({
-      botId,
-      userId,
-      moduleName,
-      gradeLevel,
-      questionType,
-      mcqCount,
-      textCount,
-      useWebSearch,
-    });
+    let quizPrompt;
+    try {
+      quizPrompt = await generateEnhancedQuizPrompt({
+        botId,
+        userId,
+        moduleName,
+        gradeLevel,
+        questionType,
+        mcqCount,
+        textCount,
+        useWebSearch: false, // Disable web search for now to avoid external dependency issues
+      });
+    } catch (promptErr) {
+      console.error(
+        "[generate-quiz] Error generating quiz prompt:",
+        promptErr.message,
+      );
+      console.error("[generate-quiz] Prompt error stack:", promptErr.stack);
+      // Fall back to simple prompt
+      quizPrompt = `Generate a ${questionType} quiz with ${mcqCount} MCQ and ${textCount} text questions about "${moduleName}".`;
+    }
 
     console.log(
       "[generate-quiz] 📝 Enhanced quiz prompt generated with learning analysis",
@@ -2327,7 +2350,7 @@ app.post("/api/generate-quiz", async (req, res) => {
     const groqRes = await axios.post(
       "https://api.groq.com/openai/v1/chat/completions",
       {
-        model: "openai/gpt-oss-20b",
+        model: "mixtral-8x7b-32768",
         messages: [
           {
             role: "system",

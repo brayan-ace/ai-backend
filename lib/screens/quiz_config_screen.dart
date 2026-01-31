@@ -26,8 +26,6 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
   // Web search toggle
   bool _useWebSearch = true;
 
-  bool _isLoading = false;
-
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -293,35 +291,21 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
                 SizedBox(width: AppTheme.spaceMd),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: _isLoading ? null : _handleStartQuiz,
+                    onPressed: _handleStartQuiz,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.primaryBlue,
-                      disabledBackgroundColor: AppTheme.primaryBlue.withOpacity(
-                        0.5,
-                      ),
                       padding: EdgeInsets.symmetric(vertical: AppTheme.spaceMd),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(AppTheme.radiusMd),
                       ),
                     ),
-                    child: _isLoading
-                        ? SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
-                            ),
-                          )
-                        : Text(
-                            'Start Quiz',
-                            style: AppTheme.labelMedium.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                    child: Text(
+                      'Start Quiz',
+                      style: AppTheme.labelMedium.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -409,8 +393,6 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
   }
 
   void _handleStartQuiz() {
-    setState(() => _isLoading = true);
-
     final config = {
       'questionType': _questionType,
       'mcqCount': _questionType == 'mcq' || _questionType == 'both'
@@ -422,6 +404,8 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
       'useWebSearch': _useWebSearch,
     };
 
+    // Close dialog and pass config to parent callback
+    // Parent (chat screen) will handle loading state and quiz generation
     widget.onStartQuiz(config);
     Navigator.pop(context);
   }

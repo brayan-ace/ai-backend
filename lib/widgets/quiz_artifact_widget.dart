@@ -170,8 +170,18 @@ class _QuizArtifactWidgetState extends State<QuizArtifactWidget> {
         if (question == null) return SizedBox.shrink();
 
         final type = question['type'] as String? ?? 'unknown';
-        final text = question['text'] as String? ?? '';
-        final options = question['options'] as List<dynamic>? ?? [];
+        // Support both 'question' and 'text' field names
+        final text =
+            (question['question'] as String?) ??
+            (question['text'] as String?) ??
+            '';
+        final options =
+            (question['options'] as List<dynamic>?)?.cast<String>() ?? [];
+
+        if (text.isEmpty) {
+          print('[QuizArtifactWidget] Warning: Question $index has empty text');
+          return SizedBox.shrink();
+        }
 
         return Padding(
           padding: EdgeInsets.only(bottom: AppTheme.spaceMd),
@@ -188,11 +198,23 @@ class _QuizArtifactWidgetState extends State<QuizArtifactWidget> {
                 children: [
                   Row(
                     children: [
-                      Text(
-                        'Q${index + 1}',
-                        style: AppTheme.labelMedium.copyWith(
-                          color: AppTheme.primaryBlue,
-                          fontWeight: FontWeight.bold,
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryBlue.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(
+                            AppTheme.radiusSm,
+                          ),
+                        ),
+                        child: Text(
+                          'Q${index + 1}',
+                          style: AppTheme.labelSmall.copyWith(
+                            color: AppTheme.primaryBlue,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                       SizedBox(width: AppTheme.spaceSm),
@@ -259,9 +281,21 @@ class _QuizArtifactWidgetState extends State<QuizArtifactWidget> {
         final answer = answers[index] as Map<String, dynamic>?;
         if (answer == null) return SizedBox.shrink();
 
-        final answerText = answer['answer'] as String? ?? '';
-        final explanation = answer['explanation'] as String? ?? '';
+        // Support both field name variations
+        final answerText =
+            (answer['answer'] as String?) ??
+            (answer['correct_answer'] as String?) ??
+            '';
+        final explanation =
+            (answer['explanation'] as String?) ??
+            (answer['reason'] as String?) ??
+            '';
         final type = answer['type'] as String? ?? 'unknown';
+
+        if (answerText.isEmpty) {
+          print('[QuizArtifactWidget] Warning: Answer $index has empty text');
+          return SizedBox.shrink();
+        }
 
         return Padding(
           padding: EdgeInsets.only(bottom: AppTheme.spaceMd),

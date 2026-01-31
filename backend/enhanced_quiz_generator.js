@@ -26,7 +26,11 @@ async function getUserConversationHistory(botId, userId) {
       timestamp: msg.created_at,
     }));
   } catch (error) {
-    console.error("[EnhancedQuiz] Error fetching conversation history:", error);
+    console.warn(
+      "[EnhancedQuiz] Warning: Could not fetch conversation history from database:",
+      error.code,
+    );
+    // Return empty array - quiz generation will proceed without learning context
     return [];
   }
 }
@@ -42,6 +46,10 @@ async function analyzeLearningConcepts(conversationHistory, gradeLevel) {
       userInterests: [],
       difficultyLevel: gradeLevel || "Medium",
       learningStyle: "unknown",
+      strengths: [],
+      weaknesses: [],
+      keyQuestions: [],
+      misconceptions: [],
     };
   }
 
@@ -54,7 +62,12 @@ async function analyzeLearningConcepts(conversationHistory, gradeLevel) {
       return {
         conceptsDiscussed: [],
         userInterests: [],
-        difficultyLevel: gradeLevel,
+        difficultyLevel: gradeLevel || "Medium",
+        learningStyle: "unknown",
+        strengths: [],
+        weaknesses: [],
+        keyQuestions: [],
+        misconceptions: [],
       };
     }
 
@@ -130,11 +143,25 @@ Return ONLY valid JSON, no explanations.`;
 
     return analysis;
   } catch (error) {
-    console.error("[EnhancedQuiz] Error analyzing learning concepts:", error);
+    console.error(
+      "[EnhancedQuiz] Error analyzing learning concepts:",
+      error.message || error,
+    );
+    if (error.response?.data) {
+      console.error(
+        "[EnhancedQuiz] Groq API response error:",
+        error.response.data,
+      );
+    }
     return {
       conceptsDiscussed: [],
       userInterests: [],
-      difficultyLevel: gradeLevel,
+      difficultyLevel: gradeLevel || "Medium",
+      learningStyle: "unknown",
+      strengths: [],
+      weaknesses: [],
+      keyQuestions: [],
+      misconceptions: [],
     };
   }
 }
@@ -163,7 +190,11 @@ async function getUserStudyPlan(botId, userId) {
     }
     return null;
   } catch (error) {
-    console.error("[EnhancedQuiz] Error fetching study plan:", error);
+    console.warn(
+      "[EnhancedQuiz] Warning: Could not fetch study plan from database:",
+      error.code,
+    );
+    // Return null - quiz generation will proceed without study plan context
     return null;
   }
 }
@@ -182,37 +213,53 @@ async function generateEnhancedQuizPrompt({
   useWebSearch,
 }) {
   console.log("[EnhancedQuiz] Starting deep analysis for quiz generation...");
+  console.log("[EnhancedQuiz] Input params:", {
+    botId,
+    userId,
+    moduleName,
+    gradeLevel,
+    questionType,
+    mcqCount,
+    textCount,
+    useWebSearch,
+  });
 
   // 1. Get conversation history
+  console.log("[EnhancedQuiz] Fetching conversation history...");
   const conversationHistory = await getUserConversationHistory(botId, userId);
   console.log(
     `[EnhancedQuiz] Found ${conversationHistory.length} conversation messages`,
   );
 
   // 2. Analyze learning concepts
+  console.log("[EnhancedQuiz] Analyzing learning concepts...");
   const learningAnalysis = await analyzeLearningConcepts(
     conversationHistory,
     gradeLevel,
   );
-  console.log("[EnhancedQuiz] Learning analysis completed");
+  console.log("[EnhancedQuiz] Learning analysis completed:", {
+    concepts: learningAnalysis.conceptsDiscussed?.length || 0,
+    interests: learningAnalysis.userInterests?.length || 0,
+  });
 
   // 3. Get study plan context
+  console.log("[EnhancedQuiz] Fetching study plan...");
   const studyPlan = await getUserStudyPlan(botId, userId);
-  console.log("[EnhancedQuiz] Study plan context retrieved");
+  console.log("[EnhancedQuiz] Study plan context retrieved:", !!studyPlan);
 
   // 4. Get web search context if enabled
+  // Note: Web search is disabled in the generator module to avoid external dependencies
+  // If web search is needed, it should be handled in the main server.js file
   let searchContext = "";
   if (useWebSearch) {
-    const searchResults = await searchTopicOnline(
-      `${moduleName} ${learningAnalysis.conceptsDiscussed.join(" ")}`.trim(),
-      gradeLevel || "General",
+    console.log(
+      "[EnhancedQuiz] Web search requested but handled separately in main endpoint",
     );
-    if (searchResults && searchResults.answer) {
-      searchContext = `Web search context: ${searchResults.answer}`;
-    }
+    // Web search context would be added here if available
   }
 
   // 5. Build comprehensive quiz prompt
+  console.log("[EnhancedQuiz] Building quiz prompt...");
   let quizPrompt = `Generate a PERSONALIZED quiz based on deep analysis of this student's learning journey.
 
 STUDENT PROFILE:

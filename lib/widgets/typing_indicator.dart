@@ -30,6 +30,8 @@ class _TypingIndicatorState extends State<TypingIndicator>
 
   @override
   Widget build(BuildContext context) {
+    final isLightTheme = Theme.of(context).brightness == Brightness.light;
+
     return Container(
       padding: EdgeInsets.all(AppTheme.spaceMd),
       margin: EdgeInsets.symmetric(
@@ -37,10 +39,16 @@ class _TypingIndicatorState extends State<TypingIndicator>
         horizontal: AppTheme.spaceSm,
       ),
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: AppTheme.surfaceGradient),
+        gradient: LinearGradient(
+          colors: isLightTheme
+              ? [Color(0xFFFAFAFA), Color(0xFFF5F5F5)]
+              : AppTheme.surfaceGradient,
+        ),
         borderRadius: BorderRadius.circular(AppTheme.radiusLg),
         border: Border.all(
-          color: AppTheme.surfaceElevated.withOpacity(0.5),
+          color: isLightTheme
+              ? Color(0xFFE5E7EB)
+              : AppTheme.surfaceElevated.withOpacity(0.5),
           width: 1,
         ),
       ),
@@ -58,7 +66,9 @@ class _TypingIndicatorState extends State<TypingIndicator>
             Text(
               widget.message!,
               style: AppTheme.bodyMedium.copyWith(
-                color: AppTheme.textSecondary,
+                color: isLightTheme
+                    ? Color(0xFF000000)
+                    : AppTheme.textSecondary,
                 fontStyle: FontStyle.italic,
               ),
             ),
