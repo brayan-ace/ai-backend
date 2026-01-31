@@ -2347,32 +2347,69 @@ app.post("/api/generate-quiz", async (req, res) => {
     console.log(
       "[generate-quiz] 🤖 Calling Groq API for PERSONALIZED question generation",
     );
-    const groqRes = await axios.post(
-      "https://api.groq.com/openai/v1/chat/completions",
-      {
-        model: "mixtral-8x7b-32768",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are an expert educational quiz generator specializing in personalized assessments. Generate ONLY valid JSON with no markdown, code blocks, or extra text. Make quizzes feel personal to each student's learning journey.",
-          },
-          {
-            role: "user",
-            content: quizPrompt,
-          },
-        ],
-        max_tokens: 3000, // Increased for more detailed responses
-        temperature: 0.7, // Slightly higher for creativity
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${groqApiKey}`,
+    let groqRes;
+    try {
+      groqRes = await axios.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        {
+          model: "openai/gpt-oss-20b",
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are an expert educational quiz generator specializing in personalized assessments. Generate ONLY valid JSON with no markdown, code blocks, or extra text. Make quizzes feel personal to each student's learning journey.",
+            },
+            {
+              role: "user",
+              content: quizPrompt,
+            },
+          ],
+          max_tokens: 3000, // Increased for more detailed responses
+          temperature: 0.7, // Slightly higher for creativity
         },
-        timeout: 45000, // Increased timeout for complex analysis
-      },
-    );
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${groqApiKey}`,
+          },
+          timeout: 45000, // Increased timeout for complex analysis
+        },
+      );
+    } catch (groqErr) {
+      console.error(
+        "[generate-quiz] Groq API error:",
+        groqErr.response?.status,
+        groqErr.response?.data || groqErr.message,
+      );
+      // Try with a simpler model if the first one fails
+      console.log("[generate-quiz] Retrying with simpler model...");
+      groqRes = await axios.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        {
+          model: "openai/gpt-oss-20b",
+          messages: [
+            {
+              role: "system",
+              content:
+                "Generate an educational quiz. Return valid JSON only, no markdown.",
+            },
+            {
+              role: "user",
+              content: quizPrompt,
+            },
+          ],
+          max_tokens: 2000,
+          temperature: 0.5,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${groqApiKey}`,
+          },
+          timeout: 45000,
+        },
+      );
+    }
 
     let quizJson;
     const responseText = groqRes?.data?.choices?.[0]?.message?.content || "";
