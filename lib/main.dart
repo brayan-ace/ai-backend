@@ -3,8 +3,15 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'package:timezone/data/latest.dart' as tz;
+import 'package:flutter_localizations/flutter_localizations.dart'
+    show
+        GlobalMaterialLocalizations,
+        GlobalWidgetsLocalizations,
+        GlobalCupertinoLocalizations;
 
 import 'utils/theme_provider.dart';
+import 'utils/language_provider.dart';
+import 'utils/app_localizations.dart';
 import 'widgets/auth_gate.dart';
 import 'screens/online_ai_screen.dart';
 import 'screens/notes_screen.dart';
@@ -40,6 +47,10 @@ void main() async {
   // Initialize timezone data
   tz.initializeTimeZones();
 
+  // Initialize LanguageProvider
+  final languageProvider = LanguageProvider();
+  await languageProvider.initialize();
+
   // On web, FirebaseOptions are required when calling initializeApp.
   // If options are not provided, initialization will throw; catch and continue
   // so the app can run in environments where web options are not configured.
@@ -72,8 +83,11 @@ void main() async {
   }
 
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => ThemeProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => languageProvider),
+      ],
       child: const MyApp(),
     ),
   );
@@ -85,6 +99,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
+    final languageProvider = Provider.of<LanguageProvider>(context);
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -92,12 +107,31 @@ class MyApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: themeProvider.themeMode,
+      locale: languageProvider.currentLocale,
+      localizationsDelegates: [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en'),
+        Locale('es'),
+        Locale('fr'),
+        Locale('ar'),
+        Locale('hi'),
+      ],
       builder: (context, child) {
         return MediaQuery(
           data: MediaQuery.of(
             context,
           ).copyWith(textScaleFactor: themeProvider.textScaleFactor),
-          child: child!,
+          child: Directionality(
+            textDirection: languageProvider.isRTL
+                ? TextDirection.rtl
+                : TextDirection.ltr,
+            child: child!,
+          ),
         );
       },
       // Use AuthGate as the app home for centralized auth management
@@ -121,20 +155,20 @@ class MyApp extends StatelessWidget {
         '/notification-settings': (_) => const NotificationSettingsScreen(),
         '/analytics': (_) => const AnalyticsDashboardScreen(),
         '/billing': (_) => const PlaceholderScreen(
-          title: 'Billing',
-          message: 'Billing features coming soon',
+          titleKey: 'settings.billing',
+          messageKey: 'screens.billingComingSoon',
         ),
         '/permissions': (_) => const PlaceholderScreen(
-          title: 'Permissions',
-          message: 'Permissions will be configurable here soon',
+          titleKey: 'settings.permissions',
+          messageKey: 'screens.permissionsComingSoon',
         ),
         '/speech-language': (_) => const PlaceholderScreen(
-          title: 'Speech Language',
-          message: 'Speech language settings coming soon',
+          titleKey: 'settings.speechLanguage',
+          messageKey: 'screens.speechLanguageComingSoon',
         ),
         '/privacy': (_) => const PlaceholderScreen(
-          title: 'Privacy',
-          message: 'Privacy settings coming soon',
+          titleKey: 'settings.privacy',
+          messageKey: 'screens.privacyComingSoon',
         ),
         '/home': (_) => const HomeScreen(),
         '/api-test': (_) => const ApiTestScreen(),

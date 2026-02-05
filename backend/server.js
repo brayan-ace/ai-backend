@@ -2806,6 +2806,103 @@ app.post("/api/ask", async (req, res) => {
     switch (type) {
       case "chat":
         console.log("[Chat Case] Processing chat request:", data);
+
+        // If web search is enabled, route to search case instead
+        if (data.webSearchEnabled || data.useWebSearch) {
+          console.log("[Chat] Web search enabled, routing to search handler");
+          // Convert chat message to search query
+          const searchData = {
+            query: data.message || data.query || "Search",
+            messages: data.messages || [],
+            botId: data.botId,
+            userId: data.userId,
+          };
+          // Execute search case logic
+          type = "search";
+          // Fall through to search case
+          // We'll use a workaround by setting type and letting it fall through
+          const TAVILY_KEY = process.env.tavily;
+          if (!TAVILY_KEY) {
+            console.error("[Search] TAVILY key not configured (env 'tavily')");
+            return res.status(500).json({
+              error: "API configuration error",
+              message: "Tavily API key not configured. Set env var 'tavily'",
+              provider: "tavily",
+              timestamp: new Date().toISOString(),
+            });
+          }
+
+          const originalQuery = searchData.query;
+          const conversationMessages = Array.isArray(searchData.messages)
+            ? searchData.messages
+            : [];
+
+          try {
+            // Call Tavily search
+            const enhancedSearchQuery = await summarizeConversationForSearch(
+              originalQuery,
+              conversationMessages,
+            );
+
+            console.log("[Web Search] Enhanced query:", enhancedSearchQuery);
+
+            const resp = await axios.post(
+              "https://api.tavily.com/search",
+              {
+                api_key: TAVILY_KEY,
+                query: enhancedSearchQuery,
+                include_answer: true,
+                topic: "general",
+                max_results: 5,
+              },
+              { timeout: 15000 },
+            );
+
+            console.log(
+              `[Web Search] Found ${resp.data.results.length} results`,
+            );
+
+            const resultsText = resp.data.answer
+              ? resp.data.answer
+              : JSON.stringify(resp.data, null, 2);
+            const structured = structureTextResponse(resultsText);
+            const formattedResults = formatResponseForReadability(resultsText);
+
+            // Enhance with AI
+            const enhancedAnswer = await enhanceSearchResultsWithAI(
+              originalQuery,
+              resp.data,
+              conversationMessages,
+            );
+
+            return res.json({
+              provider: "tavily",
+              results: resp.data,
+              reply: formattedResults,
+              structured: structured,
+              enhancedAnswer: enhancedAnswer,
+              originalQuery: originalQuery,
+              enhancedQuery: enhancedSearchQuery,
+              timestamp: new Date().toISOString(),
+              status: "success",
+            });
+          } catch (searchError) {
+            console.error(
+              "[Web Search] Error:",
+              searchError?.response?.data || searchError.message || searchError,
+            );
+            const fallbackMsg = getFallbackMessage();
+            return res.status(500).json({
+              error: "Search temporarily unavailable",
+              reply: fallbackMsg,
+              provider: "tavily",
+              timestamp: new Date().toISOString(),
+              isErrorFallback: true,
+              status: "error",
+            });
+          }
+        }
+
         const userMessage = data.message || "Hello, how can I help you?";
         const responseMode = data.mode || "normal"; // Changed default from undefined to "normal"
 

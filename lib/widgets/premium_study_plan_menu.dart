@@ -17,6 +17,8 @@ class PremiumStudyPlanMenu extends StatefulWidget {
   final double progressPercentage;
   final int? planVersion;
   final String? planTitle;
+  final int userMessageCount; // New: Track user messages
+  final int totalMessageCount; // New: Track total messages
   final BuildContext context; // Add context for theme access
 
   const PremiumStudyPlanMenu({
@@ -31,6 +33,8 @@ class PremiumStudyPlanMenu extends StatefulWidget {
     this.progressPercentage = 0.0,
     this.planVersion,
     this.planTitle,
+    this.userMessageCount = 0, // New: Default to 0
+    this.totalMessageCount = 0, // New: Default to 0
     required this.context, // Make context required
   }) : super(key: key);
 
@@ -378,6 +382,14 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                   iconColor: AppTheme.primaryBlue,
                   label: 'Current',
                   value: 'Module ${widget.currentModule + 1}',
+                  isDarkMode: isDarkMode,
+                ),
+                SizedBox(height: 8),
+                _buildStatRow(
+                  icon: Icons.chat_bubble,
+                  iconColor: AppTheme.accentBlue,
+                  label: 'Messages',
+                  value: '${widget.totalMessageCount} exchanged',
                   isDarkMode: isDarkMode,
                 ),
               ],

@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../utils/theme.dart';
+import '../utils/app_localizations.dart';
 import 'study_plan_chat_screen.dart';
 
 // Premium color palette matching bot_creation_screen
@@ -39,12 +40,7 @@ class BotProcessingScreen extends StatefulWidget {
 }
 
 class _BotProcessingScreenState extends State<BotProcessingScreen> {
-  final List<String> _steps = [
-    'Analyzing your study plan...',
-    'Searching for resources...',
-    'Preparing your Study Bot...',
-    'Finalizing your custom instructions...',
-  ];
+  late List<String> _steps;
 
   int _currentStep = 0;
   String _statusMessage = '';
@@ -55,12 +51,18 @@ class _BotProcessingScreenState extends State<BotProcessingScreen> {
   // Backend URL - adjust via --dart-define or change default
   static const String _backendUrl = String.fromEnvironment(
     'BACKEND_URL',
-    defaultValue: 'https://ai-backend-vf75.onrender.com',
+    defaultValue: 'https://ai-backend-production-65d6.up.railway.app',
   );
 
   @override
   void initState() {
     super.initState();
+    _steps = [
+      AppLocalizations.of(context).t('botProcessing.analyzingPlan'),
+      AppLocalizations.of(context).t('botProcessing.searchingResources'),
+      AppLocalizations.of(context).t('botProcessing.preparingBot'),
+      AppLocalizations.of(context).t('botProcessing.finalizingInstructions'),
+    ];
     _statusMessage = _steps.first;
     print(
       '[BotProcessingScreen] initState: name=${widget.name}, userId=${widget.userId}',
@@ -208,7 +210,7 @@ class _BotProcessingScreenState extends State<BotProcessingScreen> {
             end: Alignment.bottomRight,
           ).createShader(bounds),
           child: Text(
-            'Preparing your Study Bot',
+            AppLocalizations.of(context).t('botProcessing.pageTitle'),
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w700,
@@ -600,7 +602,7 @@ class _BotProcessingScreenState extends State<BotProcessingScreen> {
         SizedBox(height: 32),
 
         Text(
-          'Oops! Something went wrong',
+          AppLocalizations.of(context).t('botProcessing.errorTitle'),
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w700,
@@ -674,7 +676,7 @@ class _BotProcessingScreenState extends State<BotProcessingScreen> {
                 Icon(Icons.refresh, color: Colors.white, size: 20),
                 SizedBox(width: 12),
                 Text(
-                  'Retry',
+                  AppLocalizations.of(context).t('botProcessing.retryButton'),
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,

@@ -10,9 +10,12 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../utils/theme.dart';
 import '../utils/greeting_utils.dart';
+import '../utils/app_localizations.dart';
 import '../widgets/ai_message_bubble.dart';
 import '../widgets/typing_indicator.dart';
 import '../widgets/voice_input_dialog.dart';
+import '../widgets/streak_indicator.dart';
+import '../widgets/streak_details_modal.dart';
 import '../services/gemini_services.dart';
 import '../services/api_service.dart';
 import '../services/web_search_service.dart';
@@ -250,7 +253,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                             ),
                             Expanded(
                               child: Text(
-                                'Add to chat',
+                                AppLocalizations.of(
+                                  context,
+                                ).t('chatScreen.addToChat'),
                                 textAlign: TextAlign.center,
                                 style: AppTheme.headlineMedium.copyWith(
                                   color:
@@ -275,7 +280,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                             Expanded(
                               child: _buildAttachmentCard(
                                 icon: Icons.camera_alt_outlined,
-                                label: 'Camera',
+                                label: AppLocalizations.of(
+                                  context,
+                                ).t('chatScreen.camera'),
                                 onTap: () {
                                   Navigator.pop(context);
                                   _pickImage(ImageSource.camera);
@@ -286,7 +293,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                             Expanded(
                               child: _buildAttachmentCard(
                                 icon: Icons.image_outlined,
-                                label: 'Photos',
+                                label: AppLocalizations.of(
+                                  context,
+                                ).t('chatScreen.photos'),
                                 onTap: () {
                                   Navigator.pop(context);
                                   _pickImage(ImageSource.gallery);
@@ -332,7 +341,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                               ),
                               SizedBox(width: 12),
                               Text(
-                                'Web search',
+                                AppLocalizations.of(
+                                  context,
+                                ).t('chatScreen.webSearch'),
                                 style: AppTheme.bodyLarge.copyWith(
                                   color:
                                       Theme.of(context).brightness ==
@@ -392,7 +403,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                               ),
                               SizedBox(width: 12),
                               Text(
-                                'Use style',
+                                AppLocalizations.of(
+                                  context,
+                                ).t('chatScreen.useStyle'),
                                 style: AppTheme.bodyLarge.copyWith(
                                   color:
                                       Theme.of(context).brightness ==
@@ -405,8 +418,12 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                               Spacer(),
                               Text(
                                 _responseMode == 'detailed'
-                                    ? 'Detailed'
-                                    : 'Normal',
+                                    ? AppLocalizations.of(
+                                        context,
+                                      ).t('chatScreen.detailed')
+                                    : AppLocalizations.of(
+                                        context,
+                                      ).t('chatScreen.normal'),
                                 style: AppTheme.bodyMedium.copyWith(
                                   color:
                                       Theme.of(context).brightness ==
@@ -523,7 +540,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                 SizedBox(height: 20),
 
                 Text(
-                  'Use style',
+                  AppLocalizations.of(context).t('chatScreen.useStyle'),
                   style: AppTheme.headlineMedium.copyWith(
                     color: Theme.of(context).brightness == Brightness.dark
                         ? AppTheme.textPrimary
@@ -560,7 +577,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Normal',
+                                AppLocalizations.of(context).t('models.normal'),
                                 style: AppTheme.bodyLarge.copyWith(
                                   color: _responseMode == 'normal'
                                       ? AppTheme.primaryBlue
@@ -573,7 +590,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                               ),
                               SizedBox(height: 4),
                               Text(
-                                'Natural and conversational responses',
+                                AppLocalizations.of(
+                                  context,
+                                ).t('models.normalDesc'),
                                 style: AppTheme.bodySmall.copyWith(
                                   color:
                                       Theme.of(context).brightness ==
@@ -622,7 +641,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Detailed',
+                                AppLocalizations.of(
+                                  context,
+                                ).t('models.detailed'),
                                 style: AppTheme.bodyLarge.copyWith(
                                   color: _responseMode == 'detailed'
                                       ? AppTheme.primaryBlue
@@ -635,7 +656,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                               ),
                               SizedBox(height: 4),
                               Text(
-                                'Complete explanations and context',
+                                AppLocalizations.of(
+                                  context,
+                                ).t('models.detailedDesc'),
                                 style: AppTheme.bodySmall.copyWith(
                                   color:
                                       Theme.of(context).brightness ==
@@ -711,7 +734,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                   SizedBox(height: AppTheme.spaceMd),
 
                   Text(
-                    'Select AI Model',
+                    AppLocalizations.of(context).t('models.selectAiModel'),
                     style: AppTheme.headlineSmall.copyWith(
                       color: Theme.of(context).brightness == Brightness.dark
                           ? AppTheme.textPrimary
@@ -722,8 +745,10 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                   SizedBox(height: AppTheme.spaceLg),
 
                   _buildModelOption(
-                    name: 'Sonnet 3.5',
-                    description: 'Fast & intelligent for everyday tasks',
+                    name: AppLocalizations.of(context).t('models.sonnet'),
+                    description: AppLocalizations.of(
+                      context,
+                    ).t('models.sonnetDesc'),
                     isSelected: _selectedModel == 'Sonnet 3.5',
                     gradient: AppTheme.primaryGradient,
                     onTap: () {
@@ -733,8 +758,10 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                   ),
                   SizedBox(height: AppTheme.spaceSm),
                   _buildModelOption(
-                    name: 'Gemini 2.0',
-                    description: 'Google Gemini — conversational text model',
+                    name: AppLocalizations.of(context).t('models.gemini'),
+                    description: AppLocalizations.of(
+                      context,
+                    ).t('models.geminiDesc'),
                     isSelected: _selectedModel == 'Gemini 2.0',
                     gradient: AppTheme.accentGradient,
                     onTap: () {
@@ -744,8 +771,10 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                   ),
                   SizedBox(height: AppTheme.spaceSm),
                   _buildModelOption(
-                    name: 'Groq Pro',
-                    description: 'Ultra-fast reasoning with LLaMA 3.3',
+                    name: AppLocalizations.of(context).t('models.groq'),
+                    description: AppLocalizations.of(
+                      context,
+                    ).t('models.groqDesc'),
                     isSelected: _selectedModel == 'Groq Pro',
                     gradient: [AppTheme.primaryBlue, AppTheme.accentBlue],
                     onTap: () {
@@ -1409,7 +1438,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
               Icon(Icons.travel_explore, color: AppTheme.primaryBlue),
               SizedBox(width: AppTheme.spaceSm),
               Text(
-                'Search the Web?',
+                AppLocalizations.of(context).t('chatScreen.searchTheWeb'),
                 style: AppTheme.headlineSmall.copyWith(
                   color: AppTheme.textPrimary,
                   fontWeight: FontWeight.w600,
@@ -1418,14 +1447,14 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
             ],
           ),
           content: Text(
-            'I may not have the latest information. Would you like me to search the web for current data?',
+            AppLocalizations.of(context).t('chatScreen.latestInfoMessage'),
             style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
               child: Text(
-                'No, thanks',
+                AppLocalizations.of(context).t('chatScreen.noThanks'),
                 style: TextStyle(color: AppTheme.textSecondary),
               ),
             ),
@@ -1438,7 +1467,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                   borderRadius: BorderRadius.circular(AppTheme.radiusMd),
                 ),
               ),
-              child: Text('Yes, search web'),
+              child: Text(
+                AppLocalizations.of(context).t('chatScreen.yesSearchWeb'),
+              ),
             ),
           ],
         );
@@ -1702,7 +1733,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                 SizedBox(height: AppTheme.spaceLg),
                 _buildOptionTile(
                   icon: isStarred ? Icons.star : Icons.star_border,
-                  title: isStarred ? 'Unstar Chat' : 'Star Chat',
+                  title: isStarred
+                      ? AppLocalizations.of(context).t('chatScreen.unstarChat')
+                      : AppLocalizations.of(context).t('chatScreen.starChat'),
                   color: Colors.amber,
                   onTap: () {
                     Navigator.pop(context);
@@ -1711,7 +1744,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                 ),
                 _buildOptionTile(
                   icon: Icons.edit,
-                  title: 'Rename Chat',
+                  title: AppLocalizations.of(
+                    context,
+                  ).t('chatScreen.renameChat'),
                   color: AppTheme.primaryBlue,
                   onTap: () {
                     Navigator.pop(context);
@@ -1720,7 +1755,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                 ),
                 _buildOptionTile(
                   icon: Icons.delete,
-                  title: 'Delete Chat',
+                  title: AppLocalizations.of(
+                    context,
+                  ).t('chatScreen.deleteChat'),
                   color: Colors.red,
                   onTap: () {
                     Navigator.pop(context);
@@ -1733,7 +1770,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                 ),
                 _buildOptionTile(
                   icon: Icons.share,
-                  title: 'Share Chat',
+                  title: AppLocalizations.of(context).t('chatScreen.shareChat'),
                   color: AppTheme.primaryBlue,
                   onTap: () {
                     Navigator.pop(context);
@@ -1814,7 +1851,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
             borderRadius: BorderRadius.circular(AppTheme.radiusLg),
           ),
           title: Text(
-            'Rename Chat',
+            AppLocalizations.of(context).t('drawer.renameDialogTitle'),
             style: AppTheme.headlineSmall.copyWith(
               color: AppTheme.textPrimary,
               fontWeight: FontWeight.w600,
@@ -1825,7 +1862,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
             autofocus: true,
             style: AppTheme.bodyLarge.copyWith(color: AppTheme.textPrimary),
             decoration: InputDecoration(
-              hintText: 'Enter new name',
+              hintText: AppLocalizations.of(
+                context,
+              ).t('drawer.renameDialogHint'),
               hintStyle: AppTheme.bodyMedium.copyWith(
                 color: AppTheme.textTertiary,
               ),
@@ -1847,7 +1886,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
             TextButton(
               onPressed: () => Navigator.pop(context),
               child: Text(
-                'Cancel',
+                AppLocalizations.of(context).t('drawer.cancelButton'),
                 style: TextStyle(color: AppTheme.textSecondary),
               ),
             ),
@@ -1858,9 +1897,16 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                   Navigator.pop(context);
                   try {
                     await _chatStorage.updateChatTitle(chatId, newTitle);
-                    _showSnackBar('✓ Chat renamed');
+                    _showSnackBar(
+                      AppLocalizations.of(context).t('drawer.chatRenamed'),
+                    );
                   } catch (e) {
-                    _showSnackBar('Error renaming: $e', isError: true);
+                    _showSnackBar(
+                      AppLocalizations.of(context)
+                          .t('drawer.renameError')
+                          .replaceAll('{error}', e.toString()),
+                      isError: true,
+                    );
                   }
                 }
               },
@@ -1868,7 +1914,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                 backgroundColor: AppTheme.primaryBlue,
                 foregroundColor: Colors.white,
               ),
-              child: Text('Rename'),
+              child: Text(
+                AppLocalizations.of(context).t('drawer.renameButton'),
+              ),
             ),
           ],
         );
@@ -1890,7 +1938,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
               Icon(Icons.warning_amber_rounded, color: Colors.red),
               SizedBox(width: AppTheme.spaceSm),
               Text(
-                'Delete Chat?',
+                AppLocalizations.of(context).t('drawer.deleteDialogTitle'),
                 style: AppTheme.headlineSmall.copyWith(
                   color: AppTheme.textPrimary,
                   fontWeight: FontWeight.w600,
@@ -1899,14 +1947,16 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
             ],
           ),
           content: Text(
-            'Are you sure you want to delete "$title"? This action cannot be undone.',
+            AppLocalizations.of(
+              context,
+            ).t('drawer.deleteDialogMessage').replaceAll('{title}', title),
             style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
               child: Text(
-                'Cancel',
+                AppLocalizations.of(context).t('drawer.cancelButton'),
                 style: TextStyle(color: AppTheme.textSecondary),
               ),
             ),
@@ -1916,7 +1966,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                 backgroundColor: Colors.red,
                 foregroundColor: Colors.white,
               ),
-              child: Text('Delete'),
+              child: Text(
+                AppLocalizations.of(context).t('drawer.deleteButton'),
+              ),
             ),
           ],
         );
@@ -2039,7 +2091,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                   child: Row(
                     children: [
                       Text(
-                        'Chat Options',
+                        AppLocalizations.of(ctx).t('menu.chatOptions'),
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
@@ -2078,8 +2130,10 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                       _buildMenuItemAdvanced(
                         ctx,
                         icon: Icons.edit_outlined,
-                        title: 'Rename',
-                        subtitle: 'Change chat title',
+                        title: AppLocalizations.of(ctx).t('menu.rename'),
+                        subtitle: AppLocalizations.of(
+                          ctx,
+                        ).t('menu.changeChatTitle'),
                         gradient: AppTheme.primaryGradient,
                         onTap: () {
                           Navigator.pop(ctx);
@@ -2107,8 +2161,10 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                       _buildMenuItemAdvanced(
                         ctx,
                         icon: Icons.person_outline,
-                        title: 'Personalize',
-                        subtitle: 'Customize chat preferences',
+                        title: AppLocalizations.of(ctx).t('menu.personalize'),
+                        subtitle: AppLocalizations.of(
+                          ctx,
+                        ).t('menu.customizeChatPreferences'),
                         gradient: AppTheme.primaryGradient,
                         onTap: () {
                           Navigator.pop(ctx);
@@ -2122,7 +2178,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                 ),
                                 SizedBox(width: 12),
                                 Text(
-                                  'Coming Soon',
+                                  AppLocalizations.of(
+                                    context,
+                                  ).t('common.comingSoon'),
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w500,
@@ -2143,8 +2201,10 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                       _buildMenuItemAdvanced(
                         ctx,
                         icon: Icons.star_outline,
-                        title: 'Star',
-                        subtitle: 'Mark as important',
+                        title: AppLocalizations.of(ctx).t('menu.star'),
+                        subtitle: AppLocalizations.of(
+                          ctx,
+                        ).t('menu.markAsImportant'),
                         gradient: [Colors.amber, Colors.orange],
                         onTap: () {
                           Navigator.pop(ctx);
@@ -2171,8 +2231,10 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                       _buildMenuItemAdvanced(
                         ctx,
                         icon: Icons.add_circle_outline,
-                        title: 'New Chat',
-                        subtitle: 'Start fresh conversation',
+                        title: AppLocalizations.of(ctx).t('menu.newChat'),
+                        subtitle: AppLocalizations.of(
+                          ctx,
+                        ).t('menu.startFreshConversation'),
                         gradient: AppTheme.accentGradient,
                         onTap: () {
                           Navigator.pop(ctx);
@@ -2189,8 +2251,10 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                       _buildMenuItemAdvanced(
                         ctx,
                         icon: Icons.smart_toy_outlined,
-                        title: 'Recent Bots',
-                        subtitle: 'View your study bot history',
+                        title: AppLocalizations.of(ctx).t('menu.recentBots'),
+                        subtitle: AppLocalizations.of(
+                          ctx,
+                        ).t('menu.viewStudyBotHistory'),
                         gradient: [Color(0xFF8B5CF6), Color(0xFFA855F7)],
                         onTap: () {
                           Navigator.pop(ctx);
@@ -2202,8 +2266,10 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                       _buildMenuItemAdvanced(
                         ctx,
                         icon: Icons.settings_outlined,
-                        title: 'Settings',
-                        subtitle: 'App preferences',
+                        title: AppLocalizations.of(ctx).t('menu.settings'),
+                        subtitle: AppLocalizations.of(
+                          ctx,
+                        ).t('menu.appPreferences'),
                         gradient: [Color(0xFF6B7280), Color(0xFF4B5563)],
                         onTap: () {
                           Navigator.pop(ctx);
@@ -2424,7 +2490,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                       await _handleLogout();
                     },
                     icon: Icon(Icons.logout, size: 18),
-                    label: Text('Sign Out'),
+                    label: Text(AppLocalizations.of(ctx).t('menu.signOut')),
                     style: OutlinedButton.styleFrom(
                       foregroundColor:
                           Theme.of(context).brightness == Brightness.dark
@@ -2467,7 +2533,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
             ),
             SizedBox(height: 8),
             Text(
-              'Sign in to save your chats',
+              AppLocalizations.of(ctx).t('menu.signInToSaveChats'),
               style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
             ),
             SizedBox(height: 12),
@@ -2479,7 +2545,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                       Navigator.pop(ctx);
                       Navigator.pushNamed(context, '/login');
                     },
-                    child: Text('Log In'),
+                    child: Text(AppLocalizations.of(ctx).t('menu.logIn')),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppTheme.primaryBlue,
                       side: BorderSide(
@@ -2499,7 +2565,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                       Navigator.pop(ctx);
                       Navigator.pushNamed(context, '/signup');
                     },
-                    child: Text('Sign Up'),
+                    child: Text(AppLocalizations.of(ctx).t('menu.signUp')),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.primaryBlue,
                       foregroundColor: Colors.white,
@@ -2559,44 +2625,57 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
             children: [
               Padding(
                 padding: EdgeInsets.all(AppTheme.spaceMd),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: ShaderMask(
-                        shaderCallback: (bounds) => LinearGradient(
-                          colors: AppTheme.primaryGradient,
-                        ).createShader(bounds),
-                        child: Text(
-                          'Chats',
-                          style: AppTheme.displayMedium.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ShaderMask(
+                            shaderCallback: (bounds) => LinearGradient(
+                              colors: AppTheme.primaryGradient,
+                            ).createShader(bounds),
+                            child: Text(
+                              AppLocalizations.of(context).t('drawer.chats'),
+                              style: AppTheme.displayMedium.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ),
-                    Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: AppTheme.accentGradient,
+                        Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: AppTheme.accentGradient,
+                            ),
+                            shape: BoxShape.circle,
+                            boxShadow: AppTheme.accentGlow,
+                          ),
+                          child: IconButton(
+                            icon: Icon(Icons.add, color: Colors.white),
+                            onPressed: () {
+                              Navigator.pop(context);
+                              setState(() {
+                                _messages.clear();
+                                _currentChatId = null;
+                                _showGreeting = true;
+                                _greetingAnimationController.forward();
+                              });
+                            },
+                          ),
                         ),
-                        shape: BoxShape.circle,
-                        boxShadow: AppTheme.accentGlow,
-                      ),
-                      child: IconButton(
-                        icon: Icon(Icons.add, color: Colors.white),
-                        onPressed: () {
-                          Navigator.pop(context);
-                          setState(() {
-                            _messages.clear();
-                            _currentChatId = null;
-                            _showGreeting = true;
-                            _greetingAnimationController.forward();
-                          });
-                        },
-                      ),
+                      ],
+                    ),
+                    SizedBox(height: AppTheme.spaceMd),
+                    // ✨ STREAK INDICATOR - Premium UI reusing existing StudyActivityService
+                    StreakIndicator(
+                      onTap: () {
+                        Navigator.pop(context);
+                        StreakDetailsModal.show(context);
+                      },
                     ),
                   ],
                 ),
@@ -2624,7 +2703,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                       });
                     },
                     decoration: InputDecoration(
-                      hintText: 'Search chats...',
+                      hintText: AppLocalizations.of(
+                        context,
+                      ).t('drawer.searchChats'),
                       hintStyle: AppTheme.bodyMedium.copyWith(
                         color: AppTheme.textTertiary,
                       ),
@@ -2688,7 +2769,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                         Icon(Icons.school, color: Colors.white, size: 24),
                         SizedBox(width: AppTheme.spaceSm),
                         Text(
-                          'Create Study Plan',
+                          AppLocalizations.of(
+                            context,
+                          ).t('drawer.createStudyPlan'),
                           style: AppTheme.labelLarge.copyWith(
                             color: Colors.white,
                             fontWeight: FontWeight.w600,
@@ -2711,7 +2794,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: AppTheme.spaceMd),
                 child: Text(
-                  'RECENT CHATS',
+                  AppLocalizations.of(context).t('drawer.recentChats'),
                   style: AppTheme.labelMedium.copyWith(
                     color: AppTheme.textTertiary,
                     letterSpacing: 1.5,
@@ -2734,7 +2817,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                             ),
                             SizedBox(height: AppTheme.spaceSm),
                             Text(
-                              'Sign in to save chats',
+                              AppLocalizations.of(
+                                context,
+                              ).t('drawer.signInToSaveChats'),
                               style: AppTheme.bodyMedium.copyWith(
                                 color: AppTheme.textTertiary,
                               ),
@@ -2749,7 +2834,11 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                 backgroundColor: AppTheme.primaryBlue,
                                 foregroundColor: Colors.white,
                               ),
-                              child: Text('Sign In'),
+                              child: Text(
+                                AppLocalizations.of(
+                                  context,
+                                ).t('drawer.signInButton'),
+                              ),
                             ),
                           ],
                         ),
@@ -2778,7 +2867,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                   ),
                                   SizedBox(height: AppTheme.spaceSm),
                                   Text(
-                                    'Error loading chats',
+                                    AppLocalizations.of(
+                                      context,
+                                    ).t('drawer.errorLoadingChats'),
                                     style: AppTheme.bodyMedium.copyWith(
                                       color: AppTheme.textTertiary,
                                     ),
@@ -2804,7 +2895,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                     ),
                                     SizedBox(height: AppTheme.spaceSm),
                                     Text(
-                                      'No chats yet',
+                                      AppLocalizations.of(
+                                        context,
+                                      ).t('drawer.noChats'),
                                       style: AppTheme.bodyMedium.copyWith(
                                         color: AppTheme.textTertiary,
                                       ),
@@ -2814,7 +2907,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                         top: AppTheme.spaceSm,
                                       ),
                                       child: Text(
-                                        'Start chatting to create your first conversation',
+                                        AppLocalizations.of(
+                                          context,
+                                        ).t('drawer.startChatting'),
                                         style: AppTheme.bodySmall.copyWith(
                                           color: AppTheme.textTertiary,
                                         ),
@@ -2962,7 +3057,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                                             .ellipsis,
                                                       ),
                                                       Text(
-                                                        '${chat['messageCount']} messages',
+                                                        '${chat['messageCount']} ${AppLocalizations.of(context).t('drawer.messages')}',
                                                         style: AppTheme
                                                             .bodySmall
                                                             .copyWith(
@@ -3029,7 +3124,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                     ),
                                     SizedBox(height: AppTheme.spaceSm),
                                     Text(
-                                      'No chats found',
+                                      AppLocalizations.of(
+                                        context,
+                                      ).t('drawer.noChatFound'),
                                       style: AppTheme.bodyMedium.copyWith(
                                         color: AppTheme.textTertiary,
                                       ),
@@ -3046,7 +3143,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                 final timestamp = chat['updatedAt'];
                                 final timeStr = timestamp != null
                                     ? _formatTimestamp(timestamp)
-                                    : 'Just now';
+                                    : AppLocalizations.of(
+                                        context,
+                                      ).t('drawer.justNow');
                                 final isStarred = chat['isStarred'] ?? false;
                                 final chatId = chat['id'];
                                 final chatTitle = chat['title'];
@@ -3205,7 +3304,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                                           ).brightness ==
                                                           Brightness.dark;
                                                       return Text(
-                                                        '${chat['messageCount']} messages',
+                                                        '${chat['messageCount']} ${AppLocalizations.of(context).t('drawer.messages')}',
                                                         style: AppTheme
                                                             .bodySmall
                                                             .copyWith(
@@ -3542,7 +3641,6 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                 _toggleFullScreen();
               },
               child: SafeArea(
-                bottom: false,
                 child: Column(
                   children: [
                     Expanded(
@@ -3556,9 +3654,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                     20,
                                     20,
                                     20,
-                                    _isFullScreen
-                                        ? 20
-                                        : 120, // Adjust padding based on full-screen mode
+                                    20, // Consistent padding, input area handles its own spacing
                                   ),
                                   itemCount: _messages.length,
                                   itemBuilder: (context, i) {
@@ -3723,7 +3819,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                         children: [
                                           Text(
                                             _selectedFileName ??
-                                                'Image selected',
+                                                AppLocalizations.of(
+                                                  context,
+                                                ).t('chatScreen.imageSelected'),
                                             style: AppTheme.bodyMedium.copyWith(
                                               color:
                                                   Theme.of(
@@ -3739,7 +3837,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                           ),
                                           SizedBox(height: 4),
                                           Text(
-                                            'Attached to message',
+                                            AppLocalizations.of(
+                                              context,
+                                            ).t('chatScreen.attachedToMessage'),
                                             style: AppTheme.bodySmall.copyWith(
                                               color:
                                                   Theme.of(
@@ -3924,9 +4024,13 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
             children: [
               // Personalized greeting
               FutureBuilder<String>(
-                future: GreetingUtils.getPersonalizedGreetingAsync(),
+                future: GreetingUtils.getPersonalizedGreetingAsync(
+                  context: context,
+                ),
                 builder: (context, snapshot) {
-                  final greeting = snapshot.data ?? GreetingUtils.getGreeting();
+                  final greeting =
+                      snapshot.data ??
+                      GreetingUtils.getGreeting(context: context);
                   return Text(
                     greeting,
                     textAlign: TextAlign.center,
@@ -3967,20 +4071,32 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                   children: [
                     _buildFeatureRow(
                       Icons.chat_bubble_outline,
-                      'Natural Conversations',
-                      'Engage in fluid, intelligent dialogue',
+                      AppLocalizations.of(
+                        context,
+                      ).t('chatScreen.naturalConversations'),
+                      AppLocalizations.of(
+                        context,
+                      ).t('chatScreen.engageFluidDialogue'),
                     ),
                     SizedBox(height: 16),
                     _buildFeatureRow(
                       Icons.image_outlined,
-                      'Visual Understanding',
-                      'Upload images and discuss them',
+                      AppLocalizations.of(
+                        context,
+                      ).t('chatScreen.visualUnderstanding'),
+                      AppLocalizations.of(
+                        context,
+                      ).t('chatScreen.uploadImagesDiscuss'),
                     ),
                     SizedBox(height: 16),
                     _buildFeatureRow(
                       Icons.psychology_outlined,
-                      'Multiple AI Models',
-                      'Choose from various AI personalities',
+                      AppLocalizations.of(
+                        context,
+                      ).t('chatScreen.multipleAIModels'),
+                      AppLocalizations.of(
+                        context,
+                      ).t('chatScreen.chooseAIPersonalities'),
                     ),
                   ],
                 ),

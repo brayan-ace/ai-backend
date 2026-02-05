@@ -1,4 +1,6 @@
 import '../services/user_profile_service.dart';
+import 'package:flutter/material.dart';
+import 'app_localizations.dart';
 
 /// Utility class for generating time-based greetings
 class GreetingUtils {
@@ -6,16 +8,28 @@ class GreetingUtils {
   /// Morning: 5:00 - 11:59
   /// Afternoon: 12:00 - 17:59
   /// Evening: 18:00 - 4:59
-  static String getGreeting() {
+  static String getGreeting({BuildContext? context}) {
     final now = DateTime.now();
     final hour = now.hour;
 
-    if (hour >= 5 && hour < 12) {
-      return 'How can I help you this morning?';
-    } else if (hour >= 12 && hour < 18) {
-      return 'How can I help you this afternoon?';
+    if (context != null) {
+      final localizations = AppLocalizations.of(context);
+      if (hour >= 5 && hour < 12) {
+        return localizations.t('greeting.morningGreeting');
+      } else if (hour >= 12 && hour < 18) {
+        return localizations.t('greeting.afternoonGreeting');
+      } else {
+        return localizations.t('greeting.eveningGreeting');
+      }
     } else {
-      return 'How can I help you this evening?';
+      // Fallback to English if context is not provided
+      if (hour >= 5 && hour < 12) {
+        return 'How can I help you this morning?';
+      } else if (hour >= 12 && hour < 18) {
+        return 'How can I help you this afternoon?';
+      } else {
+        return 'How can I help you this evening?';
+      }
     }
   }
 
@@ -34,42 +48,65 @@ class GreetingUtils {
   }
 
   /// Returns the time period name (Morning/Afternoon/Evening)
-  static String getTimePeriod() {
+  static String getTimePeriod({BuildContext? context}) {
     final now = DateTime.now();
     final hour = now.hour;
 
-    if (hour >= 5 && hour < 12) {
-      return 'Morning';
-    } else if (hour >= 12 && hour < 18) {
-      return 'Afternoon';
+    if (context != null) {
+      final localizations = AppLocalizations.of(context);
+      if (hour >= 5 && hour < 12) {
+        return localizations.t('greeting.goodMorning');
+      } else if (hour >= 12 && hour < 18) {
+        return localizations.t('greeting.goodAfternoon');
+      } else {
+        return localizations.t('greeting.goodEvening');
+      }
     } else {
-      return 'Evening';
+      // Fallback to English
+      if (hour >= 5 && hour < 12) {
+        return 'Morning';
+      } else if (hour >= 12 && hour < 18) {
+        return 'Afternoon';
+      } else {
+        return 'Evening';
+      }
     }
   }
 
   /// Returns a personalized greeting with the user's name
   /// Format: "Good Morning, {username}. What can we do today?"
-  static String getPersonalizedGreeting({String? username}) {
-    final timePeriod = getTimePeriod();
+  static String getPersonalizedGreeting({
+    String? username,
+    BuildContext? context,
+  }) {
+    final timePeriod = getTimePeriod(context: context);
     final name = username ?? UserProfileService.instance.getDisplayNameSync();
-    
-    return 'Good $timePeriod, $name. What can we do today?';
+    final whatCanWeDo = context != null
+        ? AppLocalizations.of(context).t('greeting.whatCanWeDo')
+        : 'What can we do today?';
+
+    return '$timePeriod, $name. $whatCanWeDo';
   }
 
   /// Returns a personalized greeting asynchronously (fetches username if needed)
-  static Future<String> getPersonalizedGreetingAsync() async {
-    final timePeriod = getTimePeriod();
+  static Future<String> getPersonalizedGreetingAsync({
+    BuildContext? context,
+  }) async {
+    final timePeriod = getTimePeriod(context: context);
     final name = await UserProfileService.instance.getDisplayName();
-    
-    return 'Good $timePeriod, $name. What can we do today?';
+    final whatCanWeDo = context != null
+        ? AppLocalizations.of(context).t('greeting.whatCanWeDo')
+        : 'What can we do today?';
+
+    return '$timePeriod, $name. $whatCanWeDo';
   }
 
   /// Returns just the greeting prefix without the question
   /// Format: "Good Morning, {username}"
-  static String getGreetingPrefix({String? username}) {
-    final timePeriod = getTimePeriod();
+  static String getGreetingPrefix({String? username, BuildContext? context}) {
+    final timePeriod = getTimePeriod(context: context);
     final name = username ?? UserProfileService.instance.getDisplayNameSync();
-    
-    return 'Good $timePeriod, $name';
+
+    return '$timePeriod, $name';
   }
 }

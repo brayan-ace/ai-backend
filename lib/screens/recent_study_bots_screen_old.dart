@@ -17,7 +17,8 @@ class _RecentStudyBotsScreenState extends State<RecentStudyBotsScreen> {
   bool _isLoading = true;
   String _errorMessage = '';
 
-  static const String _backendUrl = 'https://ai-backend-vf75.onrender.com';
+  static const String _backendUrl =
+      'https://ai-backend-production-65d6.up.railway.app';
 
   @override
   void initState() {

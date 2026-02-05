@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import '../utils/theme.dart';
+import '../utils/app_localizations.dart';
 
 class PlaceholderScreen extends StatelessWidget {
-  final String title;
-  final String message;
+  final String titleKey;
+  final String messageKey;
 
   const PlaceholderScreen({
     super.key,
-    required this.title,
-    this.message = 'This feature will be available in a future update.',
+    required this.titleKey,
+    this.messageKey = 'common.comingSoon',
   });
 
   @override
@@ -46,7 +47,7 @@ class PlaceholderScreen extends StatelessWidget {
               colors: AppTheme.primaryGradient,
             ).createShader(bounds),
             child: Text(
-              title,
+              AppLocalizations.of(context).t(titleKey),
               style: AppTheme.headlineMedium.copyWith(
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
@@ -82,7 +83,7 @@ class PlaceholderScreen extends StatelessWidget {
                   ),
                   SizedBox(height: AppTheme.spaceLg),
                   Text(
-                    'Coming Soon',
+                    AppLocalizations.of(context).t('common.comingSoon'),
                     style: AppTheme.headlineLarge.copyWith(
                       color: AppTheme.textPrimary,
                       fontWeight: FontWeight.bold,
@@ -91,7 +92,7 @@ class PlaceholderScreen extends StatelessWidget {
                   ),
                   SizedBox(height: AppTheme.spaceMd),
                   Text(
-                    message,
+                    AppLocalizations.of(context).t(messageKey),
                     style: AppTheme.bodyLarge.copyWith(
                       color: AppTheme.textSecondary,
                     ),

@@ -3,8 +3,9 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  // Backend URL (Render)
-  static const String baseUrl = "https://ai-backend-vf75.onrender.com";
+  // Backend URL (Railway)
+  static const String baseUrl =
+      "https://ai-backend-production-65d6.up.railway.app";
 
   /// Send a request to the backend's unified /api/ask endpoint
   /// Handles: chat (Groq), search (Tavily), image (Gemini)

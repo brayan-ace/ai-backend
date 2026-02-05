@@ -16,6 +16,7 @@ import '../services/study_bot_firebase_service.dart';
 import '../services/gamification_service.dart';
 import '../services/analytics_service.dart';
 import '../utils/theme.dart';
+import '../utils/app_localizations.dart';
 import 'study_plan_editor_screen.dart';
 import 'quiz_config_screen.dart';
 import '../widgets/quiz_artifact_widget.dart';
@@ -25,6 +26,7 @@ import '../widgets/premium_message_bubble.dart';
 import '../services/study_activity_service.dart';
 import '../services/study_notification_service.dart';
 import '../services/text_to_speech_service.dart';
+import 'main_tabs.dart';
 
 // Premium color palette matching bot creation and processing screens
 class PremiumColors {
@@ -238,6 +240,8 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
 
   // Progress tracking
   double _progressPercentage = 0;
+  int _userMessageCount = 0; // Track user messages
+  int _totalMessageCount = 0; // Track total messages (user + bot)
   String _botCurrentState = 'intro';
   LearnerProfile? _learnerProfile;
   UserMoodState? _currentMood;
@@ -250,10 +254,13 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       {}; // Map of artifactId -> artifact data
   String? _lastQuizArtifactId; // Track the last quiz artifact for reopening
 
+  // Quiz score tracking
+  Map<String, dynamic>? _lastQuizScore; // Track quiz score for AI awareness
+
   // Backend URL
   static const String _backendUrl = String.fromEnvironment(
     'BACKEND_URL',
-    defaultValue: 'https://ai-backend-vf75.onrender.com',
+    defaultValue: 'https://ai-backend-production-65d6.up.railway.app',
   );
 
   // Firebase Firestore instance - EXACT same pattern as OnlineAiScreen
@@ -397,9 +404,23 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                     text: m['text'] as String? ?? '',
                     timestamp:
                         (m['timestamp'] as dynamic)?.toDate() ?? DateTime.now(),
+                    metadata: m['metadata'] as Map<String, dynamic>?,
                   ),
                 )
                 .toList();
+
+            // Reconstruct artifacts from saved messages
+            for (final msg in messages) {
+              if (msg.senderType == 'artifact' && msg.metadata != null) {
+                final artifactId = msg.metadata!['artifactId'] as String?;
+                final artifactData =
+                    msg.metadata!['artifactData'] as Map<String, dynamic>?;
+                if (artifactId != null && artifactData != null) {
+                  _artifacts[artifactId] = artifactData;
+                  print('[ChatScreen] 📦 Restored artifact: $artifactId');
+                }
+              }
+            }
 
             setState(() => _messages = messages);
             print(
@@ -429,9 +450,25 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                         m['timestamp'] as String? ??
                             DateTime.now().toIso8601String(),
                       ),
+                      metadata: m['metadata'] as Map<String, dynamic>?,
                     ),
                   )
                   .toList();
+
+              // Reconstruct artifacts from loaded messages
+              for (final msg in messages) {
+                if (msg.senderType == 'artifact' && msg.metadata != null) {
+                  final artifactId = msg.metadata!['artifactId'] as String?;
+                  final artifactData =
+                      msg.metadata!['artifactData'] as Map<String, dynamic>?;
+                  if (artifactId != null && artifactData != null) {
+                    _artifacts[artifactId] = artifactData;
+                    print(
+                      '[ChatScreen] 📦 Restored artifact from backend: $artifactId',
+                    );
+                  }
+                }
+              }
 
               setState(() => _messages = messages);
               print(
@@ -646,6 +683,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
 
       setState(() {
         _messages.add(message);
+        _totalMessageCount = _messages.length;
+        // Update counts (this is a bot message)
+        print('[ChatScreen] 📊 Added bot message - Total: $_totalMessageCount');
       });
 
       if (_botState != null) {
@@ -670,6 +710,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
 
       setState(() {
         _messages.add(message);
+        _totalMessageCount = _messages.length;
+        // Update counts (this is a bot message)
+        print('[ChatScreen] 📊 Added bot message - Total: $_totalMessageCount');
       });
 
       // Save bot message to Firebase
@@ -724,6 +767,15 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       text: text,
       timestamp: DateTime.now(),
     );
+
+    setState(() {
+      _messages.add(message);
+      _totalMessageCount = _messages.length;
+      _userMessageCount = _messages.where((m) => m.senderType == 'user').length;
+      print(
+        '[ChatScreen] 📊 Added user message - User: $_userMessageCount, Total: $_totalMessageCount',
+      );
+    });
 
     // Save user message to Firebase
     if (widget.botId != null) {
@@ -783,7 +835,6 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     }
 
     setState(() {
-      _messages.add(message);
       _inputController.clear();
       _isLoading = true;
     });
@@ -907,9 +958,17 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
             _botCurrentState = newState;
             if (progress != null) {
               _progressPercentage = (progress['percentage'] ?? 0).toDouble();
-              print('[ChatScreen] 📊 Progress: $_progressPercentage%');
+              print('[ChatScreen] 📊 Progress updated: $_progressPercentage%');
             }
+            // Update message counts
+            _totalMessageCount = _messages.length;
+            _userMessageCount = _messages
+                .where((m) => m.senderType == 'user')
+                .length;
             print('[ChatScreen] 📊 State updated: $_botCurrentState');
+            print(
+              '[ChatScreen] 📊 Messages: $_userMessageCount user, ${_totalMessageCount - _userMessageCount} bot, Total: $_totalMessageCount',
+            );
           });
 
           // Show celebration if module was completed
@@ -939,6 +998,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
 
           // Always reload study plan from backend to ensure hamburger menu is updated
           await _loadStudyPlan();
+
+          // Refresh progress from backend to get accurate progress percentage
+          await _refreshProgressFromBackend();
 
           await _addBotMessage(botResponse);
         } catch (parseErr) {
@@ -1023,6 +1085,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
             padding: EdgeInsets.all(AppTheme.spaceMd),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 // Study Bot Header Card
                 Container(
@@ -1106,13 +1169,17 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                   child: Column(
                     children: [
                       _buildInfoRow(
-                        label: 'Bot Name',
+                        label: AppLocalizations.of(
+                          context,
+                        ).t('studyBotChat.botName'),
                         value: widget.botName ?? 'N/A',
                         icon: Icons.person,
                       ),
                       SizedBox(height: AppTheme.spaceMd),
                       _buildInfoRow(
-                        label: 'Education Level',
+                        label: AppLocalizations.of(
+                          context,
+                        ).t('studyBotChat.educationLevel'),
                         value: widget.educationLevel ?? 'N/A',
                         icon: Icons.school,
                       ),
@@ -1123,7 +1190,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
 
                 // Study Plan Information
                 Text(
-                  'Study Plan',
+                  AppLocalizations.of(context).t('studyBotChat.studyPlan'),
                   style: AppTheme.headlineSmall.copyWith(
                     color: AppTheme.textPrimary,
                   ),
@@ -1142,7 +1209,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Name',
+                        AppLocalizations.of(context).t('studyBotChat.planName'),
                         style: AppTheme.labelSmall.copyWith(
                           color: AppTheme.textSecondary,
                         ),
@@ -1157,7 +1224,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                       ),
                       SizedBox(height: AppTheme.spaceMd),
                       Text(
-                        'Description',
+                        AppLocalizations.of(
+                          context,
+                        ).t('studyBotChat.planDescription'),
                         style: AppTheme.labelSmall.copyWith(
                           color: AppTheme.textSecondary,
                         ),
@@ -1249,7 +1318,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                           ),
                         ),
                         child: Text(
-                          'What\'s Next?',
+                          AppLocalizations.of(
+                            context,
+                          ).t('studyBotChat.nextButton'),
                           style: AppTheme.labelLarge.copyWith(
                             color: Colors.white,
                           ),
@@ -1365,7 +1436,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                       color: AppTheme.primaryBlue,
                       size: 22,
                     ),
-                    tooltip: 'View Study Plan',
+                    tooltip: AppLocalizations.of(
+                      context,
+                    ).t('studyBotChat.viewStudyPlan'),
                     onPressed: () {
                       print(
                         '[ChatScreen] 📖 Bookmark tapped - showing modules modal',
@@ -1390,7 +1463,12 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                 HapticFeedback.selectionClick();
                 switch (value) {
                   case 'main_ai':
-                    Navigator.pushNamed(context, '/online-ai');
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const MainTabs(initialIndex: 0),
+                      ),
+                    );
                     break;
                   case 'bot_history':
                     Navigator.pushNamed(context, '/bot-history');
@@ -1401,7 +1479,11 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                   case 'change_mode':
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Mode switching coming soon!'),
+                        content: Text(
+                          AppLocalizations.of(
+                            context,
+                          ).t('studyBotChat.modeComingSoon'),
+                        ),
                         backgroundColor: AppTheme.primaryBlue,
                       ),
                     );
@@ -1420,7 +1502,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                       ),
                       SizedBox(width: 12),
                       Text(
-                        'Go to Main AI',
+                        AppLocalizations.of(
+                          context,
+                        ).t('studyBotChat.goToMainAI'),
                         style: TextStyle(
                           color: AppTheme.textPrimaryFromContext(context),
                         ),
@@ -1435,7 +1519,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                       Icon(Icons.school, color: AppTheme.primaryBlue, size: 20),
                       SizedBox(width: 12),
                       Text(
-                        'My Study Bots',
+                        AppLocalizations.of(
+                          context,
+                        ).t('studyBotChat.myStudyBots'),
                         style: TextStyle(
                           color: AppTheme.textPrimaryFromContext(context),
                         ),
@@ -1454,7 +1540,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                       ),
                       SizedBox(width: 12),
                       Text(
-                        'Chat History',
+                        AppLocalizations.of(
+                          context,
+                        ).t('studyBotChat.chatHistory'),
                         style: TextStyle(
                           color: AppTheme.textPrimaryFromContext(context),
                         ),
@@ -1469,7 +1557,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                       Icon(Icons.swap_horiz, color: Colors.white54, size: 20),
                       SizedBox(width: 12),
                       Text(
-                        'Change Mode',
+                        AppLocalizations.of(
+                          context,
+                        ).t('studyBotChat.changeMode'),
                         style: TextStyle(color: Colors.white54),
                       ),
                     ],
@@ -1693,81 +1783,90 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: GestureDetector(
-        onTap: () {
-          if (artifactType == 'quiz') {
-            _openQuizArtifact(artifactId);
-          }
-        },
-        child: Container(
-          margin: EdgeInsets.only(bottom: 12),
-          padding: EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDarkMode ? Color(0xFF1E1E2E) : Color(0xFFF5F5F7),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: AppTheme.primaryBlue.withOpacity(0.3),
-              width: 2,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width - 32,
+        ),
+        child: GestureDetector(
+          onTap: () {
+            if (artifactType == 'quiz') {
+              _openQuizArtifact(artifactId);
+            }
+          },
+          child: Container(
+            margin: EdgeInsets.only(bottom: 12),
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDarkMode ? Color(0xFF1E1E2E) : Color(0xFFF5F5F7),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppTheme.primaryBlue.withOpacity(0.3),
+                width: 2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.primaryBlue.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: Offset(0, 2),
+                ),
+              ],
             ),
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.primaryBlue.withOpacity(0.1),
-                blurRadius: 8,
-                offset: Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryBlue.withOpacity(0.2),
-                      shape: BoxShape.circle,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryBlue.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.quiz,
+                        color: AppTheme.primaryBlue,
+                        size: 20,
+                      ),
                     ),
-                    child: Icon(
-                      Icons.quiz,
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Quiz Artifact',
+                            style: AppTheme.labelMedium.copyWith(
+                              color: isDarkMode
+                                  ? Colors.white
+                                  : Color(0xFF1F2937),
+                              fontWeight: FontWeight.bold,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Tap to review or retake the quiz',
+                            style: AppTheme.bodySmall.copyWith(
+                              color: isDarkMode
+                                  ? Color(0xFFA0A0A0)
+                                  : Color(0xFF6B7280),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 2,
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Icon(
+                      Icons.arrow_forward_ios,
                       color: AppTheme.primaryBlue,
-                      size: 20,
+                      size: 16,
                     ),
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Quiz Artifact',
-                          style: AppTheme.labelMedium.copyWith(
-                            color: isDarkMode
-                                ? Colors.white
-                                : Color(0xFF1F2937),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Tap to review or retake the quiz',
-                          style: AppTheme.bodySmall.copyWith(
-                            color: isDarkMode
-                                ? Color(0xFFA0A0A0)
-                                : Color(0xFF6B7280),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(
-                    Icons.arrow_forward_ios,
-                    color: AppTheme.primaryBlue,
-                    size: 16,
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1936,7 +2035,12 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                             maxLines: 4,
                             minLines: 1,
                             decoration: InputDecoration(
-                              hintText: 'Message ${widget.botName ?? "AI"}...',
+                              hintText: AppLocalizations.of(context)
+                                  .t('studyBotChat.messageHint')
+                                  .replaceAll(
+                                    '{botName}',
+                                    widget.botName ?? "AI",
+                                  ),
                               hintStyle: TextStyle(
                                 color: isDarkMode
                                     ? Colors.white38
@@ -2060,7 +2164,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                 children: [
                   _buildAttachmentOption(
                     icon: Icons.quiz,
-                    label: 'Take Quiz',
+                    label: AppLocalizations.of(
+                      context,
+                    ).t('studyBotChat.takeQuiz'),
                     onTap: () {
                       Navigator.pop(context);
                       _showQuizPopup();
@@ -2068,7 +2174,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                   ),
                   _buildAttachmentOption(
                     icon: Icons.note_add,
-                    label: 'Save Note',
+                    label: AppLocalizations.of(
+                      context,
+                    ).t('studyBotChat.saveNote'),
                     onTap: () {
                       Navigator.pop(context);
                     },
@@ -2374,14 +2482,16 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
 
     return PremiumStudyPlanMenu(
       key: ValueKey(
-        'study_plan_${_planVersion}_${_studyPlan?.hashCode ?? 0}',
-      ), // Force rebuild when study plan changes
+        'study_plan_${_planVersion}_${_studyPlan?.hashCode ?? 0}_progress_${_progressPercentage.toStringAsFixed(1)}_messages_${_totalMessageCount}',
+      ), // Force rebuild when study plan, progress, or messages change
       tableOfContents: tocItems.isNotEmpty ? tocItems : null,
       currentModule: _botState?.currentModule ?? 0,
       completedModules: _botState?.completedModules,
       progressPercentage: _progressPercentage,
       planVersion: _planVersion,
       planTitle: _studyPlan?['title'] as String?,
+      userMessageCount: _userMessageCount,
+      totalMessageCount: _totalMessageCount,
       context: context, // Pass context for theme access
       onModuleEdit: (moduleIndex, moduleName) {
         print('[ChatScreen] Edit module $moduleIndex: $moduleName');
@@ -3506,7 +3616,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
           print('[ChatScreen] Showing quiz artifact with ID: $quizId');
           // Show quiz artifact
           if (mounted) {
-            _showQuizArtifact(quiz);
+            await _showQuizArtifact(quiz);
           }
         } else {
           print('[ChatScreen] Quiz is invalid: $quiz');
@@ -3567,7 +3677,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   }
 
   /// Show quiz artifact dialog
-  void _showQuizArtifact(Map<String, dynamic> quiz) {
+  Future<void> _showQuizArtifact(Map<String, dynamic> quiz) async {
     // Track quiz start
     _analyticsService.trackQuizStart(quiz);
 
@@ -3577,17 +3687,37 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     _artifacts[artifactId] = quiz;
 
     // Add artifact card to messages to show it can be reopened
+    final artifactMessage = StudyBotMessage(
+      id: artifactId,
+      text: 'Quiz Artifact',
+      senderType: 'artifact',
+      timestamp: DateTime.now(),
+      metadata: {
+        'type': 'quiz',
+        'artifactId': artifactId,
+        'artifactData': quiz, // Store quiz data for persistence
+      },
+    );
+
     setState(() {
-      _messages.add(
-        StudyBotMessage(
-          id: artifactId,
-          text: 'Quiz Artifact',
-          senderType: 'artifact',
-          timestamp: DateTime.now(),
-          metadata: {'type': 'quiz', 'artifactId': artifactId},
-        ),
-      );
+      _messages.add(artifactMessage);
     });
+
+    // Save artifact message to Firebase for persistence
+    if (widget.botId != null) {
+      try {
+        await _storageService.saveMessage(
+          botId: widget.botId!,
+          text: 'Quiz Artifact',
+          fromUser: false,
+          metadata: artifactMessage.metadata,
+          senderType: 'artifact',
+        );
+        print('[ChatScreen] 💾 Artifact saved to Firebase: $artifactId');
+      } catch (e) {
+        print('[ChatScreen] ⚠️ Error saving artifact to Firebase: $e');
+      }
+    }
 
     _scrollToBottom();
 
@@ -3607,6 +3737,18 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                   child: QuizArtifactWidget(
                     quizData: quiz,
                     onExplainAnswer: _handleExplainAnswer,
+                    onScoreUpdate: (correct, total, percentage) {
+                      // Store score for AI awareness
+                      _lastQuizScore = {
+                        'correctAnswers': correct,
+                        'totalQuestions': total,
+                        'percentage': percentage,
+                        'timestamp': DateTime.now().toIso8601String(),
+                      };
+                      print(
+                        '[ChatScreen] Quiz Score Captured: $correct/$total (${percentage.toInt()}%)',
+                      );
+                    },
                   ),
                 ),
                 SizedBox(height: AppTheme.spaceMd),
@@ -3618,7 +3760,14 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                     await _analyticsService.trackQuizCompletion(quiz);
                     await _recordMilestone('Quiz completed', 'quiz_completion');
 
-                    _sendMessageToBackend('I\'ve completed the quiz review.');
+                    // Send score information to the AI
+                    if (_lastQuizScore != null) {
+                      final scoreMessage =
+                          'I scored ${_lastQuizScore!['correctAnswers']}/${_lastQuizScore!['totalQuestions']} on the quiz (${_lastQuizScore!['percentage'].toInt()}%). Please help me improve in the areas I struggled with.';
+                      _sendMessageToBackend(scoreMessage);
+                    } else {
+                      _sendMessageToBackend('I\'ve completed the quiz review.');
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primaryBlue,
@@ -3664,6 +3813,18 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                   child: QuizArtifactWidget(
                     quizData: quiz,
                     onExplainAnswer: _handleExplainAnswer,
+                    onScoreUpdate: (correct, total, percentage) {
+                      // Store score for AI awareness
+                      _lastQuizScore = {
+                        'correctAnswers': correct,
+                        'totalQuestions': total,
+                        'percentage': percentage,
+                        'timestamp': DateTime.now().toIso8601String(),
+                      };
+                      print(
+                        '[ChatScreen] Quiz Score Captured: $correct/$total (${percentage.toInt()}%)',
+                      );
+                    },
                   ),
                 ),
                 SizedBox(height: AppTheme.spaceMd),
@@ -3970,6 +4131,60 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         lowerMessage.contains('i get it') ||
         lowerMessage.contains('yes') ||
         lowerMessage.contains('👍');
+  }
+
+  /// Refresh progress from backend and update UI
+  Future<void> _refreshProgressFromBackend() async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final userId = currentUser?.uid ?? 'anonymous';
+
+      if (widget.botId == null) {
+        print('[ChatScreen] ⚠️ Cannot refresh progress: botId is null');
+        return;
+      }
+
+      final progressUri = Uri.parse(
+        '$_backendUrl/api/bot-progress/${widget.botId}/$userId',
+      );
+
+      final progressRes = await http
+          .get(progressUri)
+          .timeout(
+            Duration(seconds: 10),
+            onTimeout: () {
+              print('[ChatScreen] ⚠️ Progress fetch timeout');
+              throw TimeoutException('Progress fetch timeout');
+            },
+          );
+
+      if (progressRes.statusCode == 200) {
+        final body = jsonDecode(progressRes.body);
+
+        setState(() {
+          if (body['progress'] != null) {
+            _progressPercentage =
+                (body['progress']['percentage'] as num?)?.toDouble() ??
+                _progressPercentage;
+            print('[ChatScreen] 🔄 Progress refreshed: $_progressPercentage%');
+          }
+          // Also update message counts from current state
+          _totalMessageCount = _messages.length;
+          _userMessageCount = _messages
+              .where((m) => m.senderType == 'user')
+              .length;
+          print(
+            '[ChatScreen] 🔄 Message counts updated: User: $_userMessageCount, Total: $_totalMessageCount',
+          );
+        });
+      } else {
+        print(
+          '[ChatScreen] ⚠️ Failed to refresh progress: ${progressRes.statusCode}',
+        );
+      }
+    } catch (e) {
+      print('[ChatScreen] ⚠️ Error refreshing progress: $e');
+    }
   }
 
   /// Check if user's message indicates confusion

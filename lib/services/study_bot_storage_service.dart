@@ -27,7 +27,7 @@ class StudyBotStorageService {
         .doc(botId);
 
     final doc = await docRef.get();
-    
+
     if (!doc.exists) {
       // Create new chat session for this bot
       await docRef.set({
@@ -53,6 +53,7 @@ class StudyBotStorageService {
     required String text,
     required bool fromUser,
     Map<String, dynamic>? metadata,
+    String? senderType,
   }) async {
     if (_userId == null) throw Exception('User not authenticated');
 
@@ -66,7 +67,7 @@ class StudyBotStorageService {
     await chatRef.collection('messages').add({
       'text': text,
       'fromUser': fromUser,
-      'senderType': fromUser ? 'user' : 'bot',
+      'senderType': senderType ?? (fromUser ? 'user' : 'bot'),
       'timestamp': FieldValue.serverTimestamp(),
       'metadata': metadata,
     });
@@ -102,7 +103,8 @@ class StudyBotStorageService {
         'id': doc.id,
         'text': data['text'] ?? '',
         'fromUser': data['fromUser'] ?? false,
-        'senderType': data['senderType'] ?? (data['fromUser'] == true ? 'user' : 'bot'),
+        'senderType':
+            data['senderType'] ?? (data['fromUser'] == true ? 'user' : 'bot'),
         'timestamp': data['timestamp'] as Timestamp?,
         'metadata': data['metadata'],
       };
@@ -130,7 +132,9 @@ class StudyBotStorageService {
               'id': doc.id,
               'text': data['text'] ?? '',
               'fromUser': data['fromUser'] ?? false,
-              'senderType': data['senderType'] ?? (data['fromUser'] == true ? 'user' : 'bot'),
+              'senderType':
+                  data['senderType'] ??
+                  (data['fromUser'] == true ? 'user' : 'bot'),
               'timestamp': data['timestamp'] as Timestamp?,
               'metadata': data['metadata'],
             };
@@ -160,10 +164,7 @@ class StudyBotStorageService {
     final messages = snapshot.docs.reversed.map((doc) {
       final data = doc.data();
       final role = data['fromUser'] == true ? 'user' : 'assistant';
-      return {
-        'role': role,
-        'content': data['text'] as String? ?? '',
-      };
+      return {'role': role, 'content': data['text'] as String? ?? ''};
     }).toList();
 
     return messages;

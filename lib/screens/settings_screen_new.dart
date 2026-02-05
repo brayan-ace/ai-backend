@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../utils/theme.dart';
 import '../utils/theme_provider.dart';
+import '../utils/language_provider.dart';
+import '../utils/app_localizations.dart';
 import '../services/settings_service.dart';
 import '../services/user_profile_service.dart';
 import '../services/onboarding_service.dart';
@@ -198,7 +200,7 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
               colors: AppTheme.primaryGradient,
             ).createShader(bounds),
             child: Text(
-              'Settings',
+              AppLocalizations.of(context).t('settings.title'),
               style: AppTheme.headlineMedium.copyWith(
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
@@ -212,13 +214,15 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
             padding: EdgeInsets.only(bottom: AppTheme.spaceLg),
             children: [
               // Profile Section
-              _sectionHeader('Account'),
+              _sectionHeader(
+                AppLocalizations.of(context).t('settings.account'),
+              ),
               _buildCard(
                 children: [
                   _tile(
                     context,
                     icon: Icons.person,
-                    title: 'Profile',
+                    title: AppLocalizations.of(context).t('nav.profile'),
                     subtitle: 'Username: $_username',
                     gradient: AppTheme.accentGradient,
                     onTap: () =>
@@ -228,14 +232,18 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
               ),
 
               // Billing Section
-              _sectionHeader('Subscription'),
+              _sectionHeader(
+                AppLocalizations.of(context).t('settings.subscription'),
+              ),
               _buildCard(
                 children: [
                   _tile(
                     context,
                     icon: Icons.credit_card,
-                    title: 'Billing',
-                    subtitle: 'Manage your subscription',
+                    title: AppLocalizations.of(context).t('settings.billing'),
+                    subtitle: AppLocalizations.of(
+                      context,
+                    ).t('settings.manageSubscription'),
                     gradient: AppTheme.primaryGradient,
                     onTap: () => Navigator.pushNamed(context, '/billing'),
                   ),
@@ -243,22 +251,32 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
               ),
 
               // Capabilities Section
-              _sectionHeader('Capabilities'),
+              _sectionHeader(
+                AppLocalizations.of(context).t('settings.capabilities'),
+              ),
               _buildCard(
                 children: [
                   _tile(
                     context,
                     icon: Icons.settings_suggest,
-                    title: 'Capabilities',
-                    subtitle: 'App features and abilities',
+                    title: AppLocalizations.of(
+                      context,
+                    ).t('settings.capabilities'),
+                    subtitle: AppLocalizations.of(
+                      context,
+                    ).t('settings.appFeatures'),
                     onTap: () => Navigator.pushNamed(context, '/capabilities'),
                   ),
                   _buildDivider(),
                   _tile(
                     context,
                     icon: Icons.notifications_active,
-                    title: 'Notification Settings',
-                    subtitle: 'Manage push notifications',
+                    title: AppLocalizations.of(
+                      context,
+                    ).t('settings.notificationSettings'),
+                    subtitle: AppLocalizations.of(
+                      context,
+                    ).t('settings.manageNotifications'),
                     onTap: () =>
                         Navigator.pushNamed(context, '/notification-settings'),
                   ),
@@ -266,8 +284,12 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                   _tile(
                     context,
                     icon: Icons.school_outlined,
-                    title: 'Show Onboarding',
-                    subtitle: 'View app walkthrough',
+                    title: AppLocalizations.of(
+                      context,
+                    ).t('settings.showOnboarding'),
+                    subtitle: AppLocalizations.of(
+                      context,
+                    ).t('settings.viewWalkthrough'),
                     onTap: () {
                       _showOnboardingConfirmation();
                     },
@@ -276,28 +298,38 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
               ),
 
               // Permissions Section
-              _sectionHeader('Permissions'),
+              _sectionHeader(
+                AppLocalizations.of(context).t('settings.permissions'),
+              ),
               _buildCard(
                 children: [
                   _tile(
                     context,
                     icon: Icons.security,
-                    title: 'Permissions',
-                    subtitle: 'App permissions',
+                    title: AppLocalizations.of(
+                      context,
+                    ).t('settings.permissions'),
+                    subtitle: AppLocalizations.of(
+                      context,
+                    ).t('settings.appPermissions'),
                     onTap: () => Navigator.pushNamed(context, '/permissions'),
                   ),
                 ],
               ),
 
               // Appearance Section
-              _sectionHeader('Appearance'),
+              _sectionHeader(
+                AppLocalizations.of(context).t('settings.appearance'),
+              ),
               _buildCard(
                 children: [
                   _tile(
                     context,
                     icon: Icons.palette,
-                    title: 'Color Mode',
-                    subtitle: _colorMode == 'dark' ? 'Dark' : 'Light',
+                    title: AppLocalizations.of(context).t('settings.colorMode'),
+                    subtitle: _colorMode == 'dark'
+                        ? AppLocalizations.of(context).t('settings.dark')
+                        : AppLocalizations.of(context).t('settings.light'),
                     trailing: Container(
                       padding: EdgeInsets.symmetric(
                         horizontal: 12,
@@ -310,7 +342,13 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        _colorMode == 'dark' ? 'DARK' : 'LIGHT',
+                        _colorMode == 'dark'
+                            ? AppLocalizations.of(
+                                context,
+                              ).t('settings.dark').toUpperCase()
+                            : AppLocalizations.of(
+                                context,
+                              ).t('settings.light').toUpperCase(),
                         style: AppTheme.labelSmall.copyWith(
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
@@ -322,15 +360,38 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                 ],
               ),
 
+              // Language Section
+              _sectionHeader(
+                AppLocalizations.of(context).t('settings.language'),
+              ),
+              _buildCard(
+                children: [
+                  _tile(
+                    context,
+                    icon: Icons.language,
+                    title: AppLocalizations.of(
+                      context,
+                    ).t('settings.appLanguage'),
+                    subtitle: _getLanguageSubtitle(),
+                    gradient: AppTheme.accentGradient,
+                    onTap: () => _showLanguageDialog(),
+                  ),
+                ],
+              ),
+
               // Speech Language Section
-              _sectionHeader('Speech'),
+              _sectionHeader(AppLocalizations.of(context).t('settings.speech')),
               _buildCard(
                 children: [
                   _tile(
                     context,
                     icon: Icons.record_voice_over,
-                    title: 'Speech Language',
-                    subtitle: 'Voice settings',
+                    title: AppLocalizations.of(
+                      context,
+                    ).t('settings.speechLanguage'),
+                    subtitle: AppLocalizations.of(
+                      context,
+                    ).t('settings.voiceSettings'),
                     onTap: () =>
                         Navigator.pushNamed(context, '/speech-language'),
                   ),
@@ -338,14 +399,18 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
               ),
 
               // Privacy Section
-              _sectionHeader('Privacy'),
+              _sectionHeader(
+                AppLocalizations.of(context).t('settings.privacy'),
+              ),
               _buildCard(
                 children: [
                   _tile(
                     context,
                     icon: Icons.privacy_tip,
-                    title: 'Privacy',
-                    subtitle: 'Privacy settings',
+                    title: AppLocalizations.of(context).t('settings.privacy'),
+                    subtitle: AppLocalizations.of(
+                      context,
+                    ).t('settings.privacySettings'),
                     onTap: () => Navigator.pushNamed(context, '/privacy'),
                   ),
                 ],
@@ -353,14 +418,20 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
 
               // Contact Us Section (visually separated)
               SizedBox(height: AppTheme.spaceLg),
-              _sectionHeader('Contact Us'),
+              _sectionHeader(
+                AppLocalizations.of(context).t('settings.contactUs'),
+              ),
               _buildCard(
                 children: [
                   _tile(
                     context,
                     icon: Icons.message,
-                    title: 'WhatsApp Community',
-                    subtitle: 'Join our WhatsApp community',
+                    title: AppLocalizations.of(
+                      context,
+                    ).t('settings.whatsappCommunity'),
+                    subtitle: AppLocalizations.of(
+                      context,
+                    ).t('settings.joinWhatsapp'),
                     trailing: SocialMediaIcon(platform: 'whatsapp', size: 32),
                     onTap: () => _launchUrl(
                       'https://chat.whatsapp.com/BSwumdCdeLF7txFxw3jGdW',
@@ -370,8 +441,12 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                   _tile(
                     context,
                     icon: Icons.thumb_up,
-                    title: 'Facebook Page',
-                    subtitle: 'Follow us on Facebook',
+                    title: AppLocalizations.of(
+                      context,
+                    ).t('settings.facebookPage'),
+                    subtitle: AppLocalizations.of(
+                      context,
+                    ).t('settings.followFacebook'),
                     trailing: SocialMediaIcon(platform: 'facebook', size: 32),
                     onTap: () => _launchUrl(
                       'https://www.facebook.com/share/17untMVSDD/',
@@ -381,8 +456,12 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                   _tile(
                     context,
                     icon: Icons.camera_alt,
-                    title: 'Instagram Profile',
-                    subtitle: 'Follow us on Instagram',
+                    title: AppLocalizations.of(
+                      context,
+                    ).t('settings.instagramProfile'),
+                    subtitle: AppLocalizations.of(
+                      context,
+                    ).t('settings.followInstagram'),
                     trailing: SocialMediaIcon(platform: 'instagram', size: 32),
                     onTap: () => _launchUrl(
                       'https://www.instagram.com/nexasmartai?igsh=YTJ1eGlneGxtZ2Zn',
@@ -392,8 +471,12 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                   _tile(
                     context,
                     icon: Icons.music_video,
-                    title: 'TikTok Page',
-                    subtitle: 'Follow us on TikTok',
+                    title: AppLocalizations.of(
+                      context,
+                    ).t('settings.tiktokPage'),
+                    subtitle: AppLocalizations.of(
+                      context,
+                    ).t('settings.followTiktok'),
                     trailing: SocialMediaIcon(platform: 'tiktok', size: 32),
                     onTap: () => _launchUrl(
                       'https://www.tiktok.com/@nexa.2035?_r=1&_t=ZM-93F28qgfiV2',
@@ -410,27 +493,156 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
     );
   }
 
+  String _getLanguageSubtitle() {
+    final languageProvider = Provider.of<LanguageProvider>(
+      context,
+      listen: false,
+    );
+    final langCode = languageProvider.currentLanguageCode;
+    return LanguageProvider.languageNames[langCode] ?? langCode;
+  }
+
+  void _showLanguageDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final languageProvider = Provider.of<LanguageProvider>(
+          context,
+          listen: false,
+        );
+        final currentLang = languageProvider.currentLanguageCode;
+
+        return AlertDialog(
+          backgroundColor: isDark
+              ? AppTheme.surfaceElevated
+              : Color(0xFFFFFFFF),
+          surfaceTintColor: isDark ? null : Color(0xFFFFFFFF),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+            side: BorderSide(
+              color: isDark ? AppTheme.surfaceElevated : Color(0xFFE5E7EB),
+              width: 1,
+            ),
+          ),
+          title: Text(
+            AppLocalizations.of(context).t('settings.selectLanguageTitle'),
+            style: AppTheme.headlineMedium.copyWith(
+              color: isDark ? AppTheme.textPrimary : Color(0xFF000000),
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: LanguageProvider.languageNames.entries.map((entry) {
+              final langCode = entry.key;
+              final langName = entry.value;
+              final isSelected = currentLang == langCode;
+
+              return InkWell(
+                onTap: () {
+                  languageProvider.setLanguage(langCode);
+                  Navigator.pop(context);
+                },
+                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                child: Container(
+                  padding: EdgeInsets.all(AppTheme.spaceMd),
+                  margin: EdgeInsets.only(bottom: AppTheme.spaceSm),
+                  decoration: BoxDecoration(
+                    gradient: isSelected
+                        ? LinearGradient(colors: AppTheme.primaryGradient)
+                        : LinearGradient(
+                            colors: isDark
+                                ? AppTheme.surfaceGradient
+                                : [Color(0xFFF3F4F6), Color(0xFFF9FAFB)],
+                          ),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                    border: Border.all(
+                      color: isSelected
+                          ? AppTheme.primaryBlue
+                          : (isDark
+                                ? AppTheme.surfaceElevated
+                                : Color(0xFFE5E7EB)),
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.language,
+                        color: isSelected
+                            ? Colors.white
+                            : (isDark
+                                  ? AppTheme.textPrimary
+                                  : Color(0xFF1F2937)),
+                        size: 24,
+                      ),
+                      SizedBox(width: AppTheme.spaceMd),
+                      Text(
+                        langName,
+                        style: AppTheme.bodyLarge.copyWith(
+                          color: isSelected
+                              ? Colors.white
+                              : (isDark
+                                    ? AppTheme.textPrimary
+                                    : Color(0xFF000000)),
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                        ),
+                      ),
+                      Spacer(),
+                      if (isSelected)
+                        Icon(Icons.check_circle, color: Colors.white, size: 20),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        );
+      },
+    );
+  }
+
   void _showColorModeDialog() {
     showDialog(
       context: context,
       builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         return AlertDialog(
-          backgroundColor: AppTheme.surfaceElevated,
+          backgroundColor: isDark
+              ? AppTheme.surfaceElevated
+              : Color(0xFFFFFFFF),
+          surfaceTintColor: isDark ? null : Color(0xFFFFFFFF),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+            side: BorderSide(
+              color: isDark ? AppTheme.surfaceElevated : Color(0xFFE5E7EB),
+              width: 1,
+            ),
           ),
           title: Text(
-            'Color Mode',
+            AppLocalizations.of(context).t('settings.colorMode'),
             style: AppTheme.headlineMedium.copyWith(
-              color: AppTheme.textPrimary,
+              color: isDark ? AppTheme.textPrimary : Color(0xFF000000),
             ),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildColorOption('Light', 'light', Icons.light_mode),
+              _buildColorOption(
+                AppLocalizations.of(context).t('settings.light'),
+                'light',
+                Icons.light_mode,
+                isDark,
+              ),
               SizedBox(height: AppTheme.spaceSm),
-              _buildColorOption('Dark', 'dark', Icons.dark_mode),
+              _buildColorOption(
+                AppLocalizations.of(context).t('settings.dark'),
+                'dark',
+                Icons.dark_mode,
+                isDark,
+              ),
             ],
           ),
         );
@@ -438,7 +650,12 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
     );
   }
 
-  Widget _buildColorOption(String label, String value, IconData icon) {
+  Widget _buildColorOption(
+    String label,
+    String value,
+    IconData icon,
+    bool isDark,
+  ) {
     final isSelected = _colorMode == value;
     return InkWell(
       onTap: () {
@@ -451,10 +668,16 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
         decoration: BoxDecoration(
           gradient: isSelected
               ? LinearGradient(colors: AppTheme.primaryGradient)
-              : LinearGradient(colors: AppTheme.surfaceGradient),
+              : LinearGradient(
+                  colors: isDark
+                      ? AppTheme.surfaceGradient
+                      : [Color(0xFFF3F4F6), Color(0xFFF9FAFB)],
+                ),
           borderRadius: BorderRadius.circular(AppTheme.radiusMd),
           border: Border.all(
-            color: isSelected ? AppTheme.primaryBlue : AppTheme.surfaceElevated,
+            color: isSelected
+                ? AppTheme.primaryBlue
+                : (isDark ? AppTheme.surfaceElevated : Color(0xFFE5E7EB)),
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -462,20 +685,24 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
           children: [
             Icon(
               icon,
-              color: isSelected ? Colors.black : AppTheme.textPrimary,
+              color: isSelected
+                  ? Colors.white
+                  : (isDark ? AppTheme.textPrimary : Color(0xFF1F2937)),
               size: 24,
             ),
             SizedBox(width: AppTheme.spaceMd),
             Text(
               label,
               style: AppTheme.bodyLarge.copyWith(
-                color: isSelected ? Colors.black : AppTheme.textPrimary,
+                color: isSelected
+                    ? Colors.white
+                    : (isDark ? AppTheme.textPrimary : Color(0xFF000000)),
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
             ),
             Spacer(),
             if (isSelected)
-              Icon(Icons.check_circle, color: Colors.black, size: 20),
+              Icon(Icons.check_circle, color: Colors.white, size: 20),
           ],
         ),
       ),

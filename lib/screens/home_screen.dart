@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../utils/globals.dart';
+import '../utils/app_localizations.dart';
 import '../services/study_plan_service.dart';
 import '../utils/theme.dart';
 import '../services/user_profile_service.dart';
@@ -58,7 +59,7 @@ class HomeScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Welcome',
+                              AppLocalizations.of(context).t('drawer.welcome'),
                               style: AppTheme.bodySmall.copyWith(
                                 color: Colors.black.withOpacity(0.7),
                               ),
@@ -107,7 +108,7 @@ class HomeScreen extends StatelessWidget {
                         color: AppTheme.textPrimary,
                       ),
                       decoration: InputDecoration(
-                        hintText: 'Search chats and projects',
+                        hintText: AppLocalizations.of(context).t('home.search'),
                         hintStyle: AppTheme.bodyMedium.copyWith(
                           color: AppTheme.textTertiary,
                         ),
@@ -131,7 +132,7 @@ class HomeScreen extends StatelessWidget {
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: AppTheme.spaceMd),
                   child: Text(
-                    'Study Plans',
+                    AppLocalizations.of(context).t('drawer.studyPlans'),
                     style: AppTheme.labelMedium.copyWith(
                       color: AppTheme.textTertiary,
                       letterSpacing: 1.5,
@@ -141,7 +142,7 @@ class HomeScreen extends StatelessWidget {
                 SizedBox(height: AppTheme.spaceSm),
                 _buildDrawerItem(
                   icon: Icons.school_rounded,
-                  title: 'My Study Plans',
+                  title: AppLocalizations.of(context).t('drawer.myStudyPlans'),
                   context: context,
                   onTap: () {
                     navigatorKey.currentState?.pushNamed('/study');
@@ -160,7 +161,7 @@ class HomeScreen extends StatelessWidget {
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: AppTheme.spaceMd),
                   child: Text(
-                    'Chats',
+                    AppLocalizations.of(context).t('drawer.chats'),
                     style: AppTheme.labelMedium.copyWith(
                       color: AppTheme.textTertiary,
                       letterSpacing: 1.5,
@@ -170,17 +171,17 @@ class HomeScreen extends StatelessWidget {
                 SizedBox(height: AppTheme.spaceSm),
                 _buildDrawerItem(
                   icon: Icons.chat_bubble_outline,
-                  title: 'All chats',
+                  title: AppLocalizations.of(context).t('drawer.allChats'),
                   context: context,
                 ),
                 _buildDrawerItem(
                   icon: Icons.star_border,
-                  title: 'Starred',
+                  title: AppLocalizations.of(context).t('drawer.starred'),
                   context: context,
                 ),
                 _buildDrawerItem(
                   icon: Icons.archive_outlined,
-                  title: 'Archived',
+                  title: AppLocalizations.of(context).t('drawer.archived'),
                   context: context,
                 ),
 
@@ -196,7 +197,7 @@ class HomeScreen extends StatelessWidget {
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: AppTheme.spaceMd),
                   child: Text(
-                    'Workspaces',
+                    AppLocalizations.of(context).t('drawer.workspaces'),
                     style: AppTheme.labelMedium.copyWith(
                       color: AppTheme.textTertiary,
                       letterSpacing: 1.5,
@@ -222,7 +223,7 @@ class HomeScreen extends StatelessWidget {
                         return Padding(
                           padding: EdgeInsets.all(AppTheme.spaceMd),
                           child: Text(
-                            'No projects yet',
+                            AppLocalizations.of(context).t('drawer.noProjects'),
                             style: AppTheme.bodyMedium.copyWith(
                               color: AppTheme.textTertiary,
                             ),
@@ -257,7 +258,7 @@ class HomeScreen extends StatelessWidget {
                 Padding(
                   padding: EdgeInsets.all(AppTheme.spaceMd),
                   child: Text(
-                    'Version 1.0 • Privacy • Terms',
+                    AppLocalizations.of(context).t('drawer.footer'),
                     style: AppTheme.bodySmall.copyWith(
                       color: AppTheme.textTertiary,
                     ),
@@ -291,14 +292,14 @@ class HomeScreen extends StatelessWidget {
                     colors: AppTheme.primaryGradient,
                   ).createShader(bounds),
                   child: Text(
-                    'What can I help with?',
+                    AppLocalizations.of(context).t('home.welcomeTitle'),
                     style: AppTheme.displayLarge.copyWith(color: Colors.white),
                     textAlign: TextAlign.center,
                   ),
                 ),
                 SizedBox(height: AppTheme.spaceMd),
                 Text(
-                  'Quick starters — choose a persona or task to get going',
+                  AppLocalizations.of(context).t('home.quickStarters'),
                   textAlign: TextAlign.center,
                   style: AppTheme.bodyMedium.copyWith(
                     color: AppTheme.textSecondary,
@@ -311,44 +312,52 @@ class HomeScreen extends StatelessWidget {
                   alignment: WrapAlignment.center,
                   children: [
                     _BigChip(
-                      label: 'Talk to a friend',
+                      label: AppLocalizations.of(
+                        context,
+                      ).t('home.talkToFriend'),
                       icon: Icons.forum,
                       gradient: AppTheme.primaryGradient,
                       onTap: () => navigatorKey.currentState?.pushNamed('/ai'),
                     ),
                     _BigChip(
-                      label: 'Discover the app',
+                      label: AppLocalizations.of(context).t('home.discoverApp'),
                       icon: Icons.explore,
                       gradient: AppTheme.accentGradient,
                       onTap: () =>
                           navigatorKey.currentState?.pushNamed('/study'),
                     ),
                     _BigChip(
-                      label: 'Talk to your agents',
+                      label: AppLocalizations.of(
+                        context,
+                      ).t('home.talkToAgents'),
                       icon: Icons.smart_toy,
                       gradient: AppTheme.primaryGradient,
                       onTap: () => navigatorKey.currentState?.pushNamed('/ai'),
                     ),
                     _BigChip(
-                      label: 'Dating assistant',
+                      label: AppLocalizations.of(
+                        context,
+                      ).t('home.datingAssistant'),
                       icon: Icons.favorite,
                       gradient: AppTheme.accentGradient,
                       onTap: () => navigatorKey.currentState?.pushNamed('/ai'),
                     ),
                     _BigChip(
-                      label: 'Create image',
+                      label: AppLocalizations.of(context).t('home.createImage'),
                       icon: Icons.image,
                       gradient: AppTheme.primaryGradient,
                       onTap: () => navigatorKey.currentState?.pushNamed('/ai'),
                     ),
                     _BigChip(
-                      label: 'Summarize text',
+                      label: AppLocalizations.of(
+                        context,
+                      ).t('home.summarizeText'),
                       icon: Icons.text_snippet,
                       gradient: AppTheme.accentGradient,
                       onTap: () => navigatorKey.currentState?.pushNamed('/ai'),
                     ),
                     _BigChip(
-                      label: 'Analyze data',
+                      label: AppLocalizations.of(context).t('home.analyzeData'),
                       icon: Icons.analytics,
                       gradient: AppTheme.primaryGradient,
                       onTap: () => navigatorKey.currentState?.pushNamed('/ai'),

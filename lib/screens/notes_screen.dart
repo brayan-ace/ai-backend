@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../utils/theme.dart';
+import '../utils/app_localizations.dart';
 
 class Note {
   final String title;
@@ -117,7 +118,7 @@ class _NotesScreenState extends State<NotesScreen> {
                           colors: AppTheme.accentGradient,
                         ).createShader(bounds),
                         child: Text(
-                          'Notes',
+                          AppLocalizations.of(context).t('notes.notesTitle'),
                           style: AppTheme.displayMedium.copyWith(
                             fontWeight: FontWeight.bold,
                             color: AppTheme.textPrimaryFromContext(context),
@@ -169,14 +170,18 @@ class _NotesScreenState extends State<NotesScreen> {
                             ),
                             SizedBox(height: AppTheme.spaceLg),
                             Text(
-                              'No notes yet',
+                              AppLocalizations.of(
+                                context,
+                              ).t('notes.noNotesYet'),
                               style: AppTheme.headlineMedium.copyWith(
                                 color: AppTheme.textSecondary,
                               ),
                             ),
                             SizedBox(height: AppTheme.spaceSm),
                             Text(
-                              'Tap + to create your first note',
+                              AppLocalizations.of(
+                                context,
+                              ).t('notes.tapToCreateFirst'),
                               style: AppTheme.bodyMedium.copyWith(
                                 color: AppTheme.textTertiary,
                               ),
@@ -314,10 +319,20 @@ class _NotesScreenState extends State<NotesScreen> {
     final now = DateTime.now();
     final diff = now.difference(timestamp);
 
-    if (diff.inMinutes < 1) return 'Just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    if (diff.inMinutes < 1)
+      return AppLocalizations.of(context).t('notes.justNow');
+    if (diff.inMinutes < 60)
+      return AppLocalizations.of(
+        context,
+      ).t('notes.minutesAgo').replaceAll('{count}', diff.inMinutes.toString());
+    if (diff.inHours < 24)
+      return AppLocalizations.of(
+        context,
+      ).t('notes.hoursAgo').replaceAll('{count}', diff.inHours.toString());
+    if (diff.inDays < 7)
+      return AppLocalizations.of(
+        context,
+      ).t('notes.daysAgo').replaceAll('{count}', diff.inDays.toString());
     return '${timestamp.day}/${timestamp.month}/${timestamp.year}';
   }
 }
@@ -367,7 +382,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       return;
     }
 
-    widget.onSave(title.isEmpty ? 'Untitled Note' : title, content);
+    widget.onSave(
+      title.isEmpty
+          ? AppLocalizations.of(context).t('notes.untitledNote')
+          : title,
+      content,
+    );
     Navigator.pop(context);
   }
 
@@ -425,7 +445,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               child: TextButton(
                 onPressed: _save,
                 child: Text(
-                  'Save',
+                  AppLocalizations.of(context).t('notes.saveButton'),
                   style: AppTheme.labelLarge.copyWith(
                     color: AppTheme.textPrimaryFromContext(context),
                     fontWeight: FontWeight.bold,
@@ -451,7 +471,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                       color: AppTheme.textPrimaryFromContext(context),
                     ),
                     decoration: InputDecoration(
-                      hintText: 'Note Title',
+                      hintText: AppLocalizations.of(
+                        context,
+                      ).t('notes.noteTitleHint'),
                       hintStyle: AppTheme.headlineLarge.copyWith(
                         color: AppTheme.textTertiaryFromContext(context),
                       ),
@@ -467,14 +489,17 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                     Expanded(
                       child: _buildAiButton(
                         icon: Icons.auto_awesome,
-                        title: 'Generate Notes',
+                        title: AppLocalizations.of(
+                          context,
+                        ).t('notes.generateNotes'),
                         gradient: AppTheme.primaryGradient,
                         onTap: () {
-                          // TODO: Implement AI note generation
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
-                                'AI Note Generation - Coming Soon!',
+                                AppLocalizations.of(
+                                  context,
+                                ).t('notes.generateNotesComingSoon'),
                               ),
                               backgroundColor: AppTheme.primaryBlue,
                               behavior: SnackBarBehavior.floating,
@@ -487,13 +512,18 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                     Expanded(
                       child: _buildAiButton(
                         icon: Icons.summarize,
-                        title: 'Summarize Notes',
+                        title: AppLocalizations.of(
+                          context,
+                        ).t('notes.summarizeNotes'),
                         gradient: AppTheme.accentGradient,
                         onTap: () {
-                          // TODO: Implement AI summarization
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('AI Summarization - Coming Soon!'),
+                              content: Text(
+                                AppLocalizations.of(
+                                  context,
+                                ).t('notes.summarizeComingSoon'),
+                              ),
                               backgroundColor: AppTheme.accentBlue,
                               behavior: SnackBarBehavior.floating,
                             ),
@@ -516,7 +546,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                         color: AppTheme.textPrimaryFromContext(context),
                       ),
                       decoration: InputDecoration(
-                        hintText: 'Start typing...',
+                        hintText: AppLocalizations.of(
+                          context,
+                        ).t('notes.contentHint'),
                         hintStyle: AppTheme.bodyLarge.copyWith(
                           color: AppTheme.textTertiaryFromContext(context),
                         ),

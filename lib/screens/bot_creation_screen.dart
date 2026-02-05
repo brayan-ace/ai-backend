@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../utils/globals.dart';
 import '../utils/theme.dart';
+import '../utils/app_localizations.dart';
 import 'bot_processing_screen.dart';
 import 'recent_study_bots_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -160,9 +161,11 @@ class _BotCreationScreenState extends State<BotCreationScreen>
                 shaderCallback: (bounds) => LinearGradient(
                   colors: [AppTheme.primaryBlue, AppTheme.accentBlue],
                 ).createShader(bounds),
-                child: const Text(
-                  'Crafting Your Study Bot',
-                  style: TextStyle(
+                child: Text(
+                  AppLocalizations.of(
+                    context,
+                  ).t('botCreation.craftingBotTitle'),
+                  style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
@@ -172,7 +175,9 @@ class _BotCreationScreenState extends State<BotCreationScreen>
               ),
               const SizedBox(height: 8),
               Text(
-                'AI is analyzing your learning goals...',
+                AppLocalizations.of(
+                  context,
+                ).t('botCreation.analyzeGoalsMessage'),
                 style: TextStyle(
                   fontSize: 13,
                   color: Colors.white.withOpacity(0.6),
@@ -268,7 +273,9 @@ class _BotCreationScreenState extends State<BotCreationScreen>
     // Validate plan name
     if (planName.isEmpty) {
       scaffoldMessengerKey.currentState?.showSnackBar(
-        _buildPremiumSnackBar('📚 Please enter a Study Topic'),
+        _buildPremiumSnackBar(
+          AppLocalizations.of(context).t('botCreation.errorTopicRequired'),
+        ),
       );
       return;
     }
@@ -276,7 +283,9 @@ class _BotCreationScreenState extends State<BotCreationScreen>
     // Validate plan description
     if (planDescription.isEmpty) {
       scaffoldMessengerKey.currentState?.showSnackBar(
-        _buildPremiumSnackBar('🎯 Please describe your learning goals'),
+        _buildPremiumSnackBar(
+          AppLocalizations.of(context).t('botCreation.errorGoalsRequired'),
+        ),
       );
       return;
     }
@@ -286,7 +295,7 @@ class _BotCreationScreenState extends State<BotCreationScreen>
     if (wordCount > 100) {
       scaffoldMessengerKey.currentState?.showSnackBar(
         _buildPremiumSnackBar(
-          '⚠️ Keep it under 100 words ($wordCount used)',
+          '${AppLocalizations.of(context).t('botCreation.errorWordLimit')} ($wordCount used)',
           backgroundColor: Colors.orange.shade700,
         ),
       );
@@ -296,7 +305,9 @@ class _BotCreationScreenState extends State<BotCreationScreen>
     // Validate bot name
     if (botName.isEmpty) {
       scaffoldMessengerKey.currentState?.showSnackBar(
-        _buildPremiumSnackBar('🤖 Give your bot a name'),
+        _buildPremiumSnackBar(
+          AppLocalizations.of(context).t('botCreation.errorNameRequired'),
+        ),
       );
       return;
     }
@@ -330,7 +341,9 @@ class _BotCreationScreenState extends State<BotCreationScreen>
       print('[BotCreationScreen] Error in _handleCreateStudyBot: $e');
       print(st);
       scaffoldMessengerKey.currentState?.showSnackBar(
-        _buildPremiumSnackBar('❌ Error: $e'),
+        _buildPremiumSnackBar(
+          '${AppLocalizations.of(context).t('botCreation.errorGeneric')}: $e',
+        ),
       );
     } finally {
       if (mounted) setState(() => _isProcessing = false);
@@ -357,6 +370,29 @@ class _BotCreationScreenState extends State<BotCreationScreen>
       margin: const EdgeInsets.all(16),
       duration: const Duration(seconds: 2),
     );
+  }
+
+  // Get localized education levels
+  List<String> _getLocalizedEducationLevels() {
+    return educationLevels;
+  }
+
+  // Get localized label for education level
+  String _getLocalizedLevelLabel(String level) {
+    final map = {
+      'Primary': () =>
+          AppLocalizations.of(context).t('botCreation.educationLevelPrimary'),
+      'Junior Secondary': () =>
+          AppLocalizations.of(context).t('botCreation.educationLevelJunior'),
+      'Senior Secondary': () =>
+          AppLocalizations.of(context).t('botCreation.educationLevelSenior'),
+      'University': () => AppLocalizations.of(
+        context,
+      ).t('botCreation.educationLevelUniversity'),
+      'Self-Learner / Other': () =>
+          AppLocalizations.of(context).t('botCreation.educationLevelOther'),
+    };
+    return map[level]?.call() ?? level;
   }
 
   // Build premium text field
@@ -443,9 +479,9 @@ class _BotCreationScreenState extends State<BotCreationScreen>
           shaderCallback: (bounds) => LinearGradient(
             colors: [AppTheme.primaryBlue, AppTheme.accentBlue],
           ).createShader(bounds),
-          child: const Text(
-            'Create Your Study Bot',
-            style: TextStyle(
+          child: Text(
+            AppLocalizations.of(context).t('botCreation.pageTitle'),
+            style: const TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w700,
               color: Colors.white,
@@ -479,7 +515,9 @@ class _BotCreationScreenState extends State<BotCreationScreen>
                 ),
               );
             },
-            tooltip: 'Recent Bots',
+            tooltip: AppLocalizations.of(
+              context,
+            ).t('botCreation.recentBotsTooltip'),
           ),
           const SizedBox(width: 8),
         ],
@@ -516,7 +554,9 @@ class _BotCreationScreenState extends State<BotCreationScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '✨ Personalized Learning',
+                          AppLocalizations.of(
+                            context,
+                          ).t('botCreation.personalizedLearning'),
                           style: TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.w800,
@@ -526,7 +566,9 @@ class _BotCreationScreenState extends State<BotCreationScreen>
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Design your AI mentor that learns your style',
+                          AppLocalizations.of(
+                            context,
+                          ).t('botCreation.designMentorSubtitle'),
                           style: TextStyle(
                             fontSize: 15,
                             color: AppTheme.textSecondaryFromContext(context),
@@ -562,7 +604,9 @@ class _BotCreationScreenState extends State<BotCreationScreen>
                               ),
                               const SizedBox(width: 10),
                               Text(
-                                'What will you study?',
+                                AppLocalizations.of(
+                                  context,
+                                ).t('botCreation.whatWillStudy'),
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
@@ -577,7 +621,9 @@ class _BotCreationScreenState extends State<BotCreationScreen>
                         ),
                         _buildPremiumTextField(
                           controller: _planNameCtrl,
-                          label: 'Study Topic',
+                          label: AppLocalizations.of(
+                            context,
+                          ).t('botCreation.studyTopicLabel'),
                           icon: Icons.book_rounded,
                         ),
                       ],
@@ -609,7 +655,9 @@ class _BotCreationScreenState extends State<BotCreationScreen>
                               ),
                               const SizedBox(width: 10),
                               Text(
-                                'Your learning goals',
+                                AppLocalizations.of(
+                                  context,
+                                ).t('botCreation.yourLearningGoals'),
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
@@ -624,7 +672,9 @@ class _BotCreationScreenState extends State<BotCreationScreen>
                         ),
                         _buildPremiumTextField(
                           controller: _planDescriptionCtrl,
-                          label: 'What do you want to master?',
+                          label: AppLocalizations.of(
+                            context,
+                          ).t('botCreation.masterLabel'),
                           icon: Icons.lightbulb_rounded,
                           maxLines: 4,
                           onChanged: () => setState(() {}),
@@ -660,7 +710,9 @@ class _BotCreationScreenState extends State<BotCreationScreen>
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              'Word Count',
+                              AppLocalizations.of(
+                                context,
+                              ).t('botCreation.wordCount'),
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
@@ -669,7 +721,7 @@ class _BotCreationScreenState extends State<BotCreationScreen>
                               ),
                             ),
                             Text(
-                              '$wordCount / 100',
+                              '$wordCount ${AppLocalizations.of(context).t('botCreation.maxWords')} 100',
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
@@ -724,7 +776,9 @@ class _BotCreationScreenState extends State<BotCreationScreen>
                               ),
                               const SizedBox(width: 10),
                               Text(
-                                'Name your mentor',
+                                AppLocalizations.of(
+                                  context,
+                                ).t('botCreation.nameMentor'),
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
@@ -739,7 +793,9 @@ class _BotCreationScreenState extends State<BotCreationScreen>
                         ),
                         _buildPremiumTextField(
                           controller: _botNameCtrl,
-                          label: 'Bot Name (e.g., "Dr. Math")',
+                          label: AppLocalizations.of(
+                            context,
+                          ).t('botCreation.botNameLabel'),
                           icon: Icons.psychology_rounded,
                         ),
                       ],
@@ -770,9 +826,11 @@ class _BotCreationScreenState extends State<BotCreationScreen>
                                 ),
                               ),
                               const SizedBox(width: 10),
-                              const Text(
-                                'Your level',
-                                style: TextStyle(
+                              Text(
+                                AppLocalizations.of(
+                                  context,
+                                ).t('botCreation.yourLevel'),
+                                style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
                                   color: Colors.white,
@@ -844,7 +902,7 @@ class _BotCreationScreenState extends State<BotCreationScreen>
                                   return DropdownMenuItem<String>(
                                     value: value,
                                     child: Text(
-                                      value,
+                                      _getLocalizedLevelLabel(value),
                                       style: TextStyle(
                                         color:
                                             Theme.of(context).brightness ==
@@ -919,8 +977,12 @@ class _BotCreationScreenState extends State<BotCreationScreen>
                               const SizedBox(width: 12),
                               Text(
                                 _isProcessing
-                                    ? 'Creating Your Bot...'
-                                    : 'Create Study Bot',
+                                    ? AppLocalizations.of(
+                                        context,
+                                      ).t('botCreation.creatingBotButton')
+                                    : AppLocalizations.of(
+                                        context,
+                                      ).t('botCreation.createBotButton'),
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w700,
@@ -958,20 +1020,32 @@ class _BotCreationScreenState extends State<BotCreationScreen>
                       children: [
                         _buildFeatureRow(
                           '🧠',
-                          'Adaptive Learning',
-                          'Learns your pace and style',
+                          AppLocalizations.of(
+                            context,
+                          ).t('botCreation.adaptiveLearning'),
+                          AppLocalizations.of(
+                            context,
+                          ).t('botCreation.learnsPaceStyle'),
                         ),
                         const SizedBox(height: 12),
                         _buildFeatureRow(
                           '⚡',
-                          'Instant Insights',
-                          'Get solutions in seconds',
+                          AppLocalizations.of(
+                            context,
+                          ).t('botCreation.instantInsights'),
+                          AppLocalizations.of(
+                            context,
+                          ).t('botCreation.getSolutionsSeconds'),
                         ),
                         const SizedBox(height: 12),
                         _buildFeatureRow(
                           '📈',
-                          'Progress Tracking',
-                          'Monitor your growth',
+                          AppLocalizations.of(
+                            context,
+                          ).t('botCreation.progressTracking'),
+                          AppLocalizations.of(
+                            context,
+                          ).t('botCreation.monitorGrowth'),
                         ),
                       ],
                     ),
