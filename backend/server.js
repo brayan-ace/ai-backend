@@ -430,9 +430,11 @@ Create an enhanced search query that incorporates relevant conversation context:
 
 async function searchTopicOnline(topic, gradeLevel) {
   try {
-    const tavilyApiKey = process.env.tavily;
+    const tavilyApiKey = process.env.TAVILY_API_KEY;
     if (!tavilyApiKey) {
-      console.warn("[Tavily] tavily environment variable not configured");
+      console.warn(
+        "[Tavily] TAVILY_API_KEY environment variable not configured",
+      );
       return null;
     }
 
@@ -2821,12 +2823,15 @@ app.post("/api/ask", async (req, res) => {
           type = "search";
           // Fall through to search case
           // We'll use a workaround by setting type and letting it fall through
-          const TAVILY_KEY = process.env.tavily;
+          const TAVILY_KEY = process.env.TAVILY_API_KEY;
           if (!TAVILY_KEY) {
-            console.error("[Search] TAVILY key not configured (env 'tavily')");
+            console.error(
+              "[Search] TAVILY key not configured (env 'TAVILY_API_KEY')",
+            );
             return res.status(500).json({
               error: "API configuration error",
-              message: "Tavily API key not configured. Set env var 'tavily'",
+              message:
+                "Tavily API key not configured. Set env var 'TAVILY_API_KEY'",
               provider: "tavily",
               timestamp: new Date().toISOString(),
             });
@@ -3714,9 +3719,11 @@ If the user specifies length, format, or style, follow the user exactly and igno
       case "search":
         console.log("[Search Case] Processing search request:", data);
         try {
-          const TAVILY_KEY = process.env.tavily;
+          const TAVILY_KEY = process.env.TAVILY_API_KEY;
           if (!TAVILY_KEY) {
-            console.error("[Search] TAVILY key not configured (env 'tavily')");
+            console.error(
+              "[Search] TAVILY key not configured (env 'TAVILY_API_KEY')",
+            );
             return res.status(500).json({
               error: "API configuration error",
               message: "Tavily API key not configured. Set env var 'tavily'",
