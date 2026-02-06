@@ -337,10 +337,10 @@ async function generateEnhancedQuizPrompt({
 
   // 5. Build comprehensive quiz prompt
   console.log("[EnhancedQuiz] Building quiz prompt...");
-  let quizPrompt = `Generate a PERSONALIZED quiz based on deep analysis of this student's learning journey.
+  let quizPrompt = `Generate a WORLD-CLASS, PERSONALIZED quiz based on deep analysis of this student's learning journey.
 
 STUDENT PROFILE:
-- Grade Level: ${gradeLevel || "General"}
+- Grade Level: ${gradeLevel || "General"} ⚠️ **CRITICAL: ALL questions MUST be appropriate for this grade level**
 - Learning Style: ${learningAnalysis.learningStyle || "unknown"}
 - Difficulty Level: ${learningAnalysis.difficultyLevel || "Medium"}
 - Progress: ${studyPlan?.progressPercentage || 0}% complete
@@ -358,6 +358,12 @@ COMMON QUESTIONS: ${learningAnalysis.keyQuestions?.join(", ") || "None identifie
 MISCONCEPTIONS TO ADDRESS: ${learningAnalysis.misconceptions?.join(", ") || "None identified"}
 
 CURRENT MODULE: "${moduleName}"
+
+⚠️ **GRADE LEVEL ENFORCEMENT:**
+- Questions MUST be appropriate for ${gradeLevel || "General"} students
+- Use age-appropriate language and examples
+- Match cognitive development expectations for this level
+- Do NOT include content beyond this grade level
 
 ${
   studyPlan
@@ -383,63 +389,67 @@ ${conversationHistory
   .map((msg) => `${msg.type}: ${msg.content}`)
   .join("\n")}
 
-GENERATION REQUIREMENTS:
-1. Focus on concepts the student has actually discussed
-2. Base questions on current, relevant information (especially from online research context if provided)
-3. Address their identified weaknesses and misconceptions
-4. Match their learning style and difficulty level
-5. Include questions that test their understanding of discussed topics
-6. Challenge them appropriately based on their progress
-7. Use real-world examples and current information to make questions meaningful
-8. Ensure questions are appropriate for their grade level
-2. Address their identified weaknesses and misconceptions
-3. Match their learning style and difficulty level
-4. Include questions that test their understanding of discussed topics
-5. Challenge them appropriately based on their progress
-6. Use examples and contexts from their actual conversations
+GENERATION REQUIREMENTS (CRITICAL):
+1. **Grade-Appropriate:** ALL content must be suitable for ${gradeLevel || "General"} students
+2. **Concept Focus:** Only test concepts the student has actually discussed in conversations
+3. **Real-World Context:** Base questions on current, meaningful information (use online research context)
+4. **Address Weaknesses:** Deliberately include questions targeting identified weaknesses and misconceptions
+5. **Learning Style Match:** Adapt question format to suit the student's learning style
+6. **Appropriate Challenge:** Match difficulty to their progress (not too easy, not overwhelming)
+7. **Practical Examples:** Use relatable, age-appropriate examples from their grade level
+8. **Educational Explanations:** Provide clear, teaching-focused explanations that help them learn, not just show correct answers
+9. **Varied Difficulty:** Include a mix of easier recall questions and harder application questions
+10. **No Repetition:** Avoid questions too similar to previous quizzes (check conversation history)
 
-QUIZ STRUCTURE:
+QUIZ STRUCTURE (STRICT FORMAT):
 {
   "questions": [
     {
       "type": "mcq",
-      "text": "Question tailored to student's learning journey",
-      "options": ["Option A", "Option B", "Option C", "Option D"],
-      "concept": "specific concept being tested",
+      "text": "Clear, specific question tailored to student's learning journey (${gradeLevel} appropriate)",
+      "options": ["Option A (plausible distractor)", "Option B (correct answer)", "Option C (common misconception)", "Option D (plausible distractor)"],
+      "concept": "specific concept being tested from discussions",
       "difficulty": "Easy|Medium|Hard",
-      "learningStyle": "visual|auditory|kinesthetic|reading"
+      "learningStyle": "visual|auditory|kinesthetic|reading",
+      "rationale": "Why this question is important for this student"
     },
     {
-      "type": "text", 
-      "text": "Personalized question based on conversation",
-      "concept": "specific concept being tested",
+      "type": "text",
+      "text": "Open-ended question requiring explanation or application",
+      "concept": "specific concept being tested from discussions",
       "difficulty": "Easy|Medium|Hard",
-      "learningStyle": "visual|auditory|kinesthetic|reading"
+      "learningStyle": "visual|auditory|kinesthetic|reading",
+      "rationale": "Why this question is important for this student"
     }
   ],
   "answers": [
     {
       "type": "mcq",
-      "answer": "Correct option",
-      "explanation": "Explanation referencing student's learning",
-      "addressesMisconception": "false",
-      "buildsOnStrength": "true"
+      "answer": "Option B",
+      "explanation": "🎓 EDUCATIONAL EXPLANATION: Start with why the correct answer is right, connect to concepts studied, address why wrong options are incorrect, reference conversation context where relevant. Make this a mini-lesson!",
+      "addressesMisconception": "true|false",
+      "buildsOnStrength": "true|false",
+      "keyTakeaway": "One sentence summarizing what they should remember"
     },
     {
       "type": "text",
-      "answer": "Expected answer",
-      "explanation": "Comprehensive explanation based on their learning",
-      "addressesMisconception": "true",
-      "buildsOnStrength": "false"
+      "answer": "Comprehensive model answer showing full understanding",
+      "explanation": "🎓 EDUCATIONAL EXPLANATION: Break down the expected answer, explain the reasoning process, connect to prior learning, give examples, address common mistakes. This should teach, not just evaluate!",
+      "addressesMisconception": "true|false",
+      "buildsOnStrength": "true|false",
+      "keyTakeaway": "One sentence summarizing what they should remember"
     }
   ],
   "personalization": {
     "basedOnConversation": true,
-    "addressesWeaknesses": ["weakness1", "weakness2"],
-    "buildsOnStrengths": ["strength1"],
+    "addressesWeaknesses": ["list specific weaknesses targeted"],
+    "buildsOnStrengths": ["list specific strengths leveraged"],
     "learningStyleAdapted": true,
-    "difficultyAdjusted": true
-  }
+    "difficultyAdjusted": true,
+    "gradeLevel": "${gradeLevel}",
+    "modulesFocus": "${moduleName}"
+  },
+  "teachingNotes": "Brief note on how this quiz supports the student's learning goals"
 }`;
 
   if (questionType === "mcq") {

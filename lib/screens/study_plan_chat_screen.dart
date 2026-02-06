@@ -227,8 +227,11 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   bool _showScrollToBottom = false;
 
   // Analytics tracking
+  // ignore: unused_field
   DateTime? _sessionStartTime;
+  // ignore: unused_field
   List<String> _conceptsLearned = [];
+  // ignore: unused_field
   int _sessionMessageCount = 0;
 
   // Bot instructions from database
@@ -252,6 +255,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   // Artifact tracking - for persistent artifacts like quizzes
   Map<String, Map<String, dynamic>> _artifacts =
       {}; // Map of artifactId -> artifact data
+  // ignore: unused_field
   String? _lastQuizArtifactId; // Track the last quiz artifact for reopening
 
   // Quiz score tracking
@@ -264,7 +268,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   );
 
   // Firebase Firestore instance - EXACT same pattern as OnlineAiScreen
+  // ignore: unused_field
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  // ignore: unused_field
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   late StudyBotStorageService _storageService;
@@ -1875,9 +1881,6 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
 
   // Quick Action Chips for common responses
   Widget _buildQuickActionChips() {
-    final lastMessage = _messages.isNotEmpty ? _messages.last : null;
-    final isBot = lastMessage?.senderType == 'bot';
-
     // Contextual suggestions based on conversation state
     List<String> suggestions = [];
 
@@ -2228,107 +2231,6 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
             style: TextStyle(
               color: AppTheme.textSecondaryFromContext(context),
               fontSize: 12,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Legacy Input Area (kept for reference)
-  Widget _buildInputArea() {
-    return Container(
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppTheme.backgroundGradientEndFromContext(context).withOpacity(0.8),
-            AppTheme.surfaceCardFromContext(context),
-          ],
-        ),
-        border: Border(
-          top: BorderSide(
-            color: AppTheme.primaryBlue.withOpacity(0.2),
-            width: 1.5,
-          ),
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppTheme.surfaceCardFromContext(context).withOpacity(0.6),
-                    AppTheme.backgroundGradientEndFromContext(
-                      context,
-                    ).withOpacity(0.4),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: AppTheme.primaryBlue.withOpacity(0.2),
-                  width: 1.5,
-                ),
-              ),
-              child: TextField(
-                controller: _inputController,
-                enabled: !_isLoading,
-                style: TextStyle(color: Colors.white, fontSize: 15),
-                decoration: InputDecoration(
-                  hintText: 'Ask me anything...',
-                  hintStyle: TextStyle(
-                    color: Colors.white.withOpacity(0.5),
-                    fontSize: 15,
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                ),
-                onSubmitted: (text) {
-                  if (text.isNotEmpty && !_isLoading) {
-                    _addUserMessage(text);
-                  }
-                },
-              ),
-            ),
-          ),
-          SizedBox(width: 12),
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AppTheme.accentBlue, AppTheme.primaryBlue],
-              ),
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.accentBlue.withOpacity(0.4),
-                  blurRadius: 15,
-                  spreadRadius: 2,
-                ),
-              ],
-            ),
-            child: IconButton(
-              icon: _isLoading
-                  ? SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation(Colors.white),
-                        strokeWidth: 2,
-                      ),
-                    )
-                  : Icon(Icons.send, color: Colors.white),
-              onPressed: _isLoading
-                  ? null
-                  : () {
-                      if (_inputController.text.isNotEmpty) {
-                        _addUserMessage(_inputController.text);
-                      }
-                    },
             ),
           ),
         ],
@@ -3237,7 +3139,6 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   /// Show celebration dialog when a module is completed
   void _showModuleCompletionCelebration(Map<String, dynamic>? progress) {
     final percentage = progress?['percentage'] ?? 0;
-    final currentModule = (progress?['currentModule'] ?? 0) + 1;
     final completedCount = progress?['completedModules'] ?? 1;
 
     showDialog(

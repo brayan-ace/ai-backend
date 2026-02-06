@@ -26,7 +26,6 @@ import 'notes_screen.dart';
 import 'chat_history_screen.dart';
 import 'bot_creation_screen.dart';
 import '../services/onboarding_service.dart';
-import '../widgets/onboarding_overlay.dart';
 import '../utils/onboarding_config.dart';
 
 class OnlineAiScreen extends StatefulWidget {
@@ -126,18 +125,6 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
       // If onboarding check fails, don't show it to avoid blocking the app
       print('Onboarding initialization failed: $e');
     }
-  }
-
-  void _onOnboardingComplete() {
-    setState(() {
-      _showOnboarding = false;
-    });
-  }
-
-  void _onOnboardingSkip() {
-    setState(() {
-      _showOnboarding = false;
-    });
   }
 
   @override
@@ -616,49 +603,106 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                 ),
                 InkWell(
                   onTap: () {
-                    setState(() => _responseMode = 'detailed');
+                    // TODO: Check user's premium status here
+                    // For now, show premium dialog
                     Navigator.pop(context);
+                    _showPremiumRequiredDialog();
                   },
                   child: Container(
                     padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                    color: _responseMode == 'detailed'
-                        ? AppTheme.primaryBlue.withValues(alpha: 0.1)
-                        : Colors.transparent,
+                    decoration: BoxDecoration(
+                      color: _responseMode == 'detailed'
+                          ? AppTheme.primaryBlue.withValues(alpha: 0.1)
+                          : Colors.transparent,
+                      border: Border.all(
+                        color: AppTheme.warning.withOpacity(0.3),
+                        width: 1,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.article_outlined,
-                          color: _responseMode == 'detailed'
-                              ? AppTheme.primaryBlue
-                              : (Theme.of(context).brightness == Brightness.dark
-                                    ? AppTheme.textPrimary
-                                    : Color(0xFF1F2937)),
-                          size: 24,
+                        Stack(
+                          children: [
+                            Icon(
+                              Icons.article_outlined,
+                              color: _responseMode == 'detailed'
+                                  ? AppTheme.primaryBlue
+                                  : (Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? AppTheme.textPrimary
+                                        : Color(0xFF1F2937)),
+                              size: 24,
+                            ),
+                            Positioned(
+                              right: -2,
+                              top: -2,
+                              child: Container(
+                                padding: EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.warning,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.star,
+                                  color: Colors.white,
+                                  size: 10,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                AppLocalizations.of(
-                                  context,
-                                ).t('models.detailed'),
-                                style: AppTheme.bodyLarge.copyWith(
-                                  color: _responseMode == 'detailed'
-                                      ? AppTheme.primaryBlue
-                                      : (Theme.of(context).brightness ==
-                                                Brightness.dark
-                                            ? AppTheme.textPrimary
-                                            : Color(0xFF000000)),
-                                  fontWeight: FontWeight.w500,
-                                ),
+                              Row(
+                                children: [
+                                  Text(
+                                    AppLocalizations.of(
+                                      context,
+                                    ).t('models.detailed'),
+                                    style: AppTheme.bodyLarge.copyWith(
+                                      color: _responseMode == 'detailed'
+                                          ? AppTheme.primaryBlue
+                                          : (Theme.of(context).brightness ==
+                                                    Brightness.dark
+                                                ? AppTheme.textPrimary
+                                                : Color(0xFF000000)),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  SizedBox(width: 6),
+                                  Container(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          AppTheme.warning,
+                                          Color(0xFFFF8C00),
+                                        ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      'PREMIUM',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                               SizedBox(height: 4),
                               Text(
-                                AppLocalizations.of(
-                                  context,
-                                ).t('models.detailedDesc'),
+                                'In-depth explanations with examples',
                                 style: AppTheme.bodySmall.copyWith(
                                   color:
                                       Theme.of(context).brightness ==
@@ -670,12 +714,11 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                             ],
                           ),
                         ),
-                        if (_responseMode == 'detailed')
-                          Icon(
-                            Icons.check_circle,
-                            color: AppTheme.primaryBlue,
-                            size: 24,
-                          ),
+                        Icon(
+                          Icons.chevron_right,
+                          color: AppTheme.warning,
+                          size: 20,
+                        ),
                       ],
                     ),
                   ),
@@ -968,6 +1011,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
 
   Future<void> _send() async {
     final text = _controller.text.trim();
+
     if (text.isEmpty && _selectedImage == null) return;
 
     final hasImage = _selectedImage != null;
@@ -1166,7 +1210,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
               _messages.removeLast();
             });
           }
-          _logAndAddAiMessage(response!);
+          _logAndAddAiMessage(response);
 
           final wantWebSearch = await _showWebSearchDialog();
           if (wantWebSearch == true) {
@@ -1477,6 +1521,61 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
     );
   }
 
+  void _showPremiumRequiredDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: AppTheme.surfaceElevated,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+            side: BorderSide(color: AppTheme.primaryBlue.withOpacity(0.3)),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.star, color: AppTheme.warning),
+              SizedBox(width: AppTheme.spaceSm),
+              Text(
+                AppLocalizations.of(context).t('premium.featureUnavailable'),
+                style: AppTheme.headlineSmall.copyWith(
+                  color: AppTheme.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            AppLocalizations.of(context).t('premium.upgradeToPremium'),
+            style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                AppLocalizations.of(context).t('common.cancel'),
+                style: TextStyle(color: AppTheme.textSecondary),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                // TODO: Navigate to premium screen
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.warning,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                ),
+              ),
+              child: Text(AppLocalizations.of(context).t('premium.upgrade')),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Map<String, dynamic>? _extractInstructionsFromText(String text) {
     if (text.isEmpty) return null;
     final lower = text.toLowerCase();
@@ -1512,6 +1611,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
     Map<String, dynamic>? instructions,
   }) async {
     try {
+      // ALWAYS include conversation history for context-aware responses
       final List<Map<String, String>> convo = [];
       for (final m in _messages) {
         final role = m.fromUser ? 'user' : 'assistant';
@@ -1525,11 +1625,14 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
       }
 
       final input = {
-        'messages': convo,
+        'messages': convo, // Always include conversation history
         'message': prompt,
         'mode': _responseMode,
         'model': _getBackendModelName(_selectedModel),
         'systemPrompt': AiConstants.systemPrompt,
+        'webSearchEnabled': _webSearchEnabled,
+        'conversationHistory':
+            _getConversationHistoryForSearch(), // Add for auto web search detection
         if (instructions != null) 'instructions': instructions,
       };
 
@@ -1620,7 +1723,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
         responseMode: _responseMode,
         instructions: instructions,
         messages: searchMessages,
-        model: _selectedModel,
+        model: _getBackendModelName(_selectedModel),
       );
 
       return resp;

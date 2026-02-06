@@ -293,22 +293,39 @@ class ProfessionalMessageWidget extends StatelessWidget {
     if (text.isEmpty) return SizedBox.shrink();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    // Check if this paragraph contains a markdown table
+    final isTable = text.contains('|') && text.contains('\n') &&
+                    RegExp(r'\|[^\n]+\|').hasMatch(text);
+
     final spans = _parseInlineContent(text, context);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: SelectableText.rich(
-        TextSpan(
-          children: spans,
-          style: TextStyle(
-            fontSize: 15,
-            height: 1.75,
-            fontWeight: FontWeight.w400,
-            color: isDark ? AppTheme.textPrimary : Color(0xFF374151),
-            letterSpacing: 0.2,
-          ),
+    final textWidget = SelectableText.rich(
+      TextSpan(
+        children: spans,
+        style: TextStyle(
+          fontSize: 15,
+          height: 1.85,
+          fontWeight: FontWeight.w400,
+          color: isDark ? AppTheme.textPrimary : Color(0xFF374151),
+          letterSpacing: 0.2,
         ),
       ),
+    );
+
+    // Wrap tables in horizontal scroll
+    if (isTable) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12.0),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: textWidget,
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12.0),
+      child: textWidget,
     );
   }
 
@@ -322,7 +339,7 @@ class ProfessionalMessageWidget extends StatelessWidget {
 
     final defaultStyle = TextStyle(
       fontSize: 15,
-      height: 1.75,
+      height: 1.85,
       color: isDark ? AppTheme.textPrimary : Color(0xFF374151),
       fontWeight: FontWeight.w400,
       letterSpacing: 0.2,
@@ -330,7 +347,7 @@ class ProfessionalMessageWidget extends StatelessWidget {
 
     final boldStyle = TextStyle(
       fontSize: 15,
-      height: 1.75,
+      height: 1.85,
       color: isDark ? AppTheme.textPrimary : Color(0xFF1F2937),
       fontWeight: FontWeight.w700,
       letterSpacing: 0.2,
@@ -338,7 +355,7 @@ class ProfessionalMessageWidget extends StatelessWidget {
 
     final italicStyle = TextStyle(
       fontSize: 15,
-      height: 1.75,
+      height: 1.85,
       color: isDark ? AppTheme.textPrimary : Color(0xFF374151),
       fontStyle: FontStyle.italic,
       letterSpacing: 0.2,
@@ -680,31 +697,31 @@ class ProfessionalMessageWidget extends StatelessWidget {
     var text = content.replaceFirst(RegExp(r'^#+\s*'), '').trim();
     text = text.replaceAll(RegExp(r'^\*{2}\s*|\s*\*{2}$'), '').trim();
     if (text.isEmpty) return SizedBox.shrink();
-    final topPadding = {1: 20.0, 2: 16.0, 3: 12.0};
-    final bottomPadding = {1: 12.0, 2: 10.0, 3: 8.0};
+    final topPadding = {1: 24.0, 2: 20.0, 3: 16.0};
+    final bottomPadding = {1: 14.0, 2: 12.0, 3: 10.0};
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     TextStyle style;
     if (level == 1) {
       style = AppTheme.displayLarge.copyWith(
-        fontSize: 28,
+        fontSize: 22,
         color: isDark ? AppTheme.textPrimary : Color(0xFF1F2937),
       );
     } else if (level == 2) {
       style = AppTheme.displayMedium.copyWith(
-        fontSize: 24,
+        fontSize: 19,
         color: isDark ? AppTheme.textPrimary : Color(0xFF1F2937),
       );
     } else {
       style = AppTheme.displaySmall.copyWith(
-        fontSize: 20,
+        fontSize: 17,
         color: isDark ? AppTheme.textPrimary : Color(0xFF1F2937),
       );
     }
 
     return Padding(
       padding: EdgeInsets.only(
-        top: topPadding[level] ?? 14,
+        top: topPadding[level] ?? 16,
         bottom: bottomPadding[level] ?? 10,
       ),
       child: SelectableText(text, style: style, textAlign: TextAlign.left),
@@ -869,8 +886,8 @@ class ProfessionalMessageWidget extends StatelessWidget {
             TextSpan(
               children: spans,
               style: TextStyle(
-                fontSize: 16,
-                height: 1.75,
+                fontSize: 15,
+                height: 1.85,
                 color: isDark ? AppTheme.textPrimary : Color(0xFF374151),
                 fontWeight: FontWeight.w400,
                 letterSpacing: 0.2,
@@ -935,31 +952,31 @@ class ProfessionalMessageWidget extends StatelessWidget {
   double _getBlockSpacing(MessageBlock current, MessageBlock next) {
     // Extra spacing after headings
     if (current.type == BlockType.heading1) {
-      return 14.0;
+      return 20.0;
     }
     if (current.type == BlockType.heading2 ||
         current.type == BlockType.heading3) {
-      return 12.0;
+      return 18.0;
     }
 
     // Extra spacing around code blocks
     if (current.type == BlockType.code || next.type == BlockType.code) {
-      return 14.0;
+      return 18.0;
     }
 
     // Extra spacing around math blocks
     if (current.type == BlockType.mathBlock ||
         next.type == BlockType.mathBlock) {
-      return 14.0;
+      return 18.0;
     }
 
     // Extra spacing before lists
     if (next.type == BlockType.bulletList) {
-      return 10.0;
+      return 14.0;
     }
 
     // Standard spacing between paragraphs
-    return 10.0;
+    return 14.0;
   }
 }
 

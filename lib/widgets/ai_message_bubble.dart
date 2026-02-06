@@ -332,35 +332,69 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
                   onLongPress: () => _copyToClipboard(context),
                   child: Container(
                     width: double.infinity,
-                    margin: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                    padding: EdgeInsets.symmetric(horizontal: 0, vertical: 6),
+                    margin: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: EdgeInsets.symmetric(horizontal: 0, vertical: 8),
                     // No background, border, or shadow for AI messages - full width like ChatGPT
                     color: Colors.transparent,
-                    child: Column(
+                    child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (widget.imagePath != null &&
-                            widget.imagePath!.isNotEmpty) ...[
-                          GestureDetector(
-                            onTap: () => _showFullScreenImage(context),
-                            child: Container(
-                              margin: EdgeInsets.only(bottom: AppTheme.spaceSm),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(
-                                  AppTheme.radiusSm,
-                                ),
-                                child: Image.file(
-                                  File(widget.imagePath!),
-                                  fit: BoxFit.cover,
-                                  width: double.infinity,
-                                  height: 200,
-                                ),
-                              ),
+                        // AI Avatar Icon
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [AppTheme.accentBlue, AppTheme.primaryBlue],
                             ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppTheme.primaryBlue.withOpacity(0.3),
+                                blurRadius: 8,
+                                spreadRadius: 0,
+                              ),
+                            ],
                           ),
-                        ],
-                        // Use ProfessionalMessageWidget for enhanced formatting
-                        ProfessionalMessageWidget(formattedText, isBot: true),
+                          child: Icon(
+                            Icons.psychology_outlined,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        // Message content
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (widget.imagePath != null &&
+                                  widget.imagePath!.isNotEmpty) ...[
+                                GestureDetector(
+                                  onTap: () => _showFullScreenImage(context),
+                                  child: Container(
+                                    margin: EdgeInsets.only(bottom: AppTheme.spaceSm),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(
+                                        AppTheme.radiusSm,
+                                      ),
+                                      child: Image.file(
+                                        File(widget.imagePath!),
+                                        fit: BoxFit.cover,
+                                        width: double.infinity,
+                                        height: 200,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              // Use ProfessionalMessageWidget for enhanced formatting
+                              ProfessionalMessageWidget(formattedText, isBot: true),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -369,7 +403,7 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
         // Action buttons attached directly to AI message bubble
         if (!widget.fromUser && !widget.text.contains('Welcome —'))
           Padding(
-            padding: EdgeInsets.only(left: 16, top: 6, bottom: 8),
+            padding: EdgeInsets.only(left: 64, top: 12, bottom: 12),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -378,13 +412,13 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
                   messageText: widget.text,
                   isAiMessage: true,
                 ),
-                SizedBox(width: 6),
+                SizedBox(width: 8),
                 _buildCopyButton(),
-                SizedBox(width: 6),
+                SizedBox(width: 8),
                 _buildReactionButton('👍', Icons.thumb_up_rounded),
-                SizedBox(width: 6),
+                SizedBox(width: 8),
                 _buildReactionButton('👎', Icons.thumb_down_rounded),
-                SizedBox(width: 6),
+                SizedBox(width: 8),
                 _buildRegenerateButton(),
               ],
             ),
