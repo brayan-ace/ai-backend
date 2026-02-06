@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class LanguageProvider extends ChangeNotifier {
   static const String _languageKey = 'app_language';
-  static const String _defaultLanguage = 'en';
+  // static const String _defaultLanguage = 'en';
 
   static const Map<String, Map<String, String>> _languageNames = {
     'en': {'native': 'English', 'code': 'en'},

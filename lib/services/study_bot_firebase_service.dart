@@ -181,10 +181,7 @@ class StudyBotFirebaseService {
     final messages = snapshot.docs.reversed.map((doc) {
       final data = doc.data();
       final role = data['fromUser'] == true ? 'user' : 'assistant';
-      return {
-        'role': role,
-        'content': data['text'] as String? ?? '',
-      };
+      return {'role': role, 'content': data['text'] as String? ?? ''};
     }).toList();
 
     return messages;
@@ -219,10 +216,7 @@ class StudyBotFirebaseService {
         .doc(_userId)
         .collection('study_bots')
         .doc(botId)
-        .update({
-          'name': name,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
+        .update({'name': name, 'updatedAt': FieldValue.serverTimestamp()});
   }
 
   /// Update bot progress
@@ -314,6 +308,7 @@ class StudyBotFirebaseService {
     double? progressPercentage,
     int? currentModule,
     String? botState,
+    int? messageCount,
   }) async {
     if (_userId == null) throw Exception('User not authenticated');
 
@@ -336,6 +331,7 @@ class StudyBotFirebaseService {
         'progressPercentage': progressPercentage ?? 0,
         'currentModule': currentModule ?? 0,
         'botState': botState ?? 'intro',
+        if (messageCount != null) 'messageCount': messageCount,
         'updatedAt': FieldValue.serverTimestamp(),
       });
     } else {
@@ -348,7 +344,7 @@ class StudyBotFirebaseService {
         'systemInstructions': systemInstructions,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
-        'messageCount': 0,
+        'messageCount': messageCount ?? 0,
         'progressPercentage': progressPercentage ?? 0,
         'currentModule': currentModule ?? 0,
         'botState': botState ?? 'intro',

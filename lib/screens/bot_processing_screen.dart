@@ -46,6 +46,7 @@ class _BotProcessingScreenState extends State<BotProcessingScreen> {
   String _statusMessage = '';
   bool _isError = false;
   String _errorMessage = '';
+  bool _stepsInitialized = false;
   Timer? _timer;
 
   // Backend URL - adjust via --dart-define or change default
@@ -57,16 +58,36 @@ class _BotProcessingScreenState extends State<BotProcessingScreen> {
   @override
   void initState() {
     super.initState();
+    // Initialize steps with default values first
     _steps = [
-      AppLocalizations.of(context).t('botProcessing.analyzingPlan'),
-      AppLocalizations.of(context).t('botProcessing.searchingResources'),
-      AppLocalizations.of(context).t('botProcessing.preparingBot'),
-      AppLocalizations.of(context).t('botProcessing.finalizingInstructions'),
+      'Analyzing plan...',
+      'Searching resources...',
+      'Preparing bot...',
+      'Finalizing instructions...',
     ];
     _statusMessage = _steps.first;
     print(
       '[BotProcessingScreen] initState: name=${widget.name}, userId=${widget.userId}',
     );
+
+    // Use addPostFrameCallback to access localization after widget is built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {
+          _steps = [
+            AppLocalizations.of(context).t('botProcessing.analyzingPlan'),
+            AppLocalizations.of(context).t('botProcessing.searchingResources'),
+            AppLocalizations.of(context).t('botProcessing.preparingBot'),
+            AppLocalizations.of(
+              context,
+            ).t('botProcessing.finalizingInstructions'),
+          ];
+          _statusMessage = _steps.first;
+          //_stepsInitialized = true;
+        });
+      }
+    });
+
     _startProcessing();
   }
 

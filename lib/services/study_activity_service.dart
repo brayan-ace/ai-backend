@@ -20,6 +20,7 @@ class StudyActivityService {
 
   // Preference keys
   static const String _lastStudyTimestampKey = 'study_last_timestamp';
+  static const String _lastAppOpenTimestampKey = 'study_last_app_open';
   static const String _currentStreakKey = 'study_current_streak';
   static const String _lastStreakMilestoneKey = 'study_last_milestone';
   static const String _longestStreakKey = 'study_longest_streak';
@@ -101,6 +102,74 @@ class StudyActivityService {
       return _buildStreakData(_getCurrentStreak(), false);
     } catch (e) {
       print('[StudyActivity] ❌ Error recording activity: $e');
+      rethrow;
+    }
+  }
+
+  /// Record app open and update streak if new day
+  /// This increments the streak whenever user opens the app (not just completing activities)
+  /// Returns the updated streak information
+  Future<StudyStreakData> recordAppOpen() async {
+    _ensureInitialized();
+
+    try {
+      final now = DateTime.now();
+      final lastAppOpenTimestamp = _getLastAppOpenTimestamp();
+
+      // Check if this is a new day since last app open
+      if (lastAppOpenTimestamp == null) {
+        // First app open ever
+        await _setLastAppOpenTimestamp(now);
+        await _setCurrentStreak(1);
+        await _setLastStudyTimestamp(now);
+        print('[StudyActivity] 🎯 First app open. Streak: 1');
+        return _buildStreakData(1, false);
+      }
+
+      final timeDiffHours = now.difference(lastAppOpenTimestamp).inHours;
+
+      // Already opened app today - don't increment streak
+      if (timeDiffHours < 24) {
+        print(
+          '[StudyActivity] ⏱️  Already opened app today ($timeDiffHours hours ago). No streak increment.',
+        );
+        return _buildStreakData(_getCurrentStreak(), false);
+      }
+
+      // More than 24h but less than 48h - increment streak
+      if (timeDiffHours >= 24 && timeDiffHours < 48) {
+        final newStreak = _getCurrentStreak() + 1;
+        await _setCurrentStreak(newStreak);
+        await _setLastAppOpenTimestamp(now);
+        await _setLastStudyTimestamp(now);
+
+        // Update longest streak if applicable
+        final longestStreak = _getLongestStreak();
+        if (newStreak > longestStreak) {
+          await _setLongestStreak(newStreak);
+        }
+
+        print(
+          '[StudyActivity] 🔥 Streak incremented on app open! New streak: $newStreak',
+        );
+        return _buildStreakData(newStreak, true);
+      }
+
+      // More than 48h - reset streak to 1
+      if (timeDiffHours >= 48) {
+        await _setCurrentStreak(1);
+        await _setLastAppOpenTimestamp(now);
+        await _setLastStudyTimestamp(now);
+        print(
+          '[StudyActivity] 🔄 Streak broken (>${(timeDiffHours / 24).toStringAsFixed(1)} days). Reset to 1.',
+        );
+        return _buildStreakData(1, false);
+      }
+
+      // Should not reach here, but return current state
+      return _buildStreakData(_getCurrentStreak(), false);
+    } catch (e) {
+      print('[StudyActivity] ❌ Error recording app open: $e');
       rethrow;
     }
   }
@@ -227,6 +296,19 @@ class StudyActivityService {
 
   Future<void> _setLastStudyTimestamp(DateTime dateTime) async {
     await _prefs.setString(_lastStudyTimestampKey, dateTime.toIso8601String());
+  }
+
+  DateTime? _getLastAppOpenTimestamp() {
+    final timestamp = _prefs.getString(_lastAppOpenTimestampKey);
+    if (timestamp == null) return null;
+    return DateTime.parse(timestamp);
+  }
+
+  Future<void> _setLastAppOpenTimestamp(DateTime dateTime) async {
+    await _prefs.setString(
+      _lastAppOpenTimestampKey,
+      dateTime.toIso8601String(),
+    );
   }
 
   int _getCurrentStreak() {

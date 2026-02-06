@@ -27,11 +27,8 @@ class ProfessionalMessageWidget extends StatelessWidget {
   static final RegExp _crlfPattern = RegExp(r'\r\n');
   static final RegExp _trailingSpacesPattern = RegExp(r' {2,}\n');
   static final RegExp _lineEndSpacesPattern = RegExp(r'[ \t]+\n');
-  static final RegExp _codeBlockStartPattern = RegExp(r'^```');
-  static final RegExp _codeBlockEndPattern = RegExp(r'```$');
-  static final RegExp _headingPattern = RegExp(r'^(#{1,3})\s+(.*)$');
+
   static final RegExp _numberedListPattern = RegExp(r'^(\d+)\.\s+(.*)$');
-  static final RegExp _bulletListPattern = RegExp(r'^[-•*]\s+(.*)$');
   static final RegExp _displayMathPattern = RegExp(
     r'^\$\$([\s\S]*?)\$\$$',
     multiLine: true,
@@ -294,8 +291,10 @@ class ProfessionalMessageWidget extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Check if this paragraph contains a markdown table
-    final isTable = text.contains('|') && text.contains('\n') &&
-                    RegExp(r'\|[^\n]+\|').hasMatch(text);
+    final isTable =
+        text.contains('|') &&
+        text.contains('\n') &&
+        RegExp(r'\|[^\n]+\|').hasMatch(text);
 
     final spans = _parseInlineContent(text, context);
 

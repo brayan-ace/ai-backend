@@ -222,7 +222,7 @@ class _QuizArtifactWidgetState extends State<QuizArtifactWidget> {
     );
 
     for (int i = 0; i < questions.length; i++) {
-      final question = questions[i] as Map<String, dynamic>?;
+      // final question = questions[i] as Map<String, dynamic>?;
       final answer = answers[i] as Map<String, dynamic>?;
 
       if (answer == null) {

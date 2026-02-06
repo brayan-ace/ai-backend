@@ -1,16 +1,12 @@
 import 'package:flutter/material.dart';
-import '../utils/theme.dart';
 
 /// Widget that displays the new app icon design (purple squares in 2x2 grid)
 class NewAppIcon extends StatelessWidget {
   final double size;
   final bool withGlow;
 
-  const NewAppIcon({
-    Key? key, 
-    required this.size, 
-    this.withGlow = true,
-  }) : super(key: key);
+  const NewAppIcon({Key? key, required this.size, this.withGlow = true})
+    : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -27,17 +23,17 @@ class NewAppIcon extends StatelessWidget {
           ],
         ),
         borderRadius: BorderRadius.circular(size * 0.2),
-        boxShadow: withGlow ? [
-          BoxShadow(
-            color: Color(0xFF8B5CF6).withOpacity(0.4),
-            blurRadius: 20,
-            spreadRadius: 2,
-          ),
-        ] : null,
+        boxShadow: withGlow
+            ? [
+                BoxShadow(
+                  color: Color(0xFF8B5CF6).withOpacity(0.4),
+                  blurRadius: 20,
+                  spreadRadius: 2,
+                ),
+              ]
+            : null,
       ),
-      child: Center(
-        child: _buildGridIcon(size * 0.6),
-      ),
+      child: Center(child: _buildGridIcon(size * 0.6)),
     );
   }
 
@@ -164,12 +160,7 @@ class NewGreetingIcon extends StatelessWidget {
           ),
         ],
       ),
-      child: Center(
-        child: NewAppIcon(
-          size: size * 0.5,
-          withGlow: false,
-        ),
-      ),
+      child: Center(child: NewAppIcon(size: size * 0.5, withGlow: false)),
     );
   }
 }

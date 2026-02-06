@@ -77,6 +77,13 @@ void main() async {
     await StudyActivityService().initialize();
     await StudyNotificationService().initialize();
     await TextToSpeechService().initialize();
+
+    // Record app open to increment streak
+    await StudyActivityService().recordAppOpen();
+
+    // Schedule daily notifications
+    await StudyNotificationService().scheduleDailyReminder();
+
     print('[Main] ✅ Premium services initialized');
   } catch (e) {
     print('[Main] ⚠️ Premium services initialization failed: $e');

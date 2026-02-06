@@ -72,7 +72,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
   static const double _scrollThreshold = 100.0;
 
   // Onboarding state
-  bool _showOnboarding = false;
+
   bool _onboardingInitialized = false;
 
   @override
@@ -117,7 +117,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
       final shouldShow = await OnboardingService.shouldShowOnboarding();
       if (shouldShow && mounted) {
         setState(() {
-          _showOnboarding = true;
+          //_showOnboarding = true;
           _onboardingInitialized = true;
         });
       }
@@ -1714,9 +1714,23 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
     Map<String, dynamic>? instructions,
   }) async {
     try {
-      final List<Map<String, String>> searchMessages = [
-        {'role': 'user', 'content': enhancedPrompt},
-      ];
+      // Build conversation history including all previous messages for context
+      final List<Map<String, String>> searchMessages = [];
+
+      // Add all previous messages to maintain context
+      for (final m in _messages) {
+        final role = m.fromUser ? 'user' : 'assistant';
+        final content = m.text;
+
+        if (content.isNotEmpty) {
+          if (!role.contains('assistant') || !_isDefaultIntroMessage(content)) {
+            searchMessages.add({'role': role, 'content': content});
+          }
+        }
+      }
+
+      // Add the current enhanced prompt at the end
+      searchMessages.add({'role': 'user', 'content': enhancedPrompt});
 
       final resp = await _geminiService.generateContent(
         enhancedPrompt,
@@ -3746,6 +3760,87 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
               child: SafeArea(
                 child: Column(
                   children: [
+                    // Premium Upgrade Button (shown only when no messages)
+                    if (_messages.isEmpty)
+                      Container(
+                        margin: EdgeInsets.symmetric(
+                          horizontal: AppTheme.spaceMd,
+                          vertical: 0,
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: AppTheme.primaryGradient,
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(
+                            AppTheme.radiusMd,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.primaryBlue.withValues(
+                                alpha: 0.3,
+                              ),
+                              blurRadius: 12,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () {
+                              // TODO: Navigate to premium screen
+                              _showPremiumRequiredDialog();
+                            },
+                            borderRadius: BorderRadius.circular(
+                              AppTheme.radiusMd,
+                            ),
+                            child: Container(
+                              padding: EdgeInsets.all(AppTheme.spaceMd),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.diamond,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                  SizedBox(width: AppTheme.spaceSm),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Upgrade',
+                                          style: AppTheme.bodyLarge.copyWith(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        SizedBox(height: 2),
+                                        Text(
+                                          'Unlock Premium Features',
+                                          style: AppTheme.bodySmall.copyWith(
+                                            color: Colors.white.withValues(
+                                              alpha: 0.9,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(
+                                    Icons.arrow_forward,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                     Expanded(
                       child: Stack(
                         children: [
@@ -4120,7 +4215,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
           constraints: BoxConstraints(
             minHeight:
                 MediaQuery.of(context).size.height -
-                200, // Account for app bar and input area
+                300, // Account for app bar and input area
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -4149,7 +4244,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                   );
                 },
               ),
-              SizedBox(height: 64),
+              SizedBox(height: 4),
 
               // Feature highlights
               Container(

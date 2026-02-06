@@ -101,8 +101,9 @@ class StudyNotificationService {
   }
 
   /// Schedule daily study reminder
+  /// Schedule daily study reminders at 6 AM and 6 PM
   /// Only sends if the user hasn't studied in the last 24 hours
-  /// Scheduled for 9 AM every day in the user's timezone
+  /// Scheduled for 6 AM and 6 PM every day in the user's timezone
   Future<void> scheduleDailyReminder() async {
     _ensureInitialized();
 
@@ -116,33 +117,50 @@ class StudyNotificationService {
       // Get user's timezone
       final tzLocation = tz.local;
 
-      // Schedule for 9 AM today or tomorrow
-      var scheduledDate = tz.TZDateTime.from(
-        DateTime.now().add(Duration(hours: 9)),
-        tzLocation,
+      // Schedule for 6 AM
+      await _scheduleReminderAtTime(6, 0, tzLocation);
+
+      // Schedule for 6 PM (18:00)
+      await _scheduleReminderAtTime(18, 0, tzLocation);
+
+      print(
+        '[StudyNotification] 📅 Daily reminders scheduled for 6 AM and 6 PM',
       );
+    } catch (e) {
+      print('[StudyNotification] ❌ Error scheduling daily reminder: $e');
+    }
+  }
 
-      // If it's already past 9 AM, schedule for tomorrow
-      if (scheduledDate.isBefore(tz.TZDateTime.now(tzLocation))) {
-        scheduledDate = scheduledDate.add(Duration(days: 1));
-      }
+  /// Helper method to schedule a reminder at a specific time
+  Future<void> _scheduleReminderAtTime(
+    int hour,
+    int minute,
+    tz.Location tzLocation,
+  ) async {
+    try {
+      var scheduledDate = tz.TZDateTime.now(tzLocation);
 
-      // Reset the time to 9 AM
-      final scheduledDateTime = DateTime(
+      // Create scheduled date for the given time
+      var scheduledDateTime = tz.TZDateTime(
+        tzLocation,
         scheduledDate.year,
         scheduledDate.month,
         scheduledDate.day,
-        9,
-        0,
+        hour,
+        minute,
         0,
       );
-      scheduledDate = tz.TZDateTime.from(scheduledDateTime, tzLocation);
+
+      // If it's already past this time, schedule for tomorrow
+      if (scheduledDateTime.isBefore(tz.TZDateTime.now(tzLocation))) {
+        scheduledDateTime = scheduledDateTime.add(Duration(days: 1));
+      }
 
       await _notifications.zonedSchedule(
-        _dailyReminderNotificationId,
+        _dailyReminderNotificationId + hour, // Different ID for each time
         '🧠 Time to Study!',
         'Your study bot misses you ✨ Let\'s do a quick learning session today.',
-        scheduledDate,
+        scheduledDateTime,
         NotificationDetails(
           android: AndroidNotificationDetails(
             _studyReminderChannel,
@@ -167,10 +185,12 @@ class StudyNotificationService {
       );
 
       print(
-        '[StudyNotification] 📅 Daily reminder scheduled for ${scheduledDate.toString()}',
+        '[StudyNotification] 📅 Reminder scheduled for ${scheduledDateTime.toString()}',
       );
     } catch (e) {
-      print('[StudyNotification] ❌ Error scheduling daily reminder: $e');
+      print(
+        '[StudyNotification] ❌ Error scheduling reminder at ${hour}:$minute: $e',
+      );
     }
   }
 

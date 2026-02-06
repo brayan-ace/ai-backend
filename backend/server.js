@@ -1981,6 +1981,77 @@ app.get("/api/bot-progress/:botId/:userId", async (req, res) => {
   }
 });
 
+// Save progress endpoint (called when user records milestones during learning)
+app.post("/api/save-progress", async (req, res) => {
+  try {
+    const {
+      botId,
+      userId,
+      progressPercentage,
+      botState,
+      currentModule,
+      completedModules,
+    } = req.body;
+
+    // Validate input
+    if (!botId || !userId) {
+      return res
+        .status(400)
+        .json({ success: false, error: "botId and userId are required" });
+    }
+
+    console.log(
+      `[save-progress] Saving progress: botId=${botId}, userId=${userId}, progress=${progressPercentage}%`,
+    );
+
+    // Upsert progress record (insert if doesn't exist, update if does)
+    const result = await pool.query(
+      `INSERT INTO bot_progress (bot_id, user_id, progress_percentage, bot_state, current_module, completed_modules, last_updated)
+       VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+       ON CONFLICT (bot_id, user_id) DO UPDATE SET
+       progress_percentage = EXCLUDED.progress_percentage,
+       bot_state = EXCLUDED.bot_state,
+       current_module = EXCLUDED.current_module,
+       completed_modules = EXCLUDED.completed_modules,
+       last_updated = CURRENT_TIMESTAMP
+       RETURNING *`,
+      [
+        botId,
+        userId,
+        progressPercentage || 0,
+        botState || "intro",
+        currentModule || 0,
+        JSON.stringify(completedModules || []),
+      ],
+    );
+
+    const savedProgress = result.rows[0];
+
+    console.log(
+      `[save-progress] ✅ Progress saved successfully: ${progressPercentage}%`,
+    );
+
+    return res.json({
+      success: true,
+      message: "Progress saved successfully",
+      progress: {
+        percentage: savedProgress.progress_percentage,
+        botState: savedProgress.bot_state,
+        currentModule: savedProgress.current_module,
+        completedModules: savedProgress.completed_modules,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("[POST /api/save-progress] Error:", err.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to save progress",
+      message: err.message,
+    });
+  }
+});
+
 app.get("/api/user-bots/:userId", async (req, res) => {
   try {
     const { userId } = req.params;

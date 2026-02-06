@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../utils/theme.dart';
-import '../services/auth_services.dart';
-import '../services/user_profile_service.dart';
+
 import '../widgets/google_sign_in_button.dart';
 import 'email_verification_screen.dart';
 
@@ -21,8 +20,6 @@ class _SignUpScreenState extends State<SignUpScreen>
   final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _authService = AuthService();
-  final _userProfileService = UserProfileService.instance;
 
   bool _isLoading = false;
   bool _obscurePassword = true;

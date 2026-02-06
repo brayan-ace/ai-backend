@@ -3,8 +3,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import '../utils/theme.dart';
+
 import 'user_profile_service.dart';
 
 /// Premium Push Notification Service
@@ -169,7 +168,7 @@ class PushNotificationService {
       final displayName = await userProfile.getDisplayName();
       final studyStreak = 0; // Placeholder
       lastStudyDate = DateTime.now(); // Placeholder
-      final preferredTopics = <String>['Math', 'Science']; // Placeholder
+      // final preferredTopics = <String>['Math', 'Science']; // Placeholder
 
       // Personalize message based on user data
       String title = '📚 Time to Learn, $displayName!';

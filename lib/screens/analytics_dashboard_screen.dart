@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+
 import 'dart:math';
 import '../utils/theme.dart';
 import '../services/analytics_service.dart';
 import '../services/push_notification_service.dart';
 import '../services/gamification_service.dart';
 import '../widgets/premium_chart_widget.dart';
-import '../widgets/premium_message_bubble.dart';
-import '../widgets/typing_indicator.dart';
 
 /// Premium Analytics Dashboard Screen
 /// Displays comprehensive learning analytics and insights
@@ -31,6 +29,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
   Map<String, dynamic> _gamificationData = {};
   List<Map<String, dynamic>> _leaderboard = [];
   List<Map<String, dynamic>> _recentAchievements = [];
+
   bool _isLoading = true;
   late AnimationController _fadeController;
   late AnimationController _slideController;

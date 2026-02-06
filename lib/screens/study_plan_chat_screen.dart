@@ -323,7 +323,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     final maxScroll = _scrollController.position.maxScrollExtent;
     final currentScroll = _scrollController.offset;
     final shouldShow = maxScroll - currentScroll > 200;
-    if (shouldShow != _showScrollToBottom) {
+    if (shouldShow != _showScrollToBottom && mounted) {
       setState(() => _showScrollToBottom = shouldShow);
     }
   }
@@ -383,8 +383,11 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
               progressPercentage: _progressPercentage,
               currentModule: 0,
               botState: _botCurrentState,
+              messageCount: _totalMessageCount,
             );
-            print('[ChatScreen] 🔥 Bot metadata saved to Firestore');
+            print(
+              '[ChatScreen] 🔥 Bot metadata saved to Firestore with $_totalMessageCount messages',
+            );
           } catch (e) {
             print('[ChatScreen] ⚠️ Bot metadata save error (non-blocking): $e');
           }
@@ -393,9 +396,13 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         }
 
         // Load chat history from Firebase (primary source)
+        bool messagesLoaded = false;
         try {
           final firebaseMessages = await _storageService.getMessages(
             widget.botId!,
+          );
+          print(
+            '[ChatScreen] 🔍 Firebase getMessages returned: ${firebaseMessages.length} messages',
           );
           if (firebaseMessages.isNotEmpty) {
             final messages = firebaseMessages
@@ -428,14 +435,35 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
               }
             }
 
-            setState(() => _messages = messages);
+            if (mounted) {
+              setState(() {
+                _messages = messages;
+                _totalMessageCount = messages.length;
+                _userMessageCount = messages
+                    .where((m) => m.senderType == 'user')
+                    .length;
+              });
+              print(
+                '[ChatScreen] 🔥 Loaded ${messages.length} messages from Firebase (${_userMessageCount} user messages)',
+              );
+              print(
+                '[ChatScreen] ✅ Message count set in setState: $_totalMessageCount total, $_userMessageCount user',
+              );
+              // Ensure message count is visible in drawer immediately
+              _syncMessageCounts();
+            }
+            messagesLoaded = true;
+          } else {
             print(
-              '[ChatScreen] 🔥 Loaded ${messages.length} messages from Firebase',
+              '[ChatScreen] ℹ️ No messages loaded from Firebase, will try backend fallback',
             );
           }
         } catch (e) {
           print('[ChatScreen] ⚠️ Firebase history load error: $e');
-          // Fallback to backend if Firebase fails
+        }
+
+        // Fallback to backend if Firebase failed or returned no messages
+        if (!messagesLoaded) {
           try {
             final historyUri = Uri.parse(
               '$_backendUrl/api/chat-history/${widget.botId}/$userId',
@@ -476,10 +504,23 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                 }
               }
 
-              setState(() => _messages = messages);
-              print(
-                '[ChatScreen] 📡 Loaded ${messages.length} messages from backend (fallback)',
-              );
+              if (mounted) {
+                setState(() {
+                  _messages = messages;
+                  _totalMessageCount = messages.length;
+                  _userMessageCount = messages
+                      .where((m) => m.senderType == 'user')
+                      .length;
+                });
+                print(
+                  '[ChatScreen] 📡 Loaded ${messages.length} messages from backend (fallback) (${_userMessageCount} user messages)',
+                );
+                print(
+                  '[ChatScreen] ✅ Message count set in setState (backend): $_totalMessageCount total, $_userMessageCount user',
+                );
+                // Ensure message count is visible in drawer immediately
+                _syncMessageCounts();
+              }
             }
           } catch (backendErr) {
             print('[ChatScreen] ❌ Backend history also failed: $backendErr');
@@ -497,12 +538,15 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
 
           if (progressRes.statusCode == 200) {
             final body = jsonDecode(progressRes.body);
-            setState(() {
-              _botCurrentState = body['bot_state'] as String? ?? 'intro';
-              _progressPercentage =
-                  (body['progress']?['percentage'] as num?)?.toDouble() ?? 0.0;
-              _studyPlan = body['study_plan'] as Map<String, dynamic>?;
-            });
+            if (mounted) {
+              setState(() {
+                _botCurrentState = body['bot_state'] as String? ?? 'intro';
+                _progressPercentage =
+                    (body['progress']?['percentage'] as num?)?.toDouble() ??
+                    0.0;
+                _studyPlan = body['study_plan'] as Map<String, dynamic>?;
+              });
+            }
             print(
               '[ChatScreen] Restored state: $_botCurrentState, progress: $_progressPercentage%',
             );
@@ -528,7 +572,12 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         await _fetchInitialGreeting();
       }
 
-      setState(() {});
+      if (mounted) {
+        setState(() {});
+      }
+
+      // Final sync of message counts to ensure drawer shows correct values
+      _syncMessageCounts();
     } catch (e) {
       print('[ChatScreen] Error in _initPhase2: $e');
     }
@@ -548,9 +597,11 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
             body['systemInstructions'] as Map<String, dynamic>?;
 
         if (freshInstructions != null) {
-          setState(() {
-            _botInstructions = freshInstructions;
-          });
+          if (mounted) {
+            setState(() {
+              _botInstructions = freshInstructions;
+            });
+          }
           print('[ChatScreen] ✅ Fresh system instructions fetched and updated');
           print(
             '[ChatScreen] Bot: ${body['botName']}, Topic: ${body['topic']}',
@@ -637,35 +688,210 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     final modules = plan['modules'] as List? ?? [];
     if (modules.isEmpty) return;
 
-    // Build a formatted study plan message
-    final buffer = StringBuffer();
-    buffer.writeln('📚 **Your Study Plan is Ready!**\n');
-    buffer.writeln(
-      'I\'ve created a personalized study plan with **${modules.length} modules**:\n',
+    // STEP 1: Ask user to review the study plan first
+    final reviewMessage = StudyBotMessage(
+      id: 'plan_review_${DateTime.now().millisecondsSinceEpoch}',
+      senderType: 'bot',
+      text:
+          '✋ **Before we begin, please review your study plan!**\n\n'
+          'I\'ve created a personalized **${modules.length}-module** learning path just for you. '
+          'Tap the menu icon ☰ (top-left) to check out the full plan, see each module\'s topics, '
+          'and understand your learning journey.\n\n'
+          '**Take a moment to review** - this helps me understand your comfort with the structure and make adjustments if needed! 📖',
+      timestamp: DateTime.now(),
     );
 
+    if (mounted) {
+      setState(() {
+        _messages.add(reviewMessage);
+      });
+    }
+    final buffer = StringBuffer();
+    buffer.writeln('📚 **Your Learning Roadmap**\n');
+    buffer.writeln(
+      'I\'ve structured your learning into **${modules.length} modules**:\n',
+    );
+
+    int totalTopics = 0;
     for (int i = 0; i < modules.length; i++) {
       final mod = modules[i] as Map<String, dynamic>;
       final title = mod['title'] ?? mod['module_name'] ?? 'Module ${i + 1}';
       final topics = mod['key_topics'] ?? mod['subtopics'] ?? [];
       final topicCount = (topics as List).length;
-      buffer.writeln('**${i + 1}. $title** ($topicCount topics)');
+      totalTopics += topicCount;
+
+      final difficulty = mod['difficulty_level'] ?? 'Medium';
+      final timeEstimate = mod['estimated_time'] ?? 'Flexible';
+
+      buffer.writeln('**${i + 1}. $title**');
+      buffer.writeln(
+        '   📌 $topicCount key topics | 📊 $difficulty | ⏱️ $timeEstimate',
+      );
     }
 
+    buffer.writeln('\n---\n');
     buffer.writeln(
-      '\n✨ *Tap the menu icon ☰ to view the full plan and track your progress!*',
+      '**📊 Total Learning Load:** $totalTopics topics across all modules\n',
     );
 
-    final message = StudyBotMessage(
-      id: 'plan_${DateTime.now().millisecondsSinceEpoch}',
+    final overviewMessage = StudyBotMessage(
+      id: 'plan_overview_${DateTime.now().millisecondsSinceEpoch + 1}',
       senderType: 'bot',
       text: buffer.toString(),
       timestamp: DateTime.now(),
     );
 
-    setState(() {
-      _messages.add(message);
-    });
+    if (mounted) {
+      setState(() {
+        _messages.add(overviewMessage);
+      });
+    }
+
+    // STEP 3: Smart progression guide
+    final firstModule = modules.isNotEmpty
+        ? modules[0] as Map<String, dynamic>
+        : null;
+    String smartGuidance = '';
+
+    if (_botCurrentState == 'learning' && _progressPercentage == 0.0) {
+      // Brand new user
+      final moduleName =
+          firstModule?['title'] ?? firstModule?['module_name'] ?? 'Module 1';
+      smartGuidance =
+          '🎯 **Ready to Get Started?**\n\n'
+          'Let\'s begin with **\"$moduleName\"** - this is the perfect starting point for you.\n\n'
+          'I\'ll:\n'
+          '• Explain the core concepts step-by-step\n'
+          '• Check your understanding with questions\n'
+          '• Adjust my teaching style based on your responses\n'
+          '• Track your progress automatically\n\n'
+          '**Just reply and let\'s dive in!** 💡';
+    } else if (_progressPercentage > 0 && _progressPercentage < 30) {
+      // In early progress
+      final currentIndex = (_progressPercentage / (100 / modules.length))
+          .toInt();
+      final nextIndex = (currentIndex + 1).clamp(0, modules.length - 1);
+      final nextModule = modules[nextIndex] as Map<String, dynamic>;
+      final nextModuleName =
+          nextModule['title'] ?? nextModule['module_name'] ?? 'Next Module';
+
+      smartGuidance =
+          '✅ **Great Progress! You\'re on a roll!**\n\n'
+          'You\'ve built a solid foundation (${_progressPercentage.toStringAsFixed(0)}% complete).\n\n'
+          'Next up: **\"$nextModuleName\"**\n'
+          '• Building on what you\'ve already learned\n'
+          '• New and exciting concepts ahead\n'
+          '• Your learning style is already optimized\n\n'
+          'Would you like to continue or dive deeper into the current module? 🚀';
+    } else if (_progressPercentage >= 30 && _progressPercentage < 70) {
+      // Mid-way through
+      smartGuidance =
+          '🌟 **You\'re Crushing It!**\n\n'
+          'You\'re already ${_progressPercentage.toStringAsFixed(0)}% through your learning path!\n\n'
+          'You\'ve developed excellent learning habits. I\'ve noticed:\n'
+          '• Strong question patterns\n'
+          '• Consistent engagement\n'
+          '• Growing confidence\n\n'
+          'Keep this momentum going - you\'re in the sweet spot of learning! 💪';
+    } else if (_progressPercentage >= 70) {
+      // Near completion
+      smartGuidance =
+          '🏆 **Final Stretch!**\n\n'
+          'You\'re ${_progressPercentage.toStringAsFixed(0)}% complete - almost there!\n\n'
+          'Let\'s finish strong:\n'
+          '• Consolidate your knowledge\n'
+          '• Master the remaining complex topics\n'
+          '• Prepare you to apply what you\'ve learned\n\n'
+          'Ready to reach mastery? 🎓';
+    } else {
+      // Default
+      smartGuidance =
+          '🚀 **Let\'s Begin Your Learning Journey!**\n\n'
+          'You have a comprehensive learning path ahead. '
+          'I\'ll guide you through each module at your pace.\n\n'
+          'Remember:\n'
+          '• There are no stupid questions\n'
+          '• We learn together\n'
+          '• Your progress is tracked and celebrated\n\n'
+          'Ready to start? 💫';
+    }
+
+    final guidanceMessage = StudyBotMessage(
+      id: 'plan_guidance_${DateTime.now().millisecondsSinceEpoch + 2}',
+      senderType: 'bot',
+      text: smartGuidance,
+      timestamp: DateTime.now(),
+    );
+
+    if (mounted) {
+      setState(() {
+        _messages.add(guidanceMessage);
+      });
+    }
+
+    // Save to Firebase
+    if (widget.botId != null) {
+      try {
+        await _firebaseService.saveMessage(
+          botId: widget.botId!,
+          text: reviewMessage.text,
+          fromUser: false,
+        );
+        print('[ChatScreen] 🔥 Study plan review message saved');
+      } catch (e) {
+        print('[ChatScreen] ⚠️ Could not save review message: $e');
+      }
+    }
+
+    // Send overview of the first module so user knows what to expect
+    if (modules.isNotEmpty) {
+      await Future.delayed(Duration(milliseconds: 800));
+      await _sendModuleOverview(modules[0] as Map<String, dynamic>, 0);
+    }
+
+    // Enhance system instructions for learning phase
+    _enhanceSystemInstructionsForLearning(modules);
+  }
+
+  /// Enhance system instructions after study plan is created to guide learning
+  void _enhanceSystemInstructionsForLearning(List<dynamic> modules) {
+    try {
+      if (_botInstructions == null) return;
+
+      final currentInstructions =
+          _botInstructions?['instructions'] as String? ?? '';
+
+      // Add smart guidance directives based on study structure
+      final enhancedInstructions =
+          '''$currentInstructions
+
+## SMART STUDY PROGRESSION GUIDE
+Based on the user's personalized study plan with ${modules.length} modules:
+
+1. **Adaptive Pacing**: Slow down if user shows confusion, speed up if they demonstrate mastery
+2. **Progress Tracking**: Celebrate milestones when user completes topics
+3. **Intelligent Transitions**: When user says "I understand", confirm and guide to next concept
+4. **Personalized Examples**: Use examples relevant to user's expressed interests
+5. **Depth Adjustment**: Provide deeper explanations for complex topics, brief summaries for simple ones
+6. **Engagement Tactics**: 
+   - Ask clarifying questions rather than just providing answers
+   - Encourage critical thinking with "why" and "how" questions
+   - Connect concepts to real-world applications
+7. **Progress Celebration**: Mark understanding with encouragement (✅, 🎯, 💡 emojis)
+8. **Module Transitions**: When moving to a new module, recap key learnings and show connections
+
+Remember: The user is learning ${modules.length} interconnected modules. Each success builds on the previous understanding.''';
+
+      if (mounted) {
+        setState(() {
+          _botInstructions?['instructions'] = enhancedInstructions;
+        });
+      }
+
+      print('[ChatScreen] 📚 System instructions enhanced for smart learning');
+    } catch (e) {
+      print('[ChatScreen] ⚠️ Could not enhance instructions: $e');
+    }
   }
 
   Future<void> _addBotMessage(String text) async {
@@ -687,12 +913,16 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         timestamp: DateTime.now(),
       );
 
-      setState(() {
-        _messages.add(message);
-        _totalMessageCount = _messages.length;
-        // Update counts (this is a bot message)
-        print('[ChatScreen] 📊 Added bot message - Total: $_totalMessageCount');
-      });
+      if (mounted) {
+        setState(() {
+          _messages.add(message);
+          _totalMessageCount = _messages.length;
+          // Update counts (this is a bot message)
+          print(
+            '[ChatScreen] 📊 Added bot message - Total: $_totalMessageCount',
+          );
+        });
+      }
 
       if (_botState != null) {
         _botState = _botState!.copyWith(
@@ -714,17 +944,21 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         timestamp: DateTime.now(),
       );
 
-      setState(() {
-        _messages.add(message);
-        _totalMessageCount = _messages.length;
-        // Update counts (this is a bot message)
-        print('[ChatScreen] 📊 Added bot message - Total: $_totalMessageCount');
-      });
+      if (mounted) {
+        setState(() {
+          _messages.add(message);
+          _totalMessageCount = _messages.length;
+          // Update counts (this is a bot message)
+          print(
+            '[ChatScreen] 📊 Added bot message - Total: $_totalMessageCount',
+          );
+        });
+      }
 
       // Save bot message to Firebase
       if (widget.botId != null) {
         try {
-          await _storageService.saveMessage(
+          await _firebaseService.saveMessage(
             botId: widget.botId!,
             text: adaptedText,
             fromUser: false,
@@ -742,8 +976,11 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
             progressPercentage: _progressPercentage,
             currentModule: 0,
             botState: _botCurrentState,
+            messageCount: _totalMessageCount,
           );
-          print('[ChatScreen] 🔥 Bot metadata updated in Firestore');
+          print(
+            '[ChatScreen] 🔥 Bot metadata updated in Firestore with $_totalMessageCount messages',
+          );
         } catch (e) {
           print('[ChatScreen] ⚠️ Firebase save error (non-blocking): $e');
         }
@@ -774,19 +1011,23 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       timestamp: DateTime.now(),
     );
 
-    setState(() {
-      _messages.add(message);
-      _totalMessageCount = _messages.length;
-      _userMessageCount = _messages.where((m) => m.senderType == 'user').length;
-      print(
-        '[ChatScreen] 📊 Added user message - User: $_userMessageCount, Total: $_totalMessageCount',
-      );
-    });
+    if (mounted) {
+      setState(() {
+        _messages.add(message);
+        _totalMessageCount = _messages.length;
+        _userMessageCount = _messages
+            .where((m) => m.senderType == 'user')
+            .length;
+        print(
+          '[ChatScreen] 📊 Added user message - User: $_userMessageCount, Total: $_totalMessageCount',
+        );
+      });
+    }
 
     // Save user message to Firebase
     if (widget.botId != null) {
       try {
-        await _storageService.saveMessage(
+        await _firebaseService.saveMessage(
           botId: widget.botId!,
           text: text,
           fromUser: true,
@@ -804,8 +1045,11 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
           progressPercentage: _progressPercentage,
           currentModule: 0,
           botState: _botCurrentState,
+          messageCount: _totalMessageCount,
         );
-        print('[ChatScreen] 🔥 Bot metadata updated in Firestore');
+        print(
+          '[ChatScreen] 🔥 Bot metadata updated in Firestore with $_totalMessageCount messages',
+        );
       } catch (e) {
         print('[ChatScreen] ⚠️ Firebase save error (non-blocking): $e');
       }
@@ -818,7 +1062,12 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     // Check if user is indicating understanding or confusion
     if (_indicatesUnderstanding(text)) {
       print('[ChatScreen] User indicated understanding');
-      // Will trigger milestone recording after backend response
+      // Record milestone for understanding
+      await _recordMilestone(
+        'User demonstrated understanding',
+        'concept_mastery',
+        progressIncrement: 0.02,
+      );
     } else if (_indicatesConfusion(text)) {
       print('[ChatScreen] User indicated confusion');
       // Backend will know to provide clarification
@@ -840,10 +1089,12 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       );
     }
 
-    setState(() {
-      _inputController.clear();
-      _isLoading = true;
-    });
+    if (mounted) {
+      setState(() {
+        _inputController.clear();
+        _isLoading = true;
+      });
+    }
 
     // Send message to backend AI
     await _sendMessageToBackend(text);
@@ -875,7 +1126,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
 
       final uri = Uri.parse('$_backendUrl/api/chat-enhanced');
 
-      // Build enhanced payload with learner profile, mood, and conversation history
+      // Build enhanced payload with learner profile, mood, study plan context, and conversation history
       final payload = {
         'message': userMessage,
         'botId': widget.botId,
@@ -884,6 +1135,17 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         'learnerProfile': _learnerProfile?.toJson(),
         'currentMood': _currentMood?.toJson(),
         'conversationHistory': conversationHistory,
+        'studyPlanContext': {
+          'hasStudyPlan': _studyPlan != null,
+          'moduleCount': (_studyPlan?['modules'] as List?)?.length ?? 0,
+          'currentProgress': _progressPercentage,
+          'currentState': _botCurrentState,
+        },
+        'progressTracking': {
+          'userMessages': _userMessageCount,
+          'totalMessages': _totalMessageCount,
+          'engagementLevel': _totalMessageCount > 10 ? 'high' : 'medium',
+        },
       };
 
       final payloadStr = jsonEncode(payload);
@@ -894,6 +1156,12 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       );
       print('[ChatScreen] 👤 Learner profile: ${_learnerProfile != null}');
       print('[ChatScreen] 🎭 Current mood: ${_currentMood?.sentiment}');
+      print(
+        '[ChatScreen] 📚 Study plan context: ${payload['studyPlanContext']}',
+      );
+      print(
+        '[ChatScreen] 📊 Progress tracking: ${payload['progressTracking']}',
+      );
 
       final resp = await http
           .post(
@@ -960,22 +1228,26 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
             print('[ChatScreen] ⚠️ Could not record study activity: $e');
           }
 
-          setState(() {
-            _botCurrentState = newState;
-            if (progress != null) {
-              _progressPercentage = (progress['percentage'] ?? 0).toDouble();
-              print('[ChatScreen] 📊 Progress updated: $_progressPercentage%');
-            }
-            // Update message counts
-            _totalMessageCount = _messages.length;
-            _userMessageCount = _messages
-                .where((m) => m.senderType == 'user')
-                .length;
-            print('[ChatScreen] 📊 State updated: $_botCurrentState');
-            print(
-              '[ChatScreen] 📊 Messages: $_userMessageCount user, ${_totalMessageCount - _userMessageCount} bot, Total: $_totalMessageCount',
-            );
-          });
+          if (mounted) {
+            setState(() {
+              _botCurrentState = newState;
+              if (progress != null) {
+                _progressPercentage = (progress['percentage'] ?? 0).toDouble();
+                print(
+                  '[ChatScreen] 📊 Progress updated: $_progressPercentage%',
+                );
+              }
+              // Update message counts
+              _totalMessageCount = _messages.length;
+              _userMessageCount = _messages
+                  .where((m) => m.senderType == 'user')
+                  .length;
+              print('[ChatScreen] 📊 State updated: $_botCurrentState');
+              print(
+                '[ChatScreen] 📊 Messages: $_userMessageCount user, ${_totalMessageCount - _userMessageCount} bot, Total: $_totalMessageCount',
+              );
+            });
+          }
 
           // Show celebration if module was completed
           if (moduleCompleted) {
@@ -992,7 +1264,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
             final planPayload = body['studyPlan'] ?? body['study_plan'];
             if (planPayload != null) {
               final plan = Map<String, dynamic>.from(planPayload);
-              setState(() => _studyPlan = plan);
+              if (mounted) {
+                setState(() => _studyPlan = plan);
+              }
               print(
                 '[ChatScreen] 📚 Study plan received and set: ${_studyPlan?['modules']?.length ?? 0} modules',
               );
@@ -1041,7 +1315,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         'Network error: $e\n\nPlease check your internet connection and try again.',
       );
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -1422,36 +1698,43 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
                 _botCurrentState == 'plan_review')
               Padding(
                 padding: EdgeInsets.only(right: 8),
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        AppTheme.accentBlue.withOpacity(0.2),
-                        AppTheme.primaryBlue.withOpacity(0.15),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: AppTheme.primaryBlue.withOpacity(0.3),
-                      width: 1.5,
-                    ),
-                  ),
-                  child: IconButton(
-                    icon: Icon(
-                      Icons.bookmark,
-                      color: AppTheme.primaryBlue,
-                      size: 22,
-                    ),
-                    tooltip: AppLocalizations.of(
-                      context,
-                    ).t('studyBotChat.viewStudyPlan'),
-                    onPressed: () {
-                      print(
-                        '[ChatScreen] 📖 Bookmark tapped - showing modules modal',
-                      );
-                      _showModulesModal();
-                    },
-                  ),
+                child: Builder(
+                  builder: (context) {
+                    final isDark =
+                        Theme.of(context).brightness == Brightness.dark;
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? AppTheme.accentBlue.withOpacity(0.25)
+                            : AppTheme.primaryBlue.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isDark
+                              ? AppTheme.accentBlue.withOpacity(0.6)
+                              : AppTheme.primaryBlue.withOpacity(0.4),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: IconButton(
+                        icon: Icon(
+                          Icons.bookmark,
+                          color: isDark
+                              ? AppTheme.accentBlue
+                              : AppTheme.primaryBlue,
+                          size: 22,
+                        ),
+                        tooltip: AppLocalizations.of(
+                          context,
+                        ).t('studyBotChat.viewStudyPlan'),
+                        onPressed: () {
+                          print(
+                            '[ChatScreen] 📖 Bookmark tapped - showing modules modal',
+                          );
+                          _showModulesModal();
+                        },
+                      ),
+                    );
+                  },
                 ),
               ),
             // 3-Dot Menu
@@ -2342,68 +2625,22 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     );
   }
 
-  /// Convert backend study plan to TableOfContentsItem list
-  List<TableOfContentsItem> _convertStudyPlanToToc() {
-    if (_studyPlan == null) return [];
-
-    final modules = _studyPlan!['modules'] as List? ?? [];
-    return modules.asMap().entries.map((entry) {
-      final idx = entry.key;
-      final mod = entry.value as Map<String, dynamic>;
-
-      return TableOfContentsItem(
-        moduleNumber: idx + 1,
-        title: mod['title'] ?? mod['module_name'] ?? 'Module ${idx + 1}',
-        description: mod['objective'] ?? mod['description'] ?? '',
-        subtopics: List<String>.from(
-          mod['key_topics'] ??
-              mod['subtopics'] ??
-              mod['learning_objectives'] ??
-              [],
-        ),
-        estimatedTime:
-            mod['estimated_effort'] ?? mod['duration'] ?? '30 minutes',
-        difficultyLevel: mod['difficulty'] ?? 'Medium',
-      );
-    }).toList();
-  }
-
   /// Build drawer menu with navigation options
   Widget _buildDrawer() {
-    // Debug: Log study plan state
-    print(
-      '[ChatScreen] 🍔 Building drawer - _studyPlan: ${_studyPlan != null ? "EXISTS with ${(_studyPlan!['modules'] as List?)?.length ?? 0} modules" : "NULL"}',
-    );
-
-    // Use converted study plan or fallback to botState tableOfContents
-    final tocItems = _studyPlan != null
-        ? _convertStudyPlanToToc()
-        : _botState?.tableOfContents ?? [];
-
-    print('[ChatScreen] 🍔 tocItems count: ${tocItems.length}');
-
     return PremiumStudyPlanMenu(
       key: ValueKey(
-        'study_plan_${_planVersion}_${_studyPlan?.hashCode ?? 0}_progress_${_progressPercentage.toStringAsFixed(1)}_messages_${_totalMessageCount}',
-      ), // Force rebuild when study plan, progress, or messages change
-      tableOfContents: tocItems.isNotEmpty ? tocItems : null,
-      currentModule: _botState?.currentModule ?? 0,
-      completedModules: _botState?.completedModules,
+        'study_plan_${_planVersion}_progress_${_progressPercentage.toStringAsFixed(1)}_messages_${_totalMessageCount}',
+      ),
       progressPercentage: _progressPercentage,
       planVersion: _planVersion,
-      planTitle: _studyPlan?['title'] as String?,
       userMessageCount: _userMessageCount,
       totalMessageCount: _totalMessageCount,
-      context: context, // Pass context for theme access
-      onModuleEdit: (moduleIndex, moduleName) {
-        print('[ChatScreen] Edit module $moduleIndex: $moduleName');
-        _openPlanEditor();
-      },
-      onModuleTap: (moduleIndex) {
-        print('[ChatScreen] Module $moduleIndex tapped');
-        Navigator.pop(context);
-        _sendMessageToBackend('Let\'s focus on module ${moduleIndex + 1}');
-      },
+      context: context,
+      // Bot Info Parameters
+      botName: widget.botName,
+      botTopic: widget.planName,
+      botDescription: widget.planDescription,
+      botGradeLevel: widget.educationLevel,
       onEditPlan: () {
         print('[ChatScreen] Edit plan button pressed');
         _openPlanEditor();
@@ -2475,379 +2712,405 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   void _showModulesModal() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppTheme.backgroundDeep,
+      backgroundColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(
           top: Radius.circular(AppTheme.radiusLg),
         ),
       ),
       builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         return DraggableScrollableSheet(
           expand: false,
           builder: (context, scrollController) {
-            return SingleChildScrollView(
-              controller: scrollController,
-              child: Padding(
-                padding: EdgeInsets.all(AppTheme.spaceMd),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryBlue.withOpacity(0.3),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: AppTheme.spaceMd),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '📚 Your Learning Plan',
-                          style: AppTheme.headlineSmall.copyWith(
-                            color: AppTheme.textPrimary,
-                            fontWeight: FontWeight.bold,
+            return Container(
+              decoration: BoxDecoration(
+                color: isDark ? Colors.black87 : Colors.white,
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(AppTheme.radiusLg),
+                ),
+              ),
+              child: SingleChildScrollView(
+                controller: scrollController,
+                child: Padding(
+                  padding: EdgeInsets.all(AppTheme.spaceMd),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? Colors.white30
+                                : Colors.black.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(2),
                           ),
                         ),
-                        if (_studyPlan != null)
-                          IconButton(
-                            icon: Icon(Icons.edit, color: AppTheme.primaryBlue),
-                            tooltip: 'Edit Plan',
-                            onPressed: () => _openPlanEditor(),
-                          ),
-                      ],
-                    ),
-                    SizedBox(height: AppTheme.spaceSm),
-                    Text(
-                      'Tap any module to see details and concepts',
-                      style: AppTheme.bodySmall.copyWith(
-                        color: AppTheme.textSecondary,
                       ),
-                    ),
-                    SizedBox(height: AppTheme.spaceLg),
-
-                    // Modules List
-                    if (_botCurrentState == 'learning' &&
-                        widget.planName != null)
-                      Text(
-                        '✨ ${widget.planName}',
-                        style: AppTheme.bodyMedium.copyWith(
-                          color: AppTheme.primaryBlue,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-
-                    SizedBox(height: AppTheme.spaceSm),
-                    Text(
-                      'Your personalized study plan has been created. As you learn each concept, your progress will update here automatically.',
-                      style: AppTheme.bodySmall.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
-                    ),
-
-                    SizedBox(height: AppTheme.spaceLg),
-
-                    // Modules List - MAIN CONTENT
-                    if (_studyPlan != null &&
-                        (_studyPlan!['modules'] as List?)?.isNotEmpty == true)
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      SizedBox(height: AppTheme.spaceMd),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            '📚 Modules',
+                            '📚 Your Learning Plan',
                             style: AppTheme.headlineSmall.copyWith(
-                              color: AppTheme.textPrimary,
+                              color: isDark ? Colors.white : Colors.black87,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          SizedBox(height: AppTheme.spaceMd),
-                          ...((_studyPlan!['modules'] as List? ?? []).asMap().entries.map((
-                            entry,
-                          ) {
-                            final index = entry.key;
-                            final module = entry.value as Map<String, dynamic>;
-                            final isCompleted =
-                                (_botState?.completedModules ?? []).contains(
-                                  index,
-                                );
-                            final isCurrent =
-                                _botCurrentState == 'learning' &&
-                                _botState?.currentModule == index;
-
-                            return Container(
-                              margin: EdgeInsets.only(bottom: AppTheme.spaceMd),
-                              decoration: BoxDecoration(
-                                color: AppTheme.surfaceCard,
-                                border: Border.all(
-                                  color: isCurrent
-                                      ? AppTheme.primaryBlue
-                                      : AppTheme.primaryBlue.withOpacity(0.2),
-                                  width: isCurrent ? 2 : 1,
-                                ),
-                                borderRadius: BorderRadius.circular(
-                                  AppTheme.radiusMd,
-                                ),
+                          if (_studyPlan != null)
+                            IconButton(
+                              icon: Icon(
+                                Icons.edit,
+                                color: AppTheme.primaryBlue,
                               ),
-                              child: ExpansionTile(
-                                title: Row(
-                                  children: [
-                                    if (isCompleted)
-                                      Icon(
-                                        Icons.check_circle,
-                                        color: Colors.green,
-                                        size: 20,
-                                      )
-                                    else if (isCurrent)
-                                      Icon(
-                                        Icons.play_circle,
-                                        color: AppTheme.primaryBlue,
-                                        size: 20,
-                                      )
-                                    else
-                                      Icon(
-                                        Icons.radio_button_unchecked,
-                                        color: AppTheme.textSecondary,
-                                        size: 20,
+                              tooltip: 'Edit Plan',
+                              onPressed: () => _openPlanEditor(),
+                            ),
+                        ],
+                      ),
+                      SizedBox(height: AppTheme.spaceSm),
+                      Text(
+                        'Tap any module to see details and concepts',
+                        style: AppTheme.bodySmall.copyWith(
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
+                        ),
+                      ),
+                      SizedBox(height: AppTheme.spaceLg),
+
+                      // Modules List
+                      if (_botCurrentState == 'learning' &&
+                          widget.planName != null)
+                        Text(
+                          '✨ ${widget.planName}',
+                          style: AppTheme.bodyMedium.copyWith(
+                            color: AppTheme.primaryBlue,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+
+                      SizedBox(height: AppTheme.spaceSm),
+                      Text(
+                        'Your personalized study plan has been created. As you learn each concept, your progress will update here automatically.',
+                        style: AppTheme.bodySmall.copyWith(
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
+                        ),
+                      ),
+
+                      SizedBox(height: AppTheme.spaceLg),
+
+                      // Modules List - MAIN CONTENT
+                      if (_studyPlan != null &&
+                          (_studyPlan!['modules'] as List?)?.isNotEmpty == true)
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '📚 Modules',
+                              style: AppTheme.headlineSmall.copyWith(
+                                color: isDark ? Colors.white : Colors.black87,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            SizedBox(height: AppTheme.spaceMd),
+                            ...((_studyPlan!['modules'] as List? ?? []).asMap().entries.map((
+                              entry,
+                            ) {
+                              final index = entry.key;
+                              final module =
+                                  entry.value as Map<String, dynamic>;
+                              final isCompleted =
+                                  (_botState?.completedModules ?? []).contains(
+                                    index,
+                                  );
+                              final isCurrent =
+                                  _botCurrentState == 'learning' &&
+                                  _botState?.currentModule == index;
+
+                              return Container(
+                                margin: EdgeInsets.only(
+                                  bottom: AppTheme.spaceMd,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? Colors.grey[900]
+                                      : Colors.grey[100],
+                                  border: Border.all(
+                                    color: isCurrent
+                                        ? AppTheme.primaryBlue
+                                        : (isDark
+                                              ? Colors.grey[700]!
+                                              : Colors.grey[300]!),
+                                    width: isCurrent ? 2 : 1,
+                                  ),
+                                  borderRadius: BorderRadius.circular(
+                                    AppTheme.radiusMd,
+                                  ),
+                                ),
+                                child: ExpansionTile(
+                                  title: Row(
+                                    children: [
+                                      if (isCompleted)
+                                        Icon(
+                                          Icons.check_circle,
+                                          color: Colors.green,
+                                          size: 20,
+                                        )
+                                      else if (isCurrent)
+                                        Icon(
+                                          Icons.play_circle,
+                                          color: AppTheme.primaryBlue,
+                                          size: 20,
+                                        )
+                                      else
+                                        Icon(
+                                          Icons.radio_button_unchecked,
+                                          color: isDark
+                                              ? Colors.grey[500]
+                                              : Colors.grey[400],
+                                          size: 20,
+                                        ),
+                                      SizedBox(width: AppTheme.spaceSm),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Module ${index + 1}: ${module['title'] ?? 'Untitled'}',
+                                              style: AppTheme.bodyMedium
+                                                  .copyWith(
+                                                    color: isDark
+                                                        ? Colors.white
+                                                        : Colors.black87,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                            ),
+                                            Text(
+                                              module['duration'] ?? 'N/A',
+                                              style: AppTheme.bodySmall
+                                                  .copyWith(
+                                                    color: isDark
+                                                        ? Colors.grey[400]
+                                                        : Colors.grey[600],
+                                                  ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                    SizedBox(width: AppTheme.spaceSm),
-                                    Expanded(
+                                    ],
+                                  ),
+                                  collapsedBackgroundColor: isDark
+                                      ? Colors.grey[850]
+                                      : null,
+                                  children: [
+                                    Padding(
+                                      padding: EdgeInsets.all(AppTheme.spaceMd),
                                       child: Column(
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            'Module ${index + 1}: ${module['title'] ?? 'Untitled'}',
+                                            'Description',
                                             style: AppTheme.bodyMedium.copyWith(
-                                              color: AppTheme.textPrimary,
                                               fontWeight: FontWeight.bold,
+                                              color: isDark
+                                                  ? Colors.white
+                                                  : Colors.black87,
                                             ),
                                           ),
+                                          SizedBox(height: AppTheme.spaceSm),
                                           Text(
-                                            module['duration'] ?? 'N/A',
+                                            module['description'] ??
+                                                'No description',
                                             style: AppTheme.bodySmall.copyWith(
-                                              color: AppTheme.textSecondary,
+                                              color: isDark
+                                                  ? Colors.grey[400]
+                                                  : Colors.grey[600],
                                             ),
                                           ),
+                                          SizedBox(height: AppTheme.spaceMd),
+                                          Text(
+                                            'Learning Objectives',
+                                            style: AppTheme.bodyMedium.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                              color: isDark
+                                                  ? Colors.white
+                                                  : Colors.black87,
+                                            ),
+                                          ),
+                                          SizedBox(height: AppTheme.spaceSm),
+                                          ...((module['objectives'] as List? ??
+                                                  [])
+                                              .map(
+                                                (obj) => Padding(
+                                                  padding: EdgeInsets.only(
+                                                    bottom: AppTheme.spaceSm,
+                                                  ),
+                                                  child: Row(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Text(
+                                                        '• ',
+                                                        style: AppTheme
+                                                            .bodySmall
+                                                            .copyWith(
+                                                              color: isDark
+                                                                  ? Colors
+                                                                        .grey[400]
+                                                                  : Colors
+                                                                        .grey[600],
+                                                            ),
+                                                      ),
+                                                      Expanded(
+                                                        child: Text(
+                                                          obj as String? ?? '',
+                                                          style: AppTheme
+                                                              .bodySmall
+                                                              .copyWith(
+                                                                color: isDark
+                                                                    ? Colors
+                                                                          .grey[400]
+                                                                    : Colors
+                                                                          .grey[600],
+                                                              ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              )
+                                              .toList()),
                                         ],
                                       ),
                                     ),
                                   ],
                                 ),
-                                children: [
-                                  Padding(
-                                    padding: EdgeInsets.all(AppTheme.spaceMd),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Description',
-                                          style: AppTheme.bodyMedium.copyWith(
-                                            fontWeight: FontWeight.bold,
-                                            color: AppTheme.textPrimary,
-                                          ),
-                                        ),
-                                        SizedBox(height: AppTheme.spaceSm),
-                                        Text(
-                                          module['description'] ??
-                                              'No description',
-                                          style: AppTheme.bodySmall.copyWith(
-                                            color: AppTheme.textSecondary,
-                                          ),
-                                        ),
-                                        SizedBox(height: AppTheme.spaceMd),
-                                        Text(
-                                          'Learning Objectives',
-                                          style: AppTheme.bodyMedium.copyWith(
-                                            fontWeight: FontWeight.bold,
-                                            color: AppTheme.textPrimary,
-                                          ),
-                                        ),
-                                        SizedBox(height: AppTheme.spaceSm),
-                                        ...((module['objectives'] as List? ??
-                                                [])
-                                            .map(
-                                              (obj) => Padding(
-                                                padding: EdgeInsets.only(
-                                                  bottom: AppTheme.spaceSm,
-                                                ),
-                                                child: Row(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      '• ',
-                                                      style: AppTheme.bodySmall
-                                                          .copyWith(
-                                                            color: AppTheme
-                                                                .textSecondary,
-                                                          ),
-                                                    ),
-                                                    Expanded(
-                                                      child: Text(
-                                                        obj as String? ?? '',
-                                                        style: AppTheme
-                                                            .bodySmall
-                                                            .copyWith(
-                                                              color: AppTheme
-                                                                  .textSecondary,
-                                                            ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            )
-                                            .toList()),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList()),
-                          SizedBox(height: AppTheme.spaceLg),
-                        ],
-                      )
-                    else
-                      Padding(
-                        padding: EdgeInsets.all(AppTheme.spaceMd),
-                        child: Text(
-                          'No modules available yet. Create a study plan to get started!',
-                          style: AppTheme.bodyMedium.copyWith(
-                            color: AppTheme.textSecondary,
+                              );
+                            }).toList()),
+                            SizedBox(height: AppTheme.spaceLg),
+                          ],
+                        )
+                      else
+                        Padding(
+                          padding: EdgeInsets.all(AppTheme.spaceMd),
+                          child: Text(
+                            'No modules available yet. Create a study plan to get started!',
+                            style: AppTheme.bodyMedium.copyWith(
+                              color: isDark
+                                  ? Colors.grey[400]
+                                  : Colors.grey[600],
+                            ),
                           ),
                         ),
-                      ),
-
-                    SizedBox(height: AppTheme.spaceLg),
-
-                    // Progress summary
-                    Container(
-                      padding: EdgeInsets.all(AppTheme.spaceMd),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            AppTheme.primaryBlue.withOpacity(0.1),
-                            AppTheme.primaryBlue.withOpacity(0.05),
+                      SizedBox(height: AppTheme.spaceLg),
+                      Container(
+                        padding: EdgeInsets.all(AppTheme.spaceMd),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? AppTheme.primaryBlue.withOpacity(0.15)
+                              : AppTheme.primaryBlue.withOpacity(0.08),
+                          border: Border.all(
+                            color: AppTheme.primaryBlue.withOpacity(0.3),
+                          ),
+                          borderRadius: BorderRadius.circular(
+                            AppTheme.radiusMd,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '📚 Progress Summary',
+                              style: AppTheme.bodyMedium.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : Colors.black87,
+                              ),
+                            ),
+                            SizedBox(height: AppTheme.spaceSm),
+                            Text(
+                              _botState == null
+                                  ? 'No progress yet'
+                                  : '${_botState?.completedModules?.length ?? 0} modules completed',
+                              style: AppTheme.bodySmall.copyWith(
+                                color: isDark
+                                    ? Colors.grey[400]
+                                    : Colors.grey[600],
+                              ),
+                            ),
                           ],
                         ),
-                        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '🎯 Learning Progress',
-                            style: AppTheme.bodyMedium.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.textPrimary,
-                            ),
-                          ),
-                          SizedBox(height: AppTheme.spaceSm),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Concepts Mastered',
-                                style: AppTheme.bodySmall.copyWith(
-                                  color: AppTheme.textSecondary,
-                                ),
-                              ),
-                              Text(
-                                '${_progressPercentage.toStringAsFixed(0)}%',
-                                style: AppTheme.bodyMedium.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.primaryBlue,
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 8),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: LinearProgressIndicator(
-                              value: _progressPercentage / 100,
-                              minHeight: 6,
-                              backgroundColor: AppTheme.primaryBlue.withOpacity(
-                                0.2,
-                              ),
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                AppTheme.primaryBlue,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                      SizedBox(height: AppTheme.spaceLg),
 
-                    SizedBox(height: AppTheme.spaceLg),
-
-                    // Tips
-                    Container(
-                      padding: EdgeInsets.all(AppTheme.spaceMd),
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: AppTheme.primaryBlue.withOpacity(0.2),
+                      // Tips
+                      Container(
+                        padding: EdgeInsets.all(AppTheme.spaceMd),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: AppTheme.primaryBlue.withOpacity(0.2),
+                          ),
+                          borderRadius: BorderRadius.circular(
+                            AppTheme.radiusMd,
+                          ),
                         ),
-                        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '💡 Pro Tips',
+                              style: AppTheme.bodyMedium.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.textPrimary,
+                              ),
+                            ),
+                            SizedBox(height: AppTheme.spaceSm),
+                            Text(
+                              '• When you understand a concept, tell me "I understand" or "that makes sense"\n• I\'ll track your progress automatically\n• Take your time - quality over speed\n• Ask questions anytime!',
+                              style: AppTheme.bodySmall.copyWith(
+                                color: AppTheme.textSecondary,
+                                height: 1.6,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '💡 Pro Tips',
-                            style: AppTheme.bodyMedium.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.textPrimary,
+
+                      SizedBox(height: AppTheme.spaceLg),
+
+                      // Close button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryBlue,
+                            padding: EdgeInsets.symmetric(
+                              vertical: AppTheme.spaceMd,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                AppTheme.radiusMd,
+                              ),
                             ),
                           ),
-                          SizedBox(height: AppTheme.spaceSm),
-                          Text(
-                            '• When you understand a concept, tell me "I understand" or "that makes sense"\n• I\'ll track your progress automatically\n• Take your time - quality over speed\n• Ask questions anytime!',
-                            style: AppTheme.bodySmall.copyWith(
-                              color: AppTheme.textSecondary,
-                              height: 1.6,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    SizedBox(height: AppTheme.spaceLg),
-
-                    // Close button
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryBlue,
-                          padding: EdgeInsets.symmetric(
-                            vertical: AppTheme.spaceMd,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                              AppTheme.radiusMd,
+                          child: Text(
+                            'Back to Learning',
+                            style: AppTheme.labelMedium.copyWith(
+                              color: Colors.white,
                             ),
                           ),
                         ),
-                        child: Text(
-                          'Back to Learning',
-                          style: AppTheme.labelMedium.copyWith(
-                            color: Colors.white,
-                          ),
-                        ),
                       ),
-                    ),
 
-                    SizedBox(height: AppTheme.spaceMd),
-                  ],
+                      SizedBox(height: AppTheme.spaceMd),
+                    ],
+                  ),
                 ),
               ),
             );
@@ -2961,7 +3224,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       }
 
       // Optimistically update local state
-      setState(() => _studyPlan = updatedPlan);
+      if (mounted) {
+        setState(() => _studyPlan = updatedPlan);
+      }
 
       // Send to backend - apply immediately to make plan active
       final uri = Uri.parse('$_backendUrl/api/apply-study-plan');
@@ -2982,9 +3247,11 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         final body = jsonDecode(response.body);
         final newVersion = body['plan_version'] as int? ?? (_planVersion + 1);
 
-        setState(() {
-          _planVersion = newVersion;
-        });
+        if (mounted) {
+          setState(() {
+            _planVersion = newVersion;
+          });
+        }
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -3023,9 +3290,11 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
           final body = jsonDecode(fallbackResp.body);
           final newVersion = body['plan_version'] as int? ?? (_planVersion + 1);
 
-          setState(() {
-            _planVersion = newVersion;
-          });
+          if (mounted) {
+            setState(() {
+              _planVersion = newVersion;
+            });
+          }
 
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -3045,7 +3314,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       print('[ChatScreen] Error saving plan: $e');
 
       // Restore backup on failure - don't lose local edits
-      if (backupPlan != null) {
+      if (backupPlan != null && mounted) {
         setState(() {
           _studyPlan = backupPlan;
           _planVersion = backupVersion;
@@ -3607,12 +3876,10 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     // Save artifact message to Firebase for persistence
     if (widget.botId != null) {
       try {
-        await _storageService.saveMessage(
+        await _firebaseService.saveMessage(
           botId: widget.botId!,
           text: 'Quiz Artifact',
           fromUser: false,
-          metadata: artifactMessage.metadata,
-          senderType: 'artifact',
         );
         print('[ChatScreen] 💾 Artifact saved to Firebase: $artifactId');
       } catch (e) {
@@ -3695,9 +3962,41 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
 
   /// Show quiz artifact from the message list
   void _openQuizArtifact(String artifactId) {
-    final quiz = _artifacts[artifactId];
-    if (quiz == null) return;
+    // Try to get quiz from _artifacts first, then fallback to finding it in messages
+    var quiz = _artifacts[artifactId];
 
+    // If not found in _artifacts, try to find it from the message metadata
+    if (quiz == null) {
+      print('[ChatScreen] ⚠️ Quiz not in _artifacts, searching in messages...');
+      for (final msg in _messages) {
+        if (msg.metadata?['artifactId'] == artifactId) {
+          quiz = msg.metadata?['artifactData'] as Map<String, dynamic>?;
+          if (quiz != null) {
+            print(
+              '[ChatScreen] ✅ Found quiz in message metadata for: $artifactId',
+            );
+            // Store it in _artifacts for future use
+            _artifacts[artifactId] = quiz;
+            break;
+          }
+        }
+      }
+    }
+
+    if (quiz == null) {
+      print('[ChatScreen] ❌ Quiz not found for artifactId: $artifactId');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to load quiz. Please try again.'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    print('[ChatScreen] 📝 Opening quiz artifact: $artifactId');
+    final quizData = quiz; // quiz is guaranteed non-null after null check
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -3712,7 +4011,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
               children: [
                 Expanded(
                   child: QuizArtifactWidget(
-                    quizData: quiz,
+                    quizData: quizData,
                     onExplainAnswer: _handleExplainAnswer,
                     onScoreUpdate: (correct, total, percentage) {
                       // Store score for AI awareness
@@ -3916,9 +4215,81 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       print(
         '[ChatScreen] Milestone recorded: $description, Progress: ${_progressPercentage.toStringAsFixed(1)}%, XP: +$xpAmount',
       );
+
+      // Save progress to backend IMMEDIATELY to persist it
+      await _saveProgressToBackend();
+
+      // Display progress update in chat (if significant progress)
+      if (_progressPercentage > 0 && _progressPercentage % 10 == 0) {
+        await _displayProgressMilestoneInChat();
+      }
     } catch (e) {
       print('[ChatScreen] Error recording milestone: $e');
     }
+  }
+
+  /// Display progress milestone message in the chat
+  Future<void> _displayProgressMilestoneInChat() async {
+    final progressMsg = _buildProgressMessage();
+    if (progressMsg.isEmpty) return;
+
+    final message = StudyBotMessage(
+      id: 'progress_${DateTime.now().millisecondsSinceEpoch}',
+      senderType: 'bot',
+      text: progressMsg,
+      timestamp: DateTime.now(),
+    );
+
+    setState(() {
+      _messages.add(message);
+      _totalMessageCount = _messages.length;
+    });
+
+    // Save to Firebase
+    if (widget.botId != null) {
+      try {
+        await _firebaseService.saveMessage(
+          botId: widget.botId!,
+          text: progressMsg,
+          fromUser: false,
+        );
+      } catch (e) {
+        print('[ChatScreen] Could not save progress message: $e');
+      }
+    }
+  }
+
+  /// Build a smart progress message based on current progress
+  String _buildProgressMessage() {
+    final progress = _progressPercentage.toStringAsFixed(0);
+
+    if (_progressPercentage >= 100) {
+      return '🏆 **MASTERY COMPLETE!**\n\n'
+          'You\'ve successfully completed all modules! 🎓\n\n'
+          'You\'ve learned:\n'
+          '• All ${(_studyPlan?['modules'] as List?)?.length ?? 0} core modules\n'
+          '• $_totalMessageCount messages of learning\n'
+          '• Built a strong knowledge foundation\n\n'
+          'Ready for the next challenge? 🚀';
+    } else if (_progressPercentage >= 75) {
+      return '🌟 **Final Sprint!**\n\n'
+          'You\'re $progress% through - almost at the finish line!\n\n'
+          'Keep pushing to mastery! 💪';
+    } else if (_progressPercentage >= 50) {
+      return '⭐ **Halfway There!**\n\n'
+          'You\'re $progress% complete - excellent progress!\n\n'
+          'Your learning is accelerating! 🎯';
+    } else if (_progressPercentage >= 25) {
+      return '✨ **Great Start!**\n\n'
+          'You\'re $progress% through - solid foundation building! 📚\n\n'
+          'Keep up the momentum! 💡';
+    } else if (_progressPercentage >= 10) {
+      return '✅ **Off to a Good Start!**\n\n'
+          'You\'re $progress% through your learning plan.\n\n'
+          'Everything is clicking - let\'s continue! 🚀';
+    }
+
+    return '';
   }
 
   /// Automatically update module completion based on milestones
@@ -3975,6 +4346,21 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         print(
           '[ChatScreen] Module $currentModuleIndex marked as completed. Moving to module ${currentModuleIndex + 1}',
         );
+
+        // Send overview of the next module before user starts it
+        if (currentModuleIndex + 1 < modules.length) {
+          await _sendModuleOverview(
+            modules[currentModuleIndex + 1] as Map<String, dynamic>,
+            currentModuleIndex + 1,
+          );
+        } else {
+          // All modules completed
+          await _addBotMessage(
+            '🏆 **Congratulations!** You\'ve completed all modules! '
+            'You\'ve mastered all the concepts in this learning path. '
+            'Would you like to review any module or take a comprehensive assessment? 🎓',
+          );
+        }
 
         // Reload study plan to update hamburger menu
         await _loadStudyPlan();
@@ -4085,6 +4471,183 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       }
     } catch (e) {
       print('[ChatScreen] ⚠️ Error refreshing progress: $e');
+    }
+  }
+
+  /// Save current progress to backend to persist it
+  Future<void> _saveProgressToBackend() async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final userId = currentUser?.uid ?? 'anonymous';
+
+      if (widget.botId == null) {
+        print('[ChatScreen] ⚠️ Cannot save progress: botId is null');
+        return;
+      }
+
+      final progressUri = Uri.parse('$_backendUrl/api/save-progress');
+
+      final payload = {
+        'botId': widget.botId,
+        'userId': userId,
+        'progressPercentage': _progressPercentage,
+        'botState': _botCurrentState,
+        'totalMessages': _totalMessageCount,
+        'userMessages': _userMessageCount,
+        'currentModule': _botState?.currentModule ?? 0,
+        'completedModules': _botState?.completedModules ?? [],
+      };
+
+      final response = await http
+          .post(
+            progressUri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(payload),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        print(
+          '[ChatScreen] 💾 Progress saved to backend: ${_progressPercentage.toStringAsFixed(1)}%',
+        );
+      } else {
+        print(
+          '[ChatScreen] ⚠️ Failed to save progress: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      print('[ChatScreen] ⚠️ Error saving progress to backend: $e');
+      // Non-blocking - app will continue even if backend save fails
+    }
+  }
+
+  /// Synchronize message counts with current messages and Firebase
+  /// This ensures the hamburger menu always shows the correct count
+  void _syncMessageCounts() {
+    try {
+      if (!mounted) {
+        print(
+          '[ChatScreen] ⚠️ Widget not mounted, skipping message count sync',
+        );
+        return;
+      }
+
+      final newTotalCount = _messages.length;
+      final newUserCount = _messages
+          .where((m) => m.senderType == 'user')
+          .length;
+
+      // Always update counts
+      setState(() {
+        _totalMessageCount = newTotalCount;
+        _userMessageCount = newUserCount;
+      });
+
+      print(
+        '[ChatScreen] 📊 Synced message counts: Total=$_totalMessageCount, User=$_userMessageCount',
+      );
+
+      // Always save updated counts to Firebase for persistence
+      if (widget.botId != null && mounted) {
+        try {
+          _firebaseService.saveBot(
+            botId: widget.botId!,
+            name: widget.botName ?? 'Study Bot',
+            topic: widget.planName ?? '',
+            description: widget.planDescription ?? '',
+            gradeLevel: widget.educationLevel ?? '',
+            systemInstructions: widget.systemInstructions,
+            progressPercentage: _progressPercentage,
+            currentModule: 0,
+            botState: _botCurrentState,
+            messageCount: _totalMessageCount,
+          );
+          print(
+            '[ChatScreen] 💾 Message count saved to Firebase: $_totalMessageCount',
+          );
+        } catch (firebaseErr) {
+          print(
+            '[ChatScreen] ⚠️ Firebase save error in _syncMessageCounts: $firebaseErr',
+          );
+          // Non-blocking - continue even if Firebase fails
+        }
+      }
+    } catch (e) {
+      print('[ChatScreen] ⚠️ Error syncing message counts: $e');
+    }
+  }
+
+  /// Send module overview explanation before user starts a module
+  Future<void> _sendModuleOverview(
+    Map<String, dynamic> module,
+    int moduleIndex,
+  ) async {
+    try {
+      final title =
+          module['title'] ??
+          module['module_name'] ??
+          'Module ${moduleIndex + 1}';
+      final description = module['description'] ?? module['objective'] ?? '';
+      final topics = module['key_topics'] ?? module['subtopics'] ?? [];
+      final difficulty =
+          module['difficulty_level'] ?? module['difficulty'] ?? 'Medium';
+      final timeEstimate =
+          module['estimated_time'] ?? module['estimated_effort'] ?? 'Flexible';
+      final learningObjectives = module['learning_objectives'] ?? [];
+
+      // Build comprehensive module overview message
+      final buffer = StringBuffer();
+      buffer.writeln('📖 **Module ${moduleIndex + 1}: $title**\n');
+
+      if (description.toString().isNotEmpty) {
+        buffer.writeln('**Overview:**\n$description\n');
+      }
+
+      buffer.writeln('**What You\'ll Learn:**');
+
+      if (learningObjectives.isNotEmpty && learningObjectives is List) {
+        for (int i = 0; i < learningObjectives.length; i++) {
+          final obj = learningObjectives[i];
+          buffer.writeln('${i + 1}. $obj');
+        }
+      } else if (topics.isNotEmpty && topics is List) {
+        for (int i = 0; i < topics.length; i++) {
+          final topic = topics[i];
+          buffer.writeln('• $topic');
+        }
+      } else {
+        buffer.writeln(
+          '• Core concepts and practical applications\n'
+          '• Key principles and best practices\n'
+          '• Hands-on problem-solving',
+        );
+      }
+
+      buffer.writeln('\n**Module Details:**');
+      buffer.writeln('• **Difficulty Level:** $difficulty');
+      buffer.writeln('• **Estimated Time:** $timeEstimate');
+      buffer.writeln(
+        '• **Topics Covered:** ${topics.length > 0 ? topics.length : 'Multiple"'})',
+      );
+
+      buffer.writeln('\n💡 **How This Works:**');
+      buffer.writeln(
+        '1. I\'ll explain each concept step-by-step\n'
+        '2. You\'ll get examples and real-world applications\n'
+        '3. I\'ll check your understanding with questions\n'
+        '4. We\'ll wrap up with a quiz to solidify your learning\n\n'
+        '**Ready to dive in?** Just reply when you\'re ready to start! 🚀',
+      );
+
+      await _addBotMessage(buffer.toString());
+
+      print('[ChatScreen] 📖 Module overview sent for: $title');
+    } catch (e) {
+      print('[ChatScreen] ⚠️ Error sending module overview: $e');
+      // Fallback message
+      await _addBotMessage(
+        'Ready for the next module! What would you like to explore next? 🚀',
+      );
     }
   }
 

@@ -13,7 +13,7 @@ router.get("/:userId/:botId/state", async (req, res) => {
     const { userId, botId } = req.params;
     const state = await StudyController.getOrInitializeStudyState(
       userId,
-      botId
+      botId,
     );
     res.json({ success: true, state });
   } catch (err) {
@@ -30,7 +30,7 @@ router.post("/:userId/:botId/state", async (req, res) => {
     const updatedState = await StudyController.updateStudyState(
       userId,
       botId,
-      updates
+      updates,
     );
     res.json({ success: true, state: updatedState });
   } catch (err) {
@@ -48,7 +48,7 @@ router.post("/:userId/:botId/plan", async (req, res) => {
     const studyPlan = await StudyController.generateStudyPlan(
       topic,
       gradeLevel,
-      moduleCount
+      moduleCount,
     );
 
     // Update the study state with the new plan
@@ -112,6 +112,44 @@ router.post("/:userId/:botId/reset", async (req, res) => {
     });
   } catch (err) {
     console.error("Failed to reset study progress:", err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Save progress (called when user records milestones during learning)
+router.post("/save-progress", async (req, res) => {
+  try {
+    const {
+      botId,
+      userId,
+      progressPercentage,
+      botState,
+      currentModule,
+      completedModules,
+    } = req.body;
+
+    if (!botId || !userId) {
+      return res
+        .status(400)
+        .json({ success: false, error: "botId and userId are required" });
+    }
+
+    const result = await StudyController.saveProgress({
+      botId,
+      userId,
+      progressPercentage,
+      botState,
+      currentModule,
+      completedModules,
+    });
+
+    res.json({
+      success: true,
+      message: "Progress saved successfully",
+      progress: result,
+    });
+  } catch (err) {
+    console.error("Failed to save progress:", err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });

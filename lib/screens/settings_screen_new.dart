@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../utils/theme.dart';
 import '../utils/theme_provider.dart';
 import '../utils/language_provider.dart';
@@ -87,6 +88,8 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
     Widget? trailing,
     List<Color>? gradient,
   }) {
+    final iconColor =
+        gradient != null ? Colors.white : AppTheme.textPrimaryFromContext(context);
     return ListTile(
       leading: Container(
         width: 44,
@@ -95,7 +98,8 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: gradient ?? AppTheme.surfaceGradient,
+            colors:
+                gradient ?? AppTheme.surfaceGradientFromContext(context),
           ),
           borderRadius: BorderRadius.circular(AppTheme.radiusSm),
           boxShadow: gradient != null
@@ -108,21 +112,29 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                 ]
               : null,
         ),
-        child: Icon(icon, color: AppTheme.textPrimary, size: 22),
+        child: Icon(icon, color: iconColor, size: 22),
       ),
       title: Text(
         title,
-        style: AppTheme.bodyLarge.copyWith(color: AppTheme.textPrimary),
+        style: AppTheme.bodyLarge.copyWith(
+          color: AppTheme.textPrimaryFromContext(context),
+        ),
       ),
       subtitle: subtitle != null
           ? Text(
               subtitle,
-              style: AppTheme.bodySmall.copyWith(color: AppTheme.textTertiary),
+              style: AppTheme.bodySmall.copyWith(
+                color: AppTheme.textTertiaryFromContext(context),
+              ),
             )
           : null,
       trailing:
           trailing ??
-          Icon(Icons.chevron_right, color: AppTheme.textTertiary, size: 20),
+          Icon(
+            Icons.chevron_right,
+            color: AppTheme.textTertiaryFromContext(context),
+            size: 20,
+          ),
       onTap: onTap,
       contentPadding: EdgeInsets.symmetric(
         horizontal: AppTheme.spaceMd,
@@ -155,7 +167,7 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
     return Divider(
       height: 1,
       thickness: 1,
-      color: AppTheme.surfaceElevated.withValues(alpha: 0.3),
+      color: AppTheme.surfaceElevatedFromContext(context).withValues(alpha: 0.3),
       indent: AppTheme.spaceMd,
       endIndent: AppTheme.spaceMd,
     );
@@ -176,25 +188,10 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
       ),
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        extendBodyBehindAppBar: true,
+        extendBodyBehindAppBar: false,
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          flexibleSpace: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: AppTheme.glassGradientFromContext(context),
-              ),
-              border: Border(
-                bottom: BorderSide(
-                  color: AppTheme.surfaceElevatedFromContext(
-                    context,
-                  ).withValues(alpha: 0.3),
-                  width: 0.5,
-                ),
-              ),
-            ),
-          ),
           title: ShaderMask(
             shaderCallback: (bounds) => LinearGradient(
               colors: AppTheme.primaryGradient,
@@ -213,120 +210,39 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
           child: ListView(
             padding: EdgeInsets.only(bottom: AppTheme.spaceLg),
             children: [
-              // Profile Section
+              // Premium Header with App Logo
+              _buildPremiumHeader(context),
+
+              // User Profile Card
+              _buildUserProfileCard(context),
+
+              // Access Plans / Subscription Card (Prominent)
+              _buildAccessPlansCard(context),
+
+              // GENERAL SETTINGS Section
               _sectionHeader(
-                AppLocalizations.of(context).t('settings.account'),
+                AppLocalizations.of(context).t('settings.general'),
               ),
               _buildCard(
                 children: [
+                  // Edit Profile
                   _tile(
                     context,
                     icon: Icons.person,
                     title: AppLocalizations.of(context).t('nav.profile'),
-                    subtitle: 'Username: $_username',
+                    subtitle: AppLocalizations.of(
+                      context,
+                    ).t('settings.editProfileInfo'),
                     gradient: AppTheme.accentGradient,
                     onTap: () =>
                         Navigator.pushNamed(context, '/profile-settings'),
                   ),
-                ],
-              ),
-
-              // Billing Section
-              _sectionHeader(
-                AppLocalizations.of(context).t('settings.subscription'),
-              ),
-              _buildCard(
-                children: [
-                  _tile(
-                    context,
-                    icon: Icons.credit_card,
-                    title: AppLocalizations.of(context).t('settings.billing'),
-                    subtitle: AppLocalizations.of(
-                      context,
-                    ).t('settings.manageSubscription'),
-                    gradient: AppTheme.primaryGradient,
-                    onTap: () => Navigator.pushNamed(context, '/billing'),
-                  ),
-                ],
-              ),
-
-              // Capabilities Section
-              _sectionHeader(
-                AppLocalizations.of(context).t('settings.capabilities'),
-              ),
-              _buildCard(
-                children: [
-                  _tile(
-                    context,
-                    icon: Icons.settings_suggest,
-                    title: AppLocalizations.of(
-                      context,
-                    ).t('settings.capabilities'),
-                    subtitle: AppLocalizations.of(
-                      context,
-                    ).t('settings.appFeatures'),
-                    onTap: () => Navigator.pushNamed(context, '/capabilities'),
-                  ),
                   _buildDivider(),
-                  _tile(
-                    context,
-                    icon: Icons.notifications_active,
-                    title: AppLocalizations.of(
-                      context,
-                    ).t('settings.notificationSettings'),
-                    subtitle: AppLocalizations.of(
-                      context,
-                    ).t('settings.manageNotifications'),
-                    onTap: () =>
-                        Navigator.pushNamed(context, '/notification-settings'),
-                  ),
-                  _buildDivider(),
-                  _tile(
-                    context,
-                    icon: Icons.school_outlined,
-                    title: AppLocalizations.of(
-                      context,
-                    ).t('settings.showOnboarding'),
-                    subtitle: AppLocalizations.of(
-                      context,
-                    ).t('settings.viewWalkthrough'),
-                    onTap: () {
-                      _showOnboardingConfirmation();
-                    },
-                  ),
-                ],
-              ),
-
-              // Permissions Section
-              _sectionHeader(
-                AppLocalizations.of(context).t('settings.permissions'),
-              ),
-              _buildCard(
-                children: [
-                  _tile(
-                    context,
-                    icon: Icons.security,
-                    title: AppLocalizations.of(
-                      context,
-                    ).t('settings.permissions'),
-                    subtitle: AppLocalizations.of(
-                      context,
-                    ).t('settings.appPermissions'),
-                    onTap: () => Navigator.pushNamed(context, '/permissions'),
-                  ),
-                ],
-              ),
-
-              // Appearance Section
-              _sectionHeader(
-                AppLocalizations.of(context).t('settings.appearance'),
-              ),
-              _buildCard(
-                children: [
+                  // App Theme
                   _tile(
                     context,
                     icon: Icons.palette,
-                    title: AppLocalizations.of(context).t('settings.colorMode'),
+                    title: AppLocalizations.of(context).t('settings.appTheme'),
                     subtitle: _colorMode == 'dark'
                         ? AppLocalizations.of(context).t('settings.dark')
                         : AppLocalizations.of(context).t('settings.light'),
@@ -357,78 +273,89 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     ),
                     onTap: () => _showColorModeDialog(),
                   ),
-                ],
-              ),
-
-              // Language Section
-              _sectionHeader(
-                AppLocalizations.of(context).t('settings.language'),
-              ),
-              _buildCard(
-                children: [
+                  _buildDivider(),
+                  // Notifications
+                  _tile(
+                    context,
+                    icon: Icons.notifications_active,
+                    title: AppLocalizations.of(
+                      context,
+                    ).t('settings.notifications'),
+                    subtitle: AppLocalizations.of(
+                      context,
+                    ).t('settings.manageNotifications'),
+                    onTap: () =>
+                        Navigator.pushNamed(context, '/notification-settings'),
+                  ),
+                  _buildDivider(),
+                  // Language Selection
                   _tile(
                     context,
                     icon: Icons.language,
-                    title: AppLocalizations.of(
-                      context,
-                    ).t('settings.appLanguage'),
+                    title: AppLocalizations.of(context).t('settings.language'),
                     subtitle: _getLanguageSubtitle(),
                     gradient: AppTheme.accentGradient,
                     onTap: () => _showLanguageDialog(),
                   ),
+                  _buildDivider(),
+                  // Logout
+                  _tile(
+                    context,
+                    icon: Icons.logout,
+                    title: AppLocalizations.of(context).t('settings.logout'),
+                    subtitle: AppLocalizations.of(
+                      context,
+                    ).t('settings.signOutAccount'),
+                    onTap: () => _showLogoutConfirmation(),
+                  ),
                 ],
               ),
 
-              // Speech Language Section
-              _sectionHeader(AppLocalizations.of(context).t('settings.speech')),
+              // App Features
+              _sectionHeader(
+                AppLocalizations.of(context).t('settings.appFeatures'),
+              ),
               _buildCard(
                 children: [
                   _tile(
                     context,
-                    icon: Icons.record_voice_over,
+                    icon: Icons.settings_suggest,
                     title: AppLocalizations.of(
                       context,
-                    ).t('settings.speechLanguage'),
+                    ).t('settings.capabilities'),
                     subtitle: AppLocalizations.of(
                       context,
-                    ).t('settings.voiceSettings'),
-                    onTap: () =>
-                        Navigator.pushNamed(context, '/speech-language'),
+                    ).t('settings.exploreFeatures'),
+                    onTap: () => Navigator.pushNamed(context, '/capabilities'),
                   ),
-                ],
-              ),
-
-              // Privacy Section
-              _sectionHeader(
-                AppLocalizations.of(context).t('settings.privacy'),
-              ),
-              _buildCard(
-                children: [
+                  _buildDivider(),
                   _tile(
                     context,
-                    icon: Icons.privacy_tip,
-                    title: AppLocalizations.of(context).t('settings.privacy'),
+                    icon: Icons.school_outlined,
+                    title: AppLocalizations.of(
+                      context,
+                    ).t('settings.showOnboarding'),
                     subtitle: AppLocalizations.of(
                       context,
-                    ).t('settings.privacySettings'),
-                    onTap: () => Navigator.pushNamed(context, '/privacy'),
+                    ).t('settings.viewWalkthrough'),
+                    onTap: () {
+                      _showOnboardingConfirmation();
+                    },
                   ),
                 ],
               ),
 
-              // Contact Us Section (visually separated)
+              // CONNECT WITH US Section
               SizedBox(height: AppTheme.spaceLg),
               _sectionHeader(
-                AppLocalizations.of(context).t('settings.contactUs'),
+                AppLocalizations.of(context).t('settings.connectWithUs'),
               ),
               _buildCard(
                 children: [
                   _tile(
                     context,
                     icon: Icons.message,
-                    title: AppLocalizations.of(
-                      context,
-                    ).t('settings.whatsappCommunity'),
+                    title: AppLocalizations.of(context).t('settings.whatsapp'),
                     subtitle: AppLocalizations.of(
                       context,
                     ).t('settings.joinWhatsapp'),
@@ -441,9 +368,7 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                   _tile(
                     context,
                     icon: Icons.thumb_up,
-                    title: AppLocalizations.of(
-                      context,
-                    ).t('settings.facebookPage'),
+                    title: AppLocalizations.of(context).t('settings.facebook'),
                     subtitle: AppLocalizations.of(
                       context,
                     ).t('settings.followFacebook'),
@@ -456,9 +381,7 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                   _tile(
                     context,
                     icon: Icons.camera_alt,
-                    title: AppLocalizations.of(
-                      context,
-                    ).t('settings.instagramProfile'),
+                    title: AppLocalizations.of(context).t('settings.instagram'),
                     subtitle: AppLocalizations.of(
                       context,
                     ).t('settings.followInstagram'),
@@ -471,9 +394,7 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                   _tile(
                     context,
                     icon: Icons.music_video,
-                    title: AppLocalizations.of(
-                      context,
-                    ).t('settings.tiktokPage'),
+                    title: AppLocalizations.of(context).t('settings.tiktok'),
                     subtitle: AppLocalizations.of(
                       context,
                     ).t('settings.followTiktok'),
@@ -485,11 +406,404 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                 ],
               ),
 
+              // LEGAL & SUPPORT Section
+              SizedBox(height: AppTheme.spaceLg),
+              _sectionHeader(
+                AppLocalizations.of(context).t('settings.legalAndSupport'),
+              ),
+              _buildCard(
+                children: [
+                  _tile(
+                    context,
+                    icon: Icons.privacy_tip,
+                    title: AppLocalizations.of(
+                      context,
+                    ).t('settings.privacyPolicy'),
+                    subtitle: AppLocalizations.of(
+                      context,
+                    ).t('settings.readPrivacy'),
+                    onTap: () => Navigator.pushNamed(context, '/privacy'),
+                  ),
+                  _buildDivider(),
+                  _tile(
+                    context,
+                    icon: Icons.description,
+                    title: AppLocalizations.of(
+                      context,
+                    ).t('settings.termsOfService'),
+                    subtitle: AppLocalizations.of(
+                      context,
+                    ).t('settings.readTerms'),
+                    onTap: () async {
+                      // You can add a terms screen later or link to external URL
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            AppLocalizations.of(
+                              context,
+                            ).t('settings.comingSoon'),
+                          ),
+                          backgroundColor: AppTheme.primaryBlue,
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    },
+                  ),
+                  _buildDivider(),
+                  _tile(
+                    context,
+                    icon: Icons.info_outline,
+                    title: AppLocalizations.of(context).t('settings.about'),
+                    subtitle: AppLocalizations.of(
+                      context,
+                    ).t('settings.appInfo'),
+                    onTap: () => _showAboutDialog(),
+                  ),
+                ],
+              ),
+
               SizedBox(height: AppTheme.spaceLg),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  /// Premium header with app logo
+  Widget _buildPremiumHeader(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.all(AppTheme.spaceLg),
+      child: Column(
+        children: [
+          Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: AppTheme.primaryGradient,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.primaryBlue.withValues(alpha: 0.4),
+                  blurRadius: 30,
+                  offset: Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Icon(Icons.stars_rounded, color: Colors.white, size: 60),
+          ),
+          SizedBox(height: AppTheme.spaceMd),
+          Text(
+            'Nexa Smart AI',
+            style: AppTheme.headlineSmall.copyWith(
+              color: AppTheme.textPrimaryFromContext(context),
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: AppTheme.spaceXs),
+          Text(
+            AppLocalizations.of(context).t('settings.personalAIAssistant'),
+            style: AppTheme.bodySmall.copyWith(
+              color: AppTheme.textTertiaryFromContext(context),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// User profile card showing name and email
+  Widget _buildUserProfileCard(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: AppTheme.spaceMd,
+        vertical: AppTheme.spaceSm,
+      ),
+      child: Container(
+        padding: EdgeInsets.all(AppTheme.spaceMd),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: AppTheme.surfaceGradientFromContext(context),
+          ),
+          borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+          border: Border.all(
+            color: AppTheme.surfaceElevatedFromContext(
+              context,
+            ).withValues(alpha: 0.5),
+            width: 1,
+          ),
+          boxShadow: AppTheme.cardShadow,
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 70,
+              height: 70,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(colors: AppTheme.primaryGradient),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryBlue.withValues(alpha: 0.3),
+                    blurRadius: 15,
+                  ),
+                ],
+              ),
+              child: Icon(Icons.person_rounded, color: Colors.white, size: 35),
+            ),
+            SizedBox(width: AppTheme.spaceMd),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _username,
+                    style: AppTheme.bodyLarge.copyWith(
+                      color: AppTheme.textPrimaryFromContext(context),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: AppTheme.spaceXs),
+                  Text(
+                    FirebaseAuth.instance.currentUser?.email ??
+                        'user@example.com',
+                    style: AppTheme.bodySmall.copyWith(
+                      color: AppTheme.textTertiaryFromContext(context),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Access plans card - visually prominent
+  Widget _buildAccessPlansCard(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: AppTheme.spaceMd,
+        vertical: AppTheme.spaceSm,
+      ),
+      child: InkWell(
+        onTap: () => Navigator.pushNamed(context, '/billing'),
+        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+        child: Container(
+          padding: EdgeInsets.all(AppTheme.spaceLg),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: AppTheme.primaryGradient,
+            ),
+            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primaryBlue.withValues(alpha: 0.5),
+                blurRadius: 20,
+                offset: Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      AppLocalizations.of(context).t('settings.upgradeNow'),
+                      style: AppTheme.headlineSmall.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: AppTheme.spaceXs),
+                    Text(
+                      AppLocalizations.of(
+                        context,
+                      ).t('settings.unlockPremiumFeatures'),
+                      style: AppTheme.bodySmall.copyWith(
+                        color: Colors.white.withValues(alpha: 0.9),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(width: AppTheme.spaceMd),
+              Container(
+                padding: EdgeInsets.all(AppTheme.spaceMd),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.arrow_forward_rounded,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Show logout confirmation
+  void _showLogoutConfirmation() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: AppTheme.surfaceCardFromContext(context),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.logout, color: Colors.red, size: 24),
+              SizedBox(width: 12),
+              Text(
+                AppLocalizations.of(context).t('settings.logout'),
+                style: AppTheme.headlineSmall.copyWith(
+                  color: AppTheme.textPrimaryFromContext(context),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            AppLocalizations.of(context).t('settings.logoutConfirm'),
+            style: AppTheme.bodyLarge.copyWith(
+              color: AppTheme.textSecondaryFromContext(context),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                AppLocalizations.of(context).t('settings.cancel'),
+                style: AppTheme.bodyLarge.copyWith(
+                  color: AppTheme.textSecondaryFromContext(context),
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                await _handleLogout();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: Text(
+                AppLocalizations.of(context).t('settings.logout'),
+                style: AppTheme.bodyLarge.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Handle logout
+  Future<void> _handleLogout() async {
+    // You can implement logout logic here
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(AppLocalizations.of(context).t('settings.logoutSuccess')),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  /// Show about dialog
+  void _showAboutDialog() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: isDarkMode
+              ? AppTheme.surfaceElevated
+              : Color(0xFFFFFFFF),
+          surfaceTintColor: isDarkMode ? null : Color(0xFFFFFFFF),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+            side: BorderSide(
+              color: isDarkMode ? AppTheme.surfaceElevated : Color(0xFFE5E7EB),
+              width: 1,
+            ),
+          ),
+          title: Text(
+            AppLocalizations.of(context).t('settings.aboutApp'),
+            style: AppTheme.headlineMedium.copyWith(
+              color: isDarkMode ? AppTheme.textPrimary : Color(0xFF000000),
+            ),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Nexa Smart AI',
+                  style: AppTheme.bodyLarge.copyWith(
+                    color: isDarkMode
+                        ? AppTheme.textPrimary
+                        : Color(0xFF000000),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: AppTheme.spaceSm),
+                Text(
+                  'Version 1.0.0',
+                  style: AppTheme.bodyMedium.copyWith(
+                    color: isDarkMode
+                        ? AppTheme.textSecondary
+                        : Color(0xFF6B7280),
+                  ),
+                ),
+                SizedBox(height: AppTheme.spaceMd),
+                Text(
+                  AppLocalizations.of(context).t('settings.appDescription'),
+                  style: AppTheme.bodyMedium.copyWith(
+                    color: isDarkMode
+                        ? AppTheme.textSecondary
+                        : Color(0xFF6B7280),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                AppLocalizations.of(context).t('settings.close'),
+                style: AppTheme.bodyLarge.copyWith(color: AppTheme.primaryBlue),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -743,7 +1057,7 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          backgroundColor: AppTheme.surfaceCard,
+          backgroundColor: AppTheme.surfaceCardFromContext(context),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -754,7 +1068,7 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
               Text(
                 'Show Onboarding Guide',
                 style: AppTheme.headlineSmall.copyWith(
-                  color: AppTheme.textPrimary,
+                  color: AppTheme.textPrimaryFromContext(context),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -762,7 +1076,9 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
           ),
           content: Text(
             'This will reset your onboarding progress and show you the app introduction guide again. Would you like to continue?',
-            style: AppTheme.bodyLarge.copyWith(color: AppTheme.textSecondary),
+            style: AppTheme.bodyLarge.copyWith(
+              color: AppTheme.textSecondaryFromContext(context),
+            ),
           ),
           actions: [
             TextButton(
@@ -770,7 +1086,7 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
               child: Text(
                 'Cancel',
                 style: AppTheme.bodyLarge.copyWith(
-                  color: AppTheme.textSecondary,
+                  color: AppTheme.textSecondaryFromContext(context),
                 ),
               ),
             ),

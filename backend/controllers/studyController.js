@@ -44,7 +44,7 @@ class StudyController {
 
       if (updates.lastUserConfirmation !== undefined) {
         await studyState.updateLastUserConfirmation(
-          updates.lastUserConfirmation
+          updates.lastUserConfirmation,
         );
       }
 
@@ -59,7 +59,7 @@ class StudyController {
       if (updates.comprehensionFlags) {
         await studyState.updateComprehensionFlags(
           updates.moduleIndex,
-          updates.comprehensionFlags
+          updates.comprehensionFlags,
         );
       }
 
@@ -170,6 +170,54 @@ class StudyController {
       return await studyState.getCurrentState();
     } catch (err) {
       console.error("Failed to reset study progress:", err.message);
+      throw err;
+    }
+  }
+
+  /**
+   * Save progress data from the frontend (milestone recording)
+   */
+  static async saveProgress(progressData) {
+    try {
+      const {
+        botId,
+        userId,
+        progressPercentage,
+        botState,
+        currentModule,
+        completedModules,
+      } = progressData;
+
+      const { pool } = require("../db");
+
+      // Upsert progress record (insert if doesn't exist, update if does)
+      const result = await pool.query(
+        `INSERT INTO bot_progress (bot_id, user_id, progress_percentage, bot_state, current_module, completed_modules, last_updated)
+         VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+         ON CONFLICT (bot_id, user_id) DO UPDATE SET
+         progress_percentage = EXCLUDED.progress_percentage,
+         bot_state = EXCLUDED.bot_state,
+         current_module = EXCLUDED.current_module,
+         completed_modules = EXCLUDED.completed_modules,
+         last_updated = CURRENT_TIMESTAMP
+         RETURNING *`,
+        [
+          botId,
+          userId,
+          progressPercentage || 0,
+          botState || "intro",
+          currentModule || 0,
+          JSON.stringify(completedModules || []),
+        ],
+      );
+
+      console.log(
+        `[StudyController] Progress saved: botId=${botId}, userId=${userId}, progress=${progressPercentage}%`,
+      );
+
+      return result.rows[0];
+    } catch (err) {
+      console.error("Failed to save progress:", err.message);
       throw err;
     }
   }

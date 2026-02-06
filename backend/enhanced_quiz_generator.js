@@ -170,6 +170,87 @@ Return ONLY valid JSON, no explanations.`;
  * Get user's study plan and progress
  * Provides context about what they're supposed to learn
  */
+/**
+ * Get user's study goals and learning objectives
+ * Ensures quiz questions align with what the user wants to learn
+ */
+async function getUserStudyGoalsAndObjectives(botId, userId) {
+  try {
+    // First, try to get from bot_progress table (may have enhanced data)
+    const progressResult = await pool.query(
+      `SELECT 
+        study_plan, 
+        current_module, 
+        completed_modules,
+        b.description as study_goal_description
+       FROM bot_progress bp
+       LEFT JOIN bots b ON bp.bot_id = b.id
+       WHERE bp.bot_id = $1 AND bp.user_id = $2`,
+      [botId, userId],
+    );
+
+    if (progressResult.rows.length > 0) {
+      const row = progressResult.rows[0];
+      const studyPlan = row.study_plan || {};
+      const modules = studyPlan.modules || [];
+
+      // Extract objectives from completed modules
+      const completedModuleIndices = row.completed_modules || [];
+      const completedObjectives = modules
+        .filter((m, idx) => completedModuleIndices.includes(idx))
+        .flatMap((m) => m.objectives || [])
+        .slice(0, 10); // Limit to 10 for clarity
+
+      // Get current module objectives
+      const currentModuleIdx = row.current_module || 0;
+      const currentModule = modules[currentModuleIdx] || {};
+      const currentObjectives = currentModule.objectives || [];
+
+      return {
+        overallGoal: row.study_goal_description || "General learning",
+        modules: modules.length,
+        completedCount: completedModuleIndices.length,
+        completedModuleNames: modules
+          .filter((m, idx) => completedModuleIndices.includes(idx))
+          .map((m) => m.title)
+          .slice(0, 5),
+        currentModuleName: currentModule.title,
+        currentModuleObjectives: currentObjectives.slice(0, 5),
+        completedObjectives: completedObjectives,
+        allModuleObjectives: modules
+          .flatMap((m) => ({ module: m.title, objectives: m.objectives || [] }))
+          .slice(0, 8),
+      };
+    }
+
+    return {
+      overallGoal: "General learning",
+      modules: 0,
+      completedCount: 0,
+      completedModuleNames: [],
+      currentModuleName: "Unknown",
+      currentModuleObjectives: [],
+      completedObjectives: [],
+      allModuleObjectives: [],
+    };
+  } catch (error) {
+    console.warn(
+      "[EnhancedQuiz] Warning: Could not fetch study goals:",
+      error.code,
+    );
+    return {
+      overallGoal: "General learning",
+      modules: 0,
+      completedCount: 0,
+      completedModuleNames: [],
+      currentModuleName: "Unknown",
+      currentModuleObjectives: [],
+      completedObjectives: [],
+      allModuleObjectives: [],
+    };
+  }
+}
+
 async function getUserStudyPlan(botId, userId) {
   try {
     const result = await pool.query(
@@ -275,6 +356,7 @@ Provide a brief summary (2-3 sentences) of the most important information that w
 
 /**
  * Generate enhanced quiz prompt based on deep learning analysis
+ * NOW INCLUDES: Study goals alignment, what's been studied, module objectives
  */
 async function generateEnhancedQuizPrompt({
   botId,
@@ -287,7 +369,7 @@ async function generateEnhancedQuizPrompt({
   useWebSearch,
   topic,
 }) {
-  console.log("[EnhancedQuiz] Starting deep analysis for quiz generation...");
+  console.log("[EnhancedQuiz] Starting GOAL-ALIGNED quiz generation...");
   console.log("[EnhancedQuiz] Input params:", {
     botId,
     userId,
@@ -323,11 +405,20 @@ async function generateEnhancedQuizPrompt({
   const studyPlan = await getUserStudyPlan(botId, userId);
   console.log("[EnhancedQuiz] Study plan context retrieved:", !!studyPlan);
 
-  // 4. Get web search context if enabled
+  // 4. 🎯 NEW: Get study goals and learning objectives
+  console.log("[EnhancedQuiz] Fetching user's study GOALS and objectives...");
+  const studyGoals = await getUserStudyGoalsAndObjectives(botId, userId);
+  console.log("[EnhancedQuiz] Study goals retrieved:", {
+    goal: studyGoals.overallGoal?.substring(0, 50),
+    completedModules: studyGoals.completedCount,
+    currentObjectives: studyGoals.currentModuleObjectives?.length || 0,
+  });
+
+  // 5. Get web search context if enabled
   let searchContext = "";
   if (useWebSearch && topic) {
     console.log(
-      `[EnhancedQuiz] Fetching online context for meaningful quiz generation about "${topic}"`,
+      `[EnhancedQuiz] Fetching online context for goal-aligned quiz about "${topic}"`,
     );
     searchContext = await getWebSearchContext(topic, gradeLevel);
     if (searchContext) {
@@ -335,71 +426,95 @@ async function generateEnhancedQuizPrompt({
     }
   }
 
-  // 5. Build comprehensive quiz prompt
-  console.log("[EnhancedQuiz] Building quiz prompt...");
-  let quizPrompt = `Generate a WORLD-CLASS, PERSONALIZED quiz based on deep analysis of this student's learning journey.
+  // 6. 🎯 Build GOAL-ALIGNED comprehensive quiz prompt
+  console.log("[EnhancedQuiz] Building GOAL-ALIGNED quiz prompt...");
+  let quizPrompt = `Generate a WORLD-CLASS, PERSONALIZED quiz that ALIGNS WITH the student's stated learning goals and current progress.
+
+═══════════════════════════════════════════════════════════════
+
+🎯 STUDENT'S LEARNING GOALS & OBJECTIVES:
+─────────────────────────────────────────
+Overall Goal: "${studyGoals.overallGoal}"
+
+Study Progress:
+- Completed: ${studyGoals.completedCount} of ${studyGoals.modules} modules
+- Currently On: "${studyGoals.currentModuleName}"
+
+${
+  studyGoals.completedModuleNames.length > 0
+    ? `Modules Already Covered: ${studyGoals.completedModuleNames.join(", ")}`
+    : "No modules completed yet"
+}
+
+Current Module Objectives (What student should master):
+${
+  studyGoals.currentModuleObjectives.length > 0
+    ? studyGoals.currentModuleObjectives
+        .map((obj, i) => `${i + 1}. ${obj}`)
+        .join("\n")
+    : "- General understanding of the topic"
+}
+
+═══════════════════════════════════════════════════════════════
 
 STUDENT PROFILE:
 - Grade Level: ${gradeLevel || "General"} ⚠️ **CRITICAL: ALL questions MUST be appropriate for this grade level**
 - Learning Style: ${learningAnalysis.learningStyle || "unknown"}
 - Difficulty Level: ${learningAnalysis.difficultyLevel || "Medium"}
-- Progress: ${studyPlan?.progressPercentage || 0}% complete
+- Overall Progress: ${studyPlan?.progressPercentage || 0}% complete
 
-CONCEPTS DISCUSSED: ${learningAnalysis.conceptsDiscussed.join(", ") || "General concepts"}
+WHAT STUDENT HAS LEARNED:
+- Concepts Discussed: ${learningAnalysis.conceptsDiscussed.join(", ") || "General concepts"}
+- Student Interests: ${learningAnalysis.userInterests.join(", ") || "General interests"}
+- Identified Strengths: ${learningAnalysis.strengths?.join(", ") || "None identified"}
+- Areas Needing Practice: ${learningAnalysis.weaknesses?.join(", ") || "None identified"}
+- Key Questions Asked: ${learningAnalysis.keyQuestions?.join(", ") || "None identified"}
+- Misconceptions to Address: ${learningAnalysis.misconceptions?.join(", ") || "None identified"}
 
-STUDENT INTERESTS: ${learningAnalysis.userInterests.join(", ") || "General interests"}
-
-STRENGTHS: ${learningAnalysis.strengths?.join(", ") || "None identified"}
-
-AREAS FOR IMPROVEMENT: ${learningAnalysis.weaknesses?.join(", ") || "None identified"}
-
-COMMON QUESTIONS: ${learningAnalysis.keyQuestions?.join(", ") || "None identified"}
-
-MISCONCEPTIONS TO ADDRESS: ${learningAnalysis.misconceptions?.join(", ") || "None identified"}
-
-CURRENT MODULE: "${moduleName}"
-
-⚠️ **GRADE LEVEL ENFORCEMENT:**
-- Questions MUST be appropriate for ${gradeLevel || "General"} students
-- Use age-appropriate language and examples
-- Match cognitive development expectations for this level
-- Do NOT include content beyond this grade level
+⚠️ **CRITICAL REQUIREMENTS:**
+1. **GOAL ALIGNMENT:** Ensure questions directly test the module objectives listed above
+2. **GRADE-APPROPRIATE:** ALL content must be suitable for ${gradeLevel || "General"} students
+3. **PROGRESS-AWARE:** Only test topics from completed + current module (NO untaught concepts)
+4. **LEARNING STYLE MATCH:** Match format to student's ${learningAnalysis.learningStyle} learning style
+5. **WEAKNESS FOCUS:** Include questions targeting identified areas for improvement
+6. **NO REPETITION:** Don't repeat questions about already-mastered concepts
 
 ${
   studyPlan
-    ? `STUDY PLAN CONTEXT:
-- Current Module: ${studyPlan.currentModule + 1}
-- Completed Modules: ${studyPlan.completedModules.length}
-- Total Modules: ${studyPlan.studyPlan?.modules?.length || 0}`
+    ? `STUDY PROGRESSION CONTEXT:
+- Current Module (${studyPlan.currentModule + 1}/${studyPlan.studyPlan?.modules?.length || "?"}): "${moduleName}"
+- Modules Completed: ${studyPlan.completedModules.length}
+- Total Modules in Plan: ${studyPlan.studyPlan?.modules?.length || 0}`
     : ""
 }
 
 ${
   searchContext
-    ? `ONLINE RESEARCH CONTEXT (for meaningful, current questions):
+    ? `CURRENT RESEARCH CONTEXT (for meaningful, up-to-date questions):
 ${searchContext}
 
-Note: The questions below should incorporate current, relevant information from online sources while remaining grounded in the student's learning journey.`
+Note: Integrate current information while staying grounded in student's learning journey.`
     : ""
 }
 
-RECENT LEARNING CONVERSATION SAMPLE:
+RECENT LEARNING CONVERSATION:
 ${conversationHistory
   .slice(-6)
   .map((msg) => `${msg.type}: ${msg.content}`)
   .join("\n")}
+═══════════════════════════════════════════════════════════════
 
-GENERATION REQUIREMENTS (CRITICAL):
-1. **Grade-Appropriate:** ALL content must be suitable for ${gradeLevel || "General"} students
-2. **Concept Focus:** Only test concepts the student has actually discussed in conversations
-3. **Real-World Context:** Base questions on current, meaningful information (use online research context)
-4. **Address Weaknesses:** Deliberately include questions targeting identified weaknesses and misconceptions
-5. **Learning Style Match:** Adapt question format to suit the student's learning style
-6. **Appropriate Challenge:** Match difficulty to their progress (not too easy, not overwhelming)
-7. **Practical Examples:** Use relatable, age-appropriate examples from their grade level
-8. **Educational Explanations:** Provide clear, teaching-focused explanations that help them learn, not just show correct answers
-9. **Varied Difficulty:** Include a mix of easier recall questions and harder application questions
-10. **No Repetition:** Avoid questions too similar to previous quizzes (check conversation history)
+GENERATION REQUIREMENTS (IN ORDER OF IMPORTANCE):
+1. Goal-Aligned: Questions MUST test the learning objectives stated above
+2. Grade-Appropriate: Ensure all language and concepts match ${gradeLevel} level
+3. Concept-Focused: Only test concepts from completed + current module
+4. Weakness-Addressing: Deliberately include questions on identified weak areas
+5. Learning-Style-Matched: Vary question types to suit ${learningAnalysis.learningStyle} learner
+6. Difficulty-Balanced: Mix recall, comprehension, and application questions
+7. Real-World-Relevant: Use current research and practical examples
+8. Teaching-Focused: Provide explanations that teach, not just correct answers
+9. Progress-Respecting: Acknowledge what they've already learned
+10. Clear-Progression: Build from easier to harder questions
 
 QUIZ STRUCTURE (STRICT FORMAT):
 {
@@ -426,31 +541,31 @@ QUIZ STRUCTURE (STRICT FORMAT):
     {
       "type": "mcq",
       "answer": "Option B",
-      "explanation": "🎓 EDUCATIONAL EXPLANATION: Start with why the correct answer is right, connect to concepts studied, address why wrong options are incorrect, reference conversation context where relevant. Make this a mini-lesson!",
-      "addressesMisconception": "true|false",
-      "buildsOnStrength": "true|false",
-      "keyTakeaway": "One sentence summarizing what they should remember"
+      "explanation": "Educational explanation that teaches and connects to student's journey",
+      "addressesMisconception": true,
+      "buildsOnStrength": true,
+      "keyTakeaway": "One sentence summary"
     },
     {
       "type": "text",
-      "answer": "Comprehensive model answer showing full understanding",
-      "explanation": "🎓 EDUCATIONAL EXPLANATION: Break down the expected answer, explain the reasoning process, connect to prior learning, give examples, address common mistakes. This should teach, not just evaluate!",
-      "addressesMisconception": "true|false",
-      "buildsOnStrength": "true|false",
-      "keyTakeaway": "One sentence summarizing what they should remember"
+      "answer": "Model answer demonstrating full understanding",
+      "explanation": "Teaching-focused explanation connecting to student's learning",
+      "addressesMisconception": true,
+      "buildsOnStrength": true,
+      "keyTakeaway": "One sentence summary"
     }
-  ],
-  "personalization": {
-    "basedOnConversation": true,
-    "addressesWeaknesses": ["list specific weaknesses targeted"],
-    "buildsOnStrengths": ["list specific strengths leveraged"],
-    "learningStyleAdapted": true,
-    "difficultyAdjusted": true,
-    "gradeLevel": "${gradeLevel}",
-    "modulesFocus": "${moduleName}"
-  },
-  "teachingNotes": "Brief note on how this quiz supports the student's learning goals"
-}`;
+  ]
+}
+
+CRITICAL REMINDER:
+- ALL questions must align with module objectives stated above
+- ONLY include topics from completed modules or current module
+- NO questions on modules the student hasn't started yet
+- Match difficulty to student's current level
+- Reference student's learning conversation where possible
+- Address identified misconceptions and weak areas
+
+Return VALID JSON ONLY - no markdown, no code blocks, no explanations.`;
 
   if (questionType === "mcq") {
     quizPrompt += `\n\nGenerate ONLY ${mcqCount} multiple choice questions focused on the student's discussed concepts.`;
@@ -470,4 +585,5 @@ module.exports = {
   getUserConversationHistory,
   analyzeLearningConcepts,
   getUserStudyPlan,
+  getUserStudyGoalsAndObjectives,
 };

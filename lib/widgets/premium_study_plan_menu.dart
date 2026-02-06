@@ -17,9 +17,15 @@ class PremiumStudyPlanMenu extends StatefulWidget {
   final double progressPercentage;
   final int? planVersion;
   final String? planTitle;
-  final int userMessageCount; // New: Track user messages
-  final int totalMessageCount; // New: Track total messages
+  final int userMessageCount; // Track user messages
+  final int totalMessageCount; // Track total messages
   final BuildContext context; // Add context for theme access
+
+  // Bot info parameters
+  final String? botName;
+  final String? botTopic;
+  final String? botDescription;
+  final String? botGradeLevel;
 
   const PremiumStudyPlanMenu({
     Key? key,
@@ -33,9 +39,13 @@ class PremiumStudyPlanMenu extends StatefulWidget {
     this.progressPercentage = 0.0,
     this.planVersion,
     this.planTitle,
-    this.userMessageCount = 0, // New: Default to 0
-    this.totalMessageCount = 0, // New: Default to 0
+    this.userMessageCount = 0, // Default to 0
+    this.totalMessageCount = 0, // Default to 0
     required this.context, // Make context required
+    this.botName,
+    this.botTopic,
+    this.botDescription,
+    this.botGradeLevel,
   }) : super(key: key);
 
   @override
@@ -127,13 +137,7 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
         child: Column(
           children: [
             _buildPremiumHeader(isDarkMode),
-            Expanded(
-              child:
-                  widget.tableOfContents == null ||
-                      widget.tableOfContents!.isEmpty
-                  ? _buildEmptyState(isDarkMode)
-                  : _buildModulesList(isDarkMode),
-            ),
+            Expanded(child: _buildBotInfoSection(isDarkMode)),
             _buildFooter(isDarkMode),
           ],
         ),
@@ -142,9 +146,6 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
   }
 
   Widget _buildPremiumHeader(bool isDarkMode) {
-    final totalModules = widget.tableOfContents?.length ?? 0;
-    final completedCount = widget.completedModules?.length ?? 0;
-
     return Container(
       padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -177,7 +178,7 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header row
+            // Header row with close button
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -200,7 +201,7 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                           ],
                         ),
                         child: Icon(
-                          Icons.auto_stories,
+                          Icons.smart_toy,
                           color: Colors.white,
                           size: 22,
                         ),
@@ -211,7 +212,7 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Study Plan',
+                              widget.botName ?? 'Study Bot',
                               style: TextStyle(
                                 color: getTextColor(isDarkMode),
                                 fontSize: 18,
@@ -220,13 +221,16 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
-                            if (widget.planVersion != null)
+                            if (widget.botTopic != null &&
+                                widget.botTopic!.isNotEmpty)
                               Text(
-                                'Version ${widget.planVersion}',
+                                widget.botTopic!,
                                 style: TextStyle(
                                   color: getSecondaryTextColor(isDarkMode),
                                   fontSize: 11,
                                 ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                           ],
                         ),
@@ -257,145 +261,115 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
             ),
             SizedBox(height: 24),
 
-            // Animated circular progress
-            _buildAnimatedProgressCard(
-              totalModules,
-              completedCount,
-              isDarkMode,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAnimatedProgressCard(
-    int totalModules,
-    int completedCount,
-    bool isDarkMode,
-  ) {
-    return Container(
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isDarkMode
-              ? [Colors.white.withOpacity(0.08), Colors.white.withOpacity(0.04)]
-              : [
-                  Color(0xFFF9FAFB).withOpacity(0.8),
-                  Color(0xFFF3F4F6).withOpacity(0.6),
-                ],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: getCardBorder(isDarkMode), width: 1),
-      ),
-      child: Row(
-        children: [
-          // Animated circular progress
-          AnimatedBuilder(
-            animation: _progressAnimation,
-            builder: (context, child) {
-              return SizedBox(
-                width: 80,
-                height: 80,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // Background circle
-                    SizedBox(
-                      width: 80,
-                      height: 80,
-                      child: CircularProgressIndicator(
-                        value: 1,
-                        strokeWidth: 8,
-                        backgroundColor: Colors.transparent,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          isDarkMode
-                              ? Colors.white.withOpacity(0.1)
-                              : Color(0xFFE5E7EB),
-                        ),
-                      ),
-                    ),
-                    // Progress circle
-                    SizedBox(
-                      width: 80,
-                      height: 80,
-                      child: CircularProgressIndicator(
-                        value: _progressAnimation.value,
-                        strokeWidth: 8,
-                        backgroundColor: Colors.transparent,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          _getProgressColor(widget.progressPercentage),
-                        ),
-                        strokeCap: StrokeCap.round,
-                      ),
-                    ),
-                    // Percentage text
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
+            // Progress card with message stats
+            Container(
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: isDarkMode
+                      ? [
+                          Colors.white.withOpacity(0.08),
+                          Colors.white.withOpacity(0.04),
+                        ]
+                      : [
+                          Color(0xFFF9FAFB).withOpacity(0.8),
+                          Color(0xFFF3F4F6).withOpacity(0.6),
+                        ],
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: getCardBorder(isDarkMode), width: 1),
+              ),
+              child: Row(
+                children: [
+                  // Animated circular progress
+                  SizedBox(
+                    width: 80,
+                    height: 80,
+                    child: Stack(
+                      alignment: Alignment.center,
                       children: [
-                        Text(
-                          '${(widget.progressPercentage).toStringAsFixed(0)}%',
-                          style: TextStyle(
-                            color: getTextColor(isDarkMode),
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
+                        // Background circle
+                        SizedBox(
+                          width: 80,
+                          height: 80,
+                          child: CircularProgressIndicator(
+                            value: 1,
+                            strokeWidth: 8,
+                            backgroundColor: Colors.transparent,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              isDarkMode
+                                  ? Colors.white.withOpacity(0.1)
+                                  : Color(0xFFE5E7EB),
+                            ),
                           ),
                         ),
-                        Text(
-                          'Complete',
-                          style: TextStyle(
-                            color: getSecondaryTextColor(isDarkMode),
-                            fontSize: 10,
+                        // Progress circle
+                        SizedBox(
+                          width: 80,
+                          height: 80,
+                          child: CircularProgressIndicator(
+                            value: widget.progressPercentage / 100,
+                            strokeWidth: 8,
+                            backgroundColor: Colors.transparent,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              _getProgressColor(widget.progressPercentage),
+                            ),
+                            strokeCap: StrokeCap.round,
                           ),
+                        ),
+                        // Percentage text
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '${(widget.progressPercentage).toStringAsFixed(0)}%',
+                              style: TextStyle(
+                                color: getTextColor(isDarkMode),
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              'Progress',
+                              style: TextStyle(
+                                color: getSecondaryTextColor(isDarkMode),
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
-                ),
-              );
-            },
-          ),
-          SizedBox(width: 20),
-          // Stats
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildStatRow(
-                  icon: Icons.check_circle,
-                  iconColor: AppTheme.success,
-                  label: 'Completed',
-                  value: '$completedCount modules',
-                  isDarkMode: isDarkMode,
-                ),
-                SizedBox(height: 8),
-                _buildStatRow(
-                  icon: Icons.pending,
-                  iconColor: AppTheme.warning,
-                  label: 'Remaining',
-                  value: '${totalModules - completedCount} modules',
-                  isDarkMode: isDarkMode,
-                ),
-                SizedBox(height: 8),
-                _buildStatRow(
-                  icon: Icons.play_circle_fill,
-                  iconColor: AppTheme.primaryBlue,
-                  label: 'Current',
-                  value: 'Module ${widget.currentModule + 1}',
-                  isDarkMode: isDarkMode,
-                ),
-                SizedBox(height: 8),
-                _buildStatRow(
-                  icon: Icons.chat_bubble,
-                  iconColor: AppTheme.accentBlue,
-                  label: 'Messages',
-                  value: '${widget.totalMessageCount} exchanged',
-                  isDarkMode: isDarkMode,
-                ),
-              ],
+                  ),
+                  SizedBox(width: 20),
+                  // Message stats
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildStatRow(
+                          icon: Icons.chat_bubble,
+                          iconColor: AppTheme.accentBlue,
+                          label: 'Your Messages',
+                          value: widget.userMessageCount.toString(),
+                          isDarkMode: isDarkMode,
+                        ),
+                        SizedBox(height: 8),
+                        _buildStatRow(
+                          icon: Icons.message,
+                          iconColor: AppTheme.primaryBlue,
+                          label: 'Total Exchange',
+                          value: widget.totalMessageCount.toString(),
+                          isDarkMode: isDarkMode,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -536,6 +510,155 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildBotInfoSection(bool isDarkMode) {
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Bot Info Card
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: isDarkMode
+                    ? [
+                        AppTheme.primaryBlue.withOpacity(0.15),
+                        AppTheme.accentBlue.withOpacity(0.1),
+                      ]
+                    : [
+                        AppTheme.primaryBlue.withOpacity(0.08),
+                        AppTheme.accentBlue.withOpacity(0.05),
+                      ],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: getCardBorder(isDarkMode), width: 1),
+            ),
+            padding: EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Bot Name Header
+                if (widget.botName != null && widget.botName!.isNotEmpty) ...[
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.smart_toy,
+                        color: AppTheme.primaryBlue,
+                        size: 28,
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          widget.botName!,
+                          style: TextStyle(
+                            color: getTextColor(isDarkMode),
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 20),
+                ],
+                // Bot Description
+                if (widget.botDescription != null &&
+                    widget.botDescription!.isNotEmpty) ...[
+                  Text(
+                    'Description',
+                    style: TextStyle(
+                      color: getSecondaryTextColor(isDarkMode),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    widget.botDescription!,
+                    style: TextStyle(
+                      color: getTextColor(isDarkMode),
+                      fontSize: 14,
+                      height: 1.6,
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                ],
+                // Bot Topic
+                if (widget.botTopic != null && widget.botTopic!.isNotEmpty) ...[
+                  _buildBotInfoRow(
+                    icon: Icons.topic,
+                    label: 'Topic',
+                    value: widget.botTopic!,
+                    isDarkMode: isDarkMode,
+                  ),
+                  SizedBox(height: 12),
+                ],
+                // Bot Grade Level
+                if (widget.botGradeLevel != null &&
+                    widget.botGradeLevel!.isNotEmpty) ...[
+                  _buildBotInfoRow(
+                    icon: Icons.school,
+                    label: 'Grade Level',
+                    value: widget.botGradeLevel!,
+                    isDarkMode: isDarkMode,
+                  ),
+                  SizedBox(height: 12),
+                ],
+                // Message Statistics
+                _buildBotInfoRow(
+                  icon: Icons.chat_bubble_outline,
+                  label: 'Messages Exchanged',
+                  value: widget.totalMessageCount.toString(),
+                  isDarkMode: isDarkMode,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBotInfoRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    required bool isDarkMode,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, color: AppTheme.accentBlue, size: 18),
+        SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: getSecondaryTextColor(isDarkMode),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              SizedBox(height: 4),
+              Text(
+                value,
+                style: TextStyle(
+                  color: getTextColor(isDarkMode),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -843,6 +966,8 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
           if (toc.description.isNotEmpty) ...[
             Text(
               toc.description,
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: Colors.white70,
                 fontSize: 13,
@@ -882,6 +1007,8 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                   ),
                   child: Text(
                     subtopic,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(color: Colors.white70, fontSize: 12),
                   ),
                 );
@@ -1011,6 +1138,8 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                 // Title
                 Text(
                   toc.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: getTextColor(isDarkMode),
                     fontSize: 16,
@@ -1023,8 +1152,9 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                 SizedBox(height: 8),
                 // Description/Objective
                 Text(
-                  toc.description ??
-                      'Complete this module to advance your learning',
+                  toc.description,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: isDarkMode
                         ? Colors.white.withOpacity(0.8)
@@ -1040,13 +1170,13 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
                   runSpacing: 4,
                   children: [
                     _buildInfoChip(
-                      toc.estimatedTime ?? '30 min',
+                      toc.estimatedTime,
                       Icons.access_time,
                       isCompleted,
                       isDarkMode,
                     ),
                     _buildInfoChip(
-                      toc.difficultyLevel ?? 'Medium',
+                      toc.difficultyLevel,
                       Icons.signal_cellular_alt,
                       isCompleted,
                       isDarkMode,
@@ -1116,6 +1246,8 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
           SizedBox(width: 4),
           Text(
             text,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
             style: TextStyle(
               color: isCompleted
                   ? AppTheme.success
@@ -1165,9 +1297,7 @@ class _PremiumStudyPlanMenuState extends State<PremiumStudyPlanMenu>
               child: _buildFooterButton(
                 icon: Icons.edit,
                 label: 'Edit Plan',
-                onTap:
-                    widget.tableOfContents != null &&
-                        widget.tableOfContents!.isNotEmpty
+                onTap: widget.botName != null && widget.botName!.isNotEmpty
                     ? () {
                         HapticFeedback.mediumImpact();
                         Navigator.pop(context);

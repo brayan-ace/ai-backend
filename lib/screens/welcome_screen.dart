@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
+
 import '../utils/theme.dart';
 
 /// Welcome/Onboarding screen for new users

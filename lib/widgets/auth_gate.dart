@@ -5,10 +5,9 @@ import '../screens/welcome_screen.dart';
 import '../screens/email_verification_screen.dart';
 import '../screens/main_tabs.dart';
 import '../utils/theme.dart';
-import '../widgets/new_app_icon.dart';
 
 /// AuthGate - Centralized authentication state management
-/// 
+///
 /// This widget sits at the root of the app and handles:
 /// - Checking authentication state on app launch
 /// - Showing appropriate screen based on auth state
@@ -21,7 +20,8 @@ class AuthGate extends StatefulWidget {
   State<AuthGate> createState() => _AuthGateState();
 }
 
-class _AuthGateState extends State<AuthGate> with SingleTickerProviderStateMixin {
+class _AuthGateState extends State<AuthGate>
+    with SingleTickerProviderStateMixin {
   bool _isInitialized = false;
   bool _showSplash = true;
   late AnimationController _fadeController;
@@ -50,16 +50,16 @@ class _AuthGateState extends State<AuthGate> with SingleTickerProviderStateMixin
   Future<void> _initializeApp() async {
     // Initialize user profile service
     await UserProfileService.instance.init();
-    
+
     // Small delay for splash effect
     await Future.delayed(const Duration(milliseconds: 1200));
-    
+
     if (mounted) {
       setState(() {
         _isInitialized = true;
       });
       _fadeController.forward();
-      
+
       // Hide splash after fade completes
       await Future.delayed(const Duration(milliseconds: 400));
       if (mounted) {
@@ -88,7 +88,7 @@ class _AuthGateState extends State<AuthGate> with SingleTickerProviderStateMixin
 
         // Check if user is logged in
         final user = snapshot.data;
-        
+
         if (user != null) {
           // User is logged in - check if email is verified
           if (!user.emailVerified) {
@@ -102,7 +102,7 @@ class _AuthGateState extends State<AuthGate> with SingleTickerProviderStateMixin
               ),
             );
           }
-          
+
           // Email verified - go to main app
           return FadeTransition(
             opacity: _fadeAnimation,
@@ -113,12 +113,13 @@ class _AuthGateState extends State<AuthGate> with SingleTickerProviderStateMixin
           return FutureBuilder<bool>(
             future: UserProfileService.instance.isOnboardingComplete(),
             builder: (context, onboardingSnapshot) {
-              if (onboardingSnapshot.connectionState == ConnectionState.waiting) {
+              if (onboardingSnapshot.connectionState ==
+                  ConnectionState.waiting) {
                 return _buildLoadingScreen();
               }
-              
+
               final onboardingComplete = onboardingSnapshot.data ?? false;
-              
+
               if (onboardingComplete) {
                 // User has seen onboarding before but logged out
                 // Go directly to main app (they can login from there)
@@ -166,10 +167,7 @@ class _AuthGateState extends State<AuthGate> with SingleTickerProviderStateMixin
               duration: const Duration(milliseconds: 600),
               curve: Curves.easeOut,
               builder: (context, opacity, child) {
-                return Opacity(
-                  opacity: opacity,
-                  child: child,
-                );
+                return Opacity(opacity: opacity, child: child);
               },
               child: Column(
                 children: [

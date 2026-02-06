@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:timezone/timezone.dart' as tz;
+
 import '../utils/theme.dart';
 import '../services/push_notification_service.dart';
 import '../services/user_profile_service.dart';

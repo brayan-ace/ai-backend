@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../utils/theme.dart';
 import '../services/auth_services.dart';
-import '../widgets/social_media_icons.dart';
 
 // Global keys for navigation and scaffolding
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();

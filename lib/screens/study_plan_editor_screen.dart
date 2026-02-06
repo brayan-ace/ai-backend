@@ -66,27 +66,44 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
     });
   }
 
-  void _showEditModuleDialog(int moduleIndex) {
+  void _showEditModuleDialog(int moduleIndex, bool isDarkMode) {
     final module = _editablePlan['modules'][moduleIndex];
     final controller = TextEditingController(text: module['title']);
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Rename Module'),
+        title: Text(
+          'Rename Module',
+          style: TextStyle(color: _getTextColor(isDarkMode)),
+        ),
+        backgroundColor: isDarkMode ? Color(0xFF1F2937) : Colors.white,
         content: TextField(
           controller: controller,
+          style: TextStyle(color: _getTextColor(isDarkMode)),
+          cursorColor: AppTheme.primaryBlue,
           decoration: InputDecoration(
             hintText: 'Module title',
+            hintStyle: TextStyle(color: _getSecondaryTextColor(isDarkMode)),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+              borderSide: BorderSide(color: _getBorderColor(isDarkMode)),
             ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+              borderSide: BorderSide(color: AppTheme.primaryBlue, width: 2),
+            ),
+            filled: true,
+            fillColor: isDarkMode ? Color(0xFF111827) : Color(0xFFF9FAFB),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: _getSecondaryTextColor(isDarkMode)),
+            ),
           ),
           TextButton(
             onPressed: () {
@@ -102,26 +119,32 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final modules = _editablePlan['modules'] as List? ?? [];
     final planTitle = _editablePlan['title'] as String? ?? 'Study Plan';
 
     return Scaffold(
-      backgroundColor: AppTheme.backgroundDeep,
+      backgroundColor: isDarkMode ? AppTheme.backgroundDeep : Color(0xFFF5F7FA),
       appBar: AppBar(
-        backgroundColor: AppTheme.backgroundDeep,
-        elevation: 0,
+        backgroundColor: isDarkMode ? AppTheme.backgroundDeep : Colors.white,
+        elevation: isDarkMode ? 0 : 1,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: Icon(Icons.arrow_back, color: _getTextColor(isDarkMode)),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           'Edit Study Plan',
-          style: AppTheme.headlineSmall.copyWith(color: AppTheme.textPrimary),
+          style: AppTheme.headlineSmall.copyWith(
+            color: _getTextColor(isDarkMode),
+          ),
         ),
         centerTitle: true,
         actions: [
           IconButton(
-            icon: Icon(Icons.info_outline, color: AppTheme.textSecondary),
+            icon: Icon(
+              Icons.info_outline,
+              color: _getSecondaryTextColor(isDarkMode),
+            ),
             onPressed: () {
               // Show info about editing
               ScaffoldMessenger.of(context).showSnackBar(
@@ -146,16 +169,23 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
               margin: EdgeInsets.only(bottom: AppTheme.spaceLg),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [
-                    AppTheme.primaryBlue.withOpacity(0.1),
-                    AppTheme.primaryBlue.withOpacity(0.05),
-                  ],
+                  colors: isDarkMode
+                      ? [
+                          AppTheme.primaryBlue.withOpacity(0.2),
+                          AppTheme.primaryBlue.withOpacity(0.08),
+                        ]
+                      : [
+                          AppTheme.primaryBlue.withOpacity(0.1),
+                          AppTheme.primaryBlue.withOpacity(0.05),
+                        ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(AppTheme.radiusLg),
                 border: Border.all(
-                  color: AppTheme.primaryBlue.withOpacity(0.2),
+                  color: AppTheme.primaryBlue.withOpacity(
+                    isDarkMode ? 0.3 : 0.2,
+                  ),
                   width: 1,
                 ),
               ),
@@ -165,7 +195,7 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
                   Text(
                     '📚 Study Plan Editor',
                     style: AppTheme.headlineMedium.copyWith(
-                      color: AppTheme.textPrimary,
+                      color: _getTextColor(isDarkMode),
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -173,7 +203,7 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
                   Text(
                     planTitle,
                     style: AppTheme.headlineSmall.copyWith(
-                      color: AppTheme.textPrimary,
+                      color: _getTextColor(isDarkMode),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -181,7 +211,7 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
                   Text(
                     'Customize your learning journey by editing modules and objectives below.',
                     style: AppTheme.bodyMedium.copyWith(
-                      color: AppTheme.textSecondary,
+                      color: _getSecondaryTextColor(isDarkMode),
                       height: 1.6,
                     ),
                   ),
@@ -199,13 +229,13 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
                       Icon(
                         Icons.library_books_outlined,
                         size: 60,
-                        color: AppTheme.textTertiary,
+                        color: _getTertiaryTextColor(isDarkMode),
                       ),
                       SizedBox(height: AppTheme.spaceMd),
                       Text(
                         'No modules in this plan',
                         style: AppTheme.bodyLarge.copyWith(
-                          color: AppTheme.textSecondary,
+                          color: _getSecondaryTextColor(isDarkMode),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -213,7 +243,7 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
                       Text(
                         'Add modules to start building your study plan',
                         style: AppTheme.bodySmall.copyWith(
-                          color: AppTheme.textTertiary,
+                          color: _getTertiaryTextColor(isDarkMode),
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -233,13 +263,18 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
                   final objectives = module['objectives'] as List? ?? [];
 
                   return Card(
-                    color: AppTheme.surfaceCard,
+                    color: isDarkMode ? Color(0xFF1F2937) : Colors.white,
                     margin: EdgeInsets.only(bottom: AppTheme.spaceMd),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-                      side: BorderSide.none,
+                      side: BorderSide(
+                        color: isDarkMode
+                            ? _getBorderColor(isDarkMode)
+                            : AppTheme.primaryBlue.withOpacity(0.3),
+                        width: 2,
+                      ),
                     ),
-                    elevation: 2,
+                    elevation: isDarkMode ? 1 : 3,
                     child: Column(
                       children: [
                         // Enhanced module header with gradient
@@ -248,10 +283,15 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
                           padding: EdgeInsets.all(AppTheme.spaceMd),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
-                              colors: [
-                                AppTheme.primaryBlue.withOpacity(0.08),
-                                AppTheme.primaryBlue.withOpacity(0.04),
-                              ],
+                              colors: isDarkMode
+                                  ? [
+                                      AppTheme.primaryBlue.withOpacity(0.15),
+                                      AppTheme.primaryBlue.withOpacity(0.08),
+                                    ]
+                                  : [
+                                      AppTheme.primaryBlue.withOpacity(0.25),
+                                      AppTheme.primaryBlue.withOpacity(0.15),
+                                    ],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
@@ -287,7 +327,7 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
                                 child: Text(
                                   moduleTitle,
                                   style: AppTheme.bodyLarge.copyWith(
-                                    color: AppTheme.textPrimary,
+                                    color: _getTextColor(isDarkMode),
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
@@ -295,23 +335,35 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
                               PopupMenuButton(
                                 onSelected: (value) {
                                   if (value == 'edit') {
-                                    _showEditModuleDialog(moduleIndex);
+                                    _showEditModuleDialog(
+                                      moduleIndex,
+                                      isDarkMode,
+                                    );
                                   } else if (value == 'delete') {
                                     _deleteModule(moduleIndex);
                                   }
                                 },
                                 itemBuilder: (context) => [
-                                  const PopupMenuItem(
+                                  PopupMenuItem(
                                     value: 'edit',
                                     child: Row(
                                       children: [
-                                        Icon(Icons.edit, size: 18),
+                                        Icon(
+                                          Icons.edit,
+                                          size: 18,
+                                          color: _getTextColor(isDarkMode),
+                                        ),
                                         SizedBox(width: 8),
-                                        Text('Rename'),
+                                        Text(
+                                          'Rename',
+                                          style: TextStyle(
+                                            color: _getTextColor(isDarkMode),
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   ),
-                                  const PopupMenuItem(
+                                  PopupMenuItem(
                                     value: 'delete',
                                     child: Row(
                                       children: [
@@ -321,7 +373,7 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
                                           color: Colors.red,
                                         ),
                                         SizedBox(width: 8),
-                                        Text(
+                                        const Text(
                                           'Delete',
                                           style: TextStyle(color: Colors.red),
                                         ),
@@ -334,7 +386,7 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
                           ),
                         ),
 
-                        // Enhanced objectives section
+                        // Enhanced objectives section with better theme styling
                         if (objectives.isNotEmpty)
                           Padding(
                             padding: EdgeInsets.symmetric(
@@ -344,34 +396,53 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.check_circle_outline,
-                                      size: 18,
-                                      color: AppTheme.primaryBlue,
-                                    ),
-                                    SizedBox(width: AppTheme.spaceSm),
-                                    Text(
-                                      'Learning Objectives',
-                                      style: AppTheme.bodyMedium.copyWith(
-                                        color: AppTheme.textPrimary,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                SizedBox(height: AppTheme.spaceMd),
                                 Container(
-                                  width: double.infinity,
                                   padding: EdgeInsets.all(AppTheme.spaceSm),
                                   decoration: BoxDecoration(
-                                    color: AppTheme.surfaceElevated,
+                                    color: isDarkMode
+                                        ? Color(0xFF111827).withOpacity(0.5)
+                                        : Color(0xFFDEEBFF),
                                     borderRadius: BorderRadius.circular(
                                       AppTheme.radiusMd,
                                     ),
                                     border: Border.all(
-                                      color: AppTheme.surfaceElevated,
+                                      color: AppTheme.primaryBlue.withOpacity(
+                                        isDarkMode ? 0.3 : 0.4,
+                                      ),
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.check_circle_outline,
+                                        size: 18,
+                                        color: AppTheme.primaryBlue,
+                                      ),
+                                      SizedBox(width: AppTheme.spaceSm),
+                                      Text(
+                                        'Learning Objectives',
+                                        style: AppTheme.bodyMedium.copyWith(
+                                          color: _getTextColor(isDarkMode),
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                SizedBox(height: AppTheme.spaceMd),
+                                Container(
+                                  width: double.infinity,
+                                  padding: EdgeInsets.all(AppTheme.spaceMd),
+                                  decoration: BoxDecoration(
+                                    color: isDarkMode
+                                        ? Color(0xFF0F172A).withOpacity(0.6)
+                                        : Color(0xFFFBFDFF),
+                                    borderRadius: BorderRadius.circular(
+                                      AppTheme.radiusMd,
+                                    ),
+                                    border: Border.all(
+                                      color: _getBorderColor(isDarkMode),
                                       width: 1,
                                     ),
                                   ),
@@ -383,26 +454,57 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
                                     itemBuilder: (context, objectiveIndex) {
                                       final objective =
                                           objectives[objectiveIndex];
-                                      return Padding(
-                                        padding: EdgeInsets.only(
-                                          bottom: AppTheme.spaceSm,
+                                      return Container(
+                                        margin: EdgeInsets.only(
+                                          bottom:
+                                              objectiveIndex <
+                                                  objectives.length - 1
+                                              ? AppTheme.spaceMd
+                                              : 0,
+                                        ),
+                                        padding: EdgeInsets.all(
+                                          AppTheme.spaceSm,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: isDarkMode
+                                              ? Color(
+                                                  0xFF1F2937,
+                                                ).withOpacity(0.6)
+                                              : Colors.white,
+                                          borderRadius: BorderRadius.circular(
+                                            AppTheme.radiusMd,
+                                          ),
+                                          border: Border.all(
+                                            color: _getBorderColor(
+                                              isDarkMode,
+                                            ).withOpacity(0.5),
+                                            width: 1,
+                                          ),
                                         ),
                                         child: Row(
                                           children: [
                                             Container(
-                                              width: 20,
-                                              height: 20,
+                                              width: 24,
+                                              height: 24,
                                               margin: EdgeInsets.only(
                                                 right: AppTheme.spaceMd,
                                               ),
                                               decoration: BoxDecoration(
                                                 shape: BoxShape.circle,
-                                                color: AppTheme.primaryBlue
-                                                    .withOpacity(0.1),
+                                                gradient: LinearGradient(
+                                                  colors: [
+                                                    AppTheme.primaryBlue
+                                                        .withOpacity(0.3),
+                                                    AppTheme.primaryBlue
+                                                        .withOpacity(0.15),
+                                                  ],
+                                                ),
                                                 border: Border.all(
                                                   color: AppTheme.primaryBlue
-                                                      .withOpacity(0.3),
-                                                  width: 1,
+                                                      .withOpacity(
+                                                        isDarkMode ? 0.5 : 0.4,
+                                                      ),
+                                                  width: 2,
                                                 ),
                                               ),
                                               child: Center(
@@ -418,9 +520,12 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
                                                 objective,
                                                 style: AppTheme.bodyMedium
                                                     .copyWith(
-                                                      color:
-                                                          AppTheme.textPrimary,
+                                                      color: _getTextColor(
+                                                        isDarkMode,
+                                                      ),
                                                       height: 1.5,
+                                                      fontWeight:
+                                                          FontWeight.w500,
                                                     ),
                                               ),
                                             ),
@@ -428,7 +533,9 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
                                               icon: Icon(
                                                 Icons.close,
                                                 size: 18,
-                                                color: Colors.redAccent,
+                                                color: isDarkMode
+                                                    ? Color(0xFFFF6B6B)
+                                                    : Colors.redAccent,
                                               ),
                                               onPressed: () {
                                                 _deleteSubtopic(
@@ -437,10 +544,11 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
                                                 );
                                               },
                                               constraints: const BoxConstraints(
-                                                minHeight: 30,
-                                                minWidth: 30,
+                                                minHeight: 32,
+                                                minWidth: 32,
                                               ),
                                               padding: EdgeInsets.zero,
+                                              tooltip: 'Delete objective',
                                             ),
                                           ],
                                         ),
@@ -466,16 +574,23 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
               padding: EdgeInsets.all(AppTheme.spaceMd),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [
-                    AppTheme.primaryBlue.withOpacity(0.08),
-                    AppTheme.primaryBlue.withOpacity(0.04),
-                  ],
+                  colors: isDarkMode
+                      ? [
+                          AppTheme.primaryBlue.withOpacity(0.15),
+                          AppTheme.primaryBlue.withOpacity(0.08),
+                        ]
+                      : [
+                          AppTheme.primaryBlue.withOpacity(0.08),
+                          AppTheme.primaryBlue.withOpacity(0.04),
+                        ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(AppTheme.radiusLg),
                 border: Border.all(
-                  color: AppTheme.primaryBlue.withOpacity(0.3),
+                  color: AppTheme.primaryBlue.withOpacity(
+                    isDarkMode ? 0.4 : 0.3,
+                  ),
                   width: 1,
                 ),
               ),
@@ -509,7 +624,7 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
                         Text(
                           '💡 What happens when you save?',
                           style: AppTheme.bodyLarge.copyWith(
-                            color: AppTheme.textPrimary,
+                            color: _getTextColor(isDarkMode),
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -517,7 +632,7 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
                         Text(
                           'Your changes will be saved and the bot will adjust its teaching strategy based on your updated plan. Your progress and chat history will be preserved.',
                           style: AppTheme.bodyMedium.copyWith(
-                            color: AppTheme.textSecondary,
+                            color: _getSecondaryTextColor(isDarkMode),
                             height: 1.6,
                           ),
                         ),
@@ -534,9 +649,12 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
             Container(
               padding: EdgeInsets.all(AppTheme.spaceMd),
               decoration: BoxDecoration(
-                color: AppTheme.surfaceCard,
+                color: isDarkMode ? Color(0xFF1F2937) : Colors.white,
                 borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-                border: Border.all(color: AppTheme.surfaceElevated, width: 1),
+                border: Border.all(
+                  color: _getBorderColor(isDarkMode),
+                  width: 1,
+                ),
               ),
               child: Row(
                 children: [
@@ -544,7 +662,9 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
                     child: ElevatedButton(
                       onPressed: () => Navigator.pop(context),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.transparent,
+                        backgroundColor: isDarkMode
+                            ? Colors.transparent
+                            : Colors.transparent,
                         padding: EdgeInsets.symmetric(
                           vertical: AppTheme.spaceMd,
                         ),
@@ -553,7 +673,9 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
                             AppTheme.radiusMd,
                           ),
                           side: BorderSide(
-                            color: AppTheme.textTertiary,
+                            color: isDarkMode
+                                ? Color(0xFF4B5563)
+                                : AppTheme.textTertiary,
                             width: 1,
                           ),
                         ),
@@ -561,7 +683,7 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
                       child: Text(
                         'Cancel',
                         style: AppTheme.labelMedium.copyWith(
-                          color: AppTheme.textPrimary,
+                          color: _getTextColor(isDarkMode),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -622,13 +744,47 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
     );
   }
 
+  // Theme color helper functions
+  Color _getTextColor(bool isDarkMode) {
+    return isDarkMode ? Colors.white : Color(0xFF1F2937);
+  }
+
+  Color _getSecondaryTextColor(bool isDarkMode) {
+    return isDarkMode ? Color(0xFFD1D5DB) : Color(0xFF6B7280);
+  }
+
+  Color _getTertiaryTextColor(bool isDarkMode) {
+    return isDarkMode ? Color(0xFF9CA3AF) : Color(0xFF9CA3AF);
+  }
+
+  Color _getBorderColor(bool isDarkMode) {
+    return isDarkMode ? Color(0xFF374151) : Color(0xFFE5E7EB);
+  }
+
   Future<void> _saveChanges() async {
     setState(() => _isSaving = true);
 
     try {
-      widget.onSave(_editablePlan);
+      // Call the onSave callback with the edited plan
+      // This should trigger _savePlanChanges in the parent screen
+      await widget.onSave(_editablePlan);
+
       if (mounted) {
-        Navigator.pop(context);
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Study plan changes saved!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+
+        // Give time for the snackbar to be seen
+        await Future.delayed(const Duration(milliseconds: 500));
+
+        if (mounted) {
+          Navigator.pop(context);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -636,6 +792,7 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
           SnackBar(
             content: Text('Error saving plan: $e'),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
           ),
         );
         setState(() => _isSaving = false);

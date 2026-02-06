@@ -373,10 +373,6 @@ class _BotCreationScreenState extends State<BotCreationScreen>
   }
 
   // Get localized education levels
-  List<String> _getLocalizedEducationLevels() {
-    return educationLevels;
-  }
-
   // Get localized label for education level
   String _getLocalizedLevelLabel(String level) {
     final map = {
