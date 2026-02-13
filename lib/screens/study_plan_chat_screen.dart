@@ -1214,11 +1214,17 @@ Remember: The user is learning ${modules.length} interconnected modules. Each su
               '[ChatScreen]    - Incremented: ${streakData.streakIncremented}',
             );
 
-            // Check if milestone should be notified
+            // Handle streak increment notifications and milestones
             if (streakData.streakIncremented) {
               final currentStreak = streakData.currentStreak;
+
+              // Send immediate streak increment notification
+              await _studyNotificationService.notifyStreakIncrement(
+                currentStreak,
+              );
+
+              // Also check if this is a milestone that should be celebrated
               if (_studyActivityService.shouldNotifyMilestone(currentStreak)) {
-                // Notify milestone
                 await _studyNotificationService.notifyStreakMilestone(
                   currentStreak,
                 );

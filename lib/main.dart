@@ -79,7 +79,14 @@ void main() async {
     await TextToSpeechService().initialize();
 
     // Record app open to increment streak
-    await StudyActivityService().recordAppOpen();
+    final appOpenData = await StudyActivityService().recordAppOpen();
+
+    // Send notification if streak incremented
+    if (appOpenData.streakIncremented) {
+      await StudyNotificationService().notifyStreakIncrement(
+        appOpenData.currentStreak,
+      );
+    }
 
     // Schedule daily notifications
     await StudyNotificationService().scheduleDailyReminder();

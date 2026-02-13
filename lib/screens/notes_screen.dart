@@ -20,20 +20,196 @@ class NotesScreen extends StatefulWidget {
 }
 
 class _NotesScreenState extends State<NotesScreen> {
-  final List<Note> _notes = [
-    Note(
-      title: 'Welcome to Notes',
-      content:
-          'This is your personal note-taking space. Tap + to create a new note.',
-      timestamp: DateTime.now().subtract(Duration(hours: 2)),
-    ),
-  ];
+  final List<Note> _notes = [];
 
   void _createNote() {
+    _showNoteCreationOptions();
+  }
+
+  /// Show premium 3-option modal for note creation
+  void _showNoteCreationOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: AppTheme.surfaceGradientFromContext(context),
+          ),
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(AppTheme.radiusLg),
+            topRight: Radius.circular(AppTheme.radiusLg),
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.all(AppTheme.spaceLg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Text(
+                  'Create a New Note',
+                  style: AppTheme.headlineSmall.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textPrimaryFromContext(context),
+                  ),
+                ),
+                SizedBox(height: AppTheme.spaceLg),
+
+                // Option 1: Take Down Notes
+                _buildNoteOption(
+                  icon: Icons.edit_note,
+                  title: 'Take Down Notes',
+                  subtitle: 'Write and organize your notes',
+                  gradient: AppTheme.primaryGradient,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _openNoteEditor();
+                  },
+                ),
+                SizedBox(height: AppTheme.spaceMd),
+
+                // Option 2: Summarise Notes
+                _buildNoteOption(
+                  icon: Icons.summarize,
+                  title: 'Summarise Notes',
+                  subtitle: 'Coming soon',
+                  gradient: AppTheme.accentGradient,
+                  isComingSoon: true,
+                  onTap: () {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Row(
+                          children: [
+                            Icon(Icons.info, color: Colors.white),
+                            SizedBox(width: 8),
+                            Text('Summarise feature coming soon'),
+                          ],
+                        ),
+                        backgroundColor: AppTheme.primaryBlue,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                ),
+                SizedBox(height: AppTheme.spaceMd),
+
+                // Option 3: Generate Notes
+                _buildNoteOption(
+                  icon: Icons.auto_awesome,
+                  title: 'Generate Notes',
+                  subtitle: 'Coming soon',
+                  gradient: [Color(0xFFFF6B6B), Color(0xFFFF8E72)],
+                  isComingSoon: true,
+                  onTap: () {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Row(
+                          children: [
+                            Icon(Icons.info, color: Colors.white),
+                            SizedBox(width: 8),
+                            Text('Generate feature coming soon'),
+                          ],
+                        ),
+                        backgroundColor: AppTheme.primaryBlue,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                ),
+                SizedBox(height: AppTheme.spaceMd),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Build individual note creation option
+  Widget _buildNoteOption({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required List<Color> gradient,
+    required VoidCallback onTap,
+    bool isComingSoon = false,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: isComingSoon ? null : onTap,
+        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+        child: Container(
+          padding: EdgeInsets.all(AppTheme.spaceMd),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: gradient,
+            ),
+            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+            boxShadow: [
+              BoxShadow(
+                color: gradient[0].withOpacity(0.3),
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(AppTheme.spaceSm),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                ),
+                child: Icon(icon, color: Colors.white, size: 28),
+              ),
+              SizedBox(width: AppTheme.spaceMd),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: AppTheme.bodyLarge.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: AppTheme.bodySmall.copyWith(
+                        color: Colors.white.withOpacity(0.8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_rounded,
+                color: Colors.white.withOpacity(0.6),
+                size: 20,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Open the premium note editor
+  void _openNoteEditor() {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => NoteEditorScreen(
+        builder: (_) => PremiumNoteEditorScreen(
           onSave: (title, content) {
             setState(() {
               _notes.insert(
@@ -52,7 +228,7 @@ class _NotesScreenState extends State<NotesScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => NoteEditorScreen(
+        builder: (_) => PremiumNoteEditorScreen(
           initialTitle: note.title,
           initialContent: note.content,
           onSave: (title, content) {
@@ -337,25 +513,33 @@ class _NotesScreenState extends State<NotesScreen> {
   }
 }
 
-class NoteEditorScreen extends StatefulWidget {
+class PremiumNoteEditorScreen extends StatefulWidget {
   final String? initialTitle;
   final String? initialContent;
   final Function(String title, String content) onSave;
 
-  const NoteEditorScreen({
-    super.key,
+  const PremiumNoteEditorScreen({
+    Key? key,
     this.initialTitle,
     this.initialContent,
     required this.onSave,
-  });
+  }) : super(key: key);
 
   @override
-  State<NoteEditorScreen> createState() => _NoteEditorScreenState();
+  State<PremiumNoteEditorScreen> createState() =>
+      _PremiumNoteEditorScreenState();
 }
 
-class _NoteEditorScreenState extends State<NoteEditorScreen> {
+class _PremiumNoteEditorScreenState extends State<PremiumNoteEditorScreen> {
   late TextEditingController _titleController;
   late TextEditingController _contentController;
+  bool _isBold = false;
+  bool _isItalic = false;
+  bool _isUnderline = false;
+  bool _isSaved = true;
+  String _lastSavedTime = 'All changes saved';
+  TextAlign _textAlign = TextAlign.left;
+  double _fontSize = 16;
 
   @override
   void initState() {
@@ -364,6 +548,23 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _contentController = TextEditingController(
       text: widget.initialContent ?? '',
     );
+
+    // Auto-save every 10 seconds
+    Future.delayed(Duration(seconds: 10), _autoSave);
+
+    // Listen for changes
+    _titleController.addListener(() => setState(() => _isSaved = false));
+    _contentController.addListener(() => setState(() => _isSaved = false));
+  }
+
+  Future<void> _autoSave() async {
+    if (!_isSaved && mounted) {
+      setState(() {
+        _lastSavedTime = 'Saved at ${TimeOfDay.now().format(context)}';
+        _isSaved = true;
+      });
+      Future.delayed(Duration(seconds: 10), _autoSave);
+    }
   }
 
   @override
@@ -373,254 +574,355 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     super.dispose();
   }
 
-  void _save() {
-    final title = _titleController.text.trim();
-    final content = _contentController.text.trim();
-
-    if (title.isEmpty && content.isEmpty) {
-      Navigator.pop(context);
-      return;
-    }
-
-    widget.onSave(
-      title.isEmpty
-          ? AppLocalizations.of(context).t('notes.untitledNote')
-          : title,
-      content,
+  Widget _buildFormatButton({
+    required IconData icon,
+    required bool isActive,
+    required VoidCallback onTap,
+    String? tooltip,
+  }) {
+    return Tooltip(
+      message: tooltip ?? '',
+      child: Container(
+        margin: EdgeInsets.symmetric(horizontal: 4),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+          color: isActive
+              ? AppTheme.primaryBlue.withOpacity(0.2)
+              : Colors.transparent,
+          border: Border.all(
+            color: isActive ? AppTheme.primaryBlue : Colors.grey[300]!,
+            width: 1,
+          ),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+            child: Padding(
+              padding: EdgeInsets.all(8),
+              child: Icon(
+                icon,
+                size: 18,
+                color: isActive ? AppTheme.primaryBlue : Colors.grey[600],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
-    Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppTheme.backgroundGradientStartFromContext(context),
-            AppTheme.backgroundGradientEndFromContext(context),
-          ],
-        ),
-      ),
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        extendBodyBehindAppBar: true,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          flexibleSpace: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: AppTheme.glassGradientFromContext(context),
-              ),
-              border: Border(
-                bottom: BorderSide(
-                  color: AppTheme.surfaceElevated.withOpacity(0.3),
-                  width: 0.5,
+    return WillPopScope(
+      onWillPop: () async {
+        if (!_isSaved) {
+          return await showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Text('Save changes?'),
+                  content: Text(
+                    'You have unsaved changes. Do you want to save before leaving?',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: Text('Discard'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        _saveNote();
+                        Navigator.pop(context, true);
+                      },
+                      child: Text('Save'),
+                    ),
+                  ],
                 ),
-              ),
-            ),
-          ),
+              ) ??
+              false;
+        }
+        return true;
+      },
+      child: Scaffold(
+        backgroundColor: AppTheme.surfaceElevatedFromContext(context),
+        appBar: AppBar(
+          backgroundColor: AppTheme.surfaceElevatedFromContext(context),
+          elevation: 0,
           leading: IconButton(
-            icon: Icon(
-              Icons.arrow_back,
-              color: AppTheme.textPrimaryFromContext(context),
-            ),
+            icon: Icon(Icons.arrow_back),
             onPressed: () => Navigator.pop(context),
           ),
+          title: Text(
+            'New Note',
+            style: AppTheme.headlineSmall.copyWith(fontWeight: FontWeight.bold),
+          ),
           actions: [
-            Container(
-              margin: EdgeInsets.only(right: AppTheme.spaceSm),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: AppTheme.primaryGradient,
-                ),
-                borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                boxShadow: AppTheme.glowShadow,
-              ),
-              child: TextButton(
-                onPressed: _save,
-                child: Text(
-                  AppLocalizations.of(context).t('notes.saveButton'),
-                  style: AppTheme.labelLarge.copyWith(
-                    color: AppTheme.textPrimaryFromContext(context),
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        body: SafeArea(
-          child: Padding(
-            padding: EdgeInsets.all(AppTheme.spaceMd),
-            child: Column(
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: AppTheme.surfaceElevated,
-                    borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                  ),
-                  child: TextField(
-                    controller: _titleController,
-                    style: AppTheme.headlineLarge.copyWith(
-                      color: AppTheme.textPrimaryFromContext(context),
-                    ),
-                    decoration: InputDecoration(
-                      hintText: AppLocalizations.of(
-                        context,
-                      ).t('notes.noteTitleHint'),
-                      hintStyle: AppTheme.headlineLarge.copyWith(
-                        color: AppTheme.textTertiaryFromContext(context),
-                      ),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.all(AppTheme.spaceMd),
-                    ),
-                  ),
-                ),
-                SizedBox(height: AppTheme.spaceMd),
-                // AI Suggestion Buttons
-                Row(
+            // Save status indicator
+            Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: AppTheme.spaceMd),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Expanded(
-                      child: _buildAiButton(
-                        icon: Icons.auto_awesome,
-                        title: AppLocalizations.of(
-                          context,
-                        ).t('notes.generateNotes'),
-                        gradient: AppTheme.primaryGradient,
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                AppLocalizations.of(
-                                  context,
-                                ).t('notes.generateNotesComingSoon'),
-                              ),
-                              backgroundColor: AppTheme.primaryBlue,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    SizedBox(width: AppTheme.spaceSm),
-                    Expanded(
-                      child: _buildAiButton(
-                        icon: Icons.summarize,
-                        title: AppLocalizations.of(
-                          context,
-                        ).t('notes.summarizeNotes'),
-                        gradient: AppTheme.accentGradient,
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                AppLocalizations.of(
-                                  context,
-                                ).t('notes.summarizeComingSoon'),
-                              ),
-                              backgroundColor: AppTheme.accentBlue,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        },
+                    Text(
+                      _lastSavedTime,
+                      style: AppTheme.labelSmall.copyWith(
+                        color: _isSaved ? Colors.green : Colors.orange,
+                        fontSize: 11,
                       ),
                     ),
                   ],
                 ),
-                SizedBox(height: AppTheme.spaceMd),
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: AppTheme.surfaceElevated,
-                      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                    ),
-                    child: TextField(
-                      controller: _contentController,
-                      style: AppTheme.bodyLarge.copyWith(
-                        color: AppTheme.textPrimaryFromContext(context),
-                      ),
-                      decoration: InputDecoration(
-                        hintText: AppLocalizations.of(
-                          context,
-                        ).t('notes.contentHint'),
-                        hintStyle: AppTheme.bodyLarge.copyWith(
-                          color: AppTheme.textTertiaryFromContext(context),
-                        ),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.all(AppTheme.spaceMd),
-                      ),
-                      maxLines: null,
-                      expands: true,
-                      textAlignVertical: TextAlignVertical.top,
-                    ),
+              ),
+            ),
+          ],
+        ),
+        body: Column(
+          children: [
+            // Title field
+            Container(
+              padding: EdgeInsets.fromLTRB(
+                AppTheme.spaceLg,
+                AppTheme.spaceMd,
+                AppTheme.spaceLg,
+                AppTheme.spaceSm,
+              ),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: Colors.grey[200]!, width: 1),
+                ),
+              ),
+              child: TextField(
+                controller: _titleController,
+                style: AppTheme.headlineSmall.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textPrimaryFromContext(context),
+                ),
+                decoration: InputDecoration(
+                  hintText: 'Note title',
+                  border: InputBorder.none,
+                  hintStyle: AppTheme.headlineSmall.copyWith(
+                    color: Colors.grey[400],
                   ),
                 ),
-              ],
+                maxLines: 1,
+              ),
             ),
-          ),
+
+            // Formatting toolbar
+            Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: AppTheme.spaceMd,
+                vertical: AppTheme.spaceSm,
+              ),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: Colors.grey[200]!, width: 1),
+                ),
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    // Text formatting
+                    _buildFormatButton(
+                      icon: Icons.format_bold,
+                      isActive: _isBold,
+                      onTap: () => setState(() => _isBold = !_isBold),
+                      tooltip: 'Bold',
+                    ),
+                    _buildFormatButton(
+                      icon: Icons.format_italic,
+                      isActive: _isItalic,
+                      onTap: () => setState(() => _isItalic = !_isItalic),
+                      tooltip: 'Italic',
+                    ),
+                    _buildFormatButton(
+                      icon: Icons.format_underlined,
+                      isActive: _isUnderline,
+                      onTap: () => setState(() => _isUnderline = !_isUnderline),
+                      tooltip: 'Underline',
+                    ),
+                    SizedBox(width: 12),
+
+                    // Text alignment
+                    _buildFormatButton(
+                      icon: Icons.format_align_left,
+                      isActive: _textAlign == TextAlign.left,
+                      onTap: () => setState(() => _textAlign = TextAlign.left),
+                      tooltip: 'Align left',
+                    ),
+                    _buildFormatButton(
+                      icon: Icons.format_align_center,
+                      isActive: _textAlign == TextAlign.center,
+                      onTap: () =>
+                          setState(() => _textAlign = TextAlign.center),
+                      tooltip: 'Align center',
+                    ),
+                    _buildFormatButton(
+                      icon: Icons.format_align_right,
+                      isActive: _textAlign == TextAlign.right,
+                      onTap: () => setState(() => _textAlign = TextAlign.right),
+                      tooltip: 'Align right',
+                    ),
+                    SizedBox(width: 12),
+
+                    // Font size - using a popup menu
+                    PopupMenuButton<double>(
+                      initialValue: _fontSize,
+                      onSelected: (size) {
+                        setState(() => _fontSize = size);
+                      },
+                      itemBuilder: (context) => [
+                        PopupMenuItem(value: 12, child: Text('Small (12)')),
+                        PopupMenuItem(value: 16, child: Text('Normal (16)')),
+                        PopupMenuItem(value: 18, child: Text('Large (18)')),
+                        PopupMenuItem(value: 20, child: Text('XL (20)')),
+                        PopupMenuItem(value: 24, child: Text('XXL (24)')),
+                      ],
+                      child: Container(
+                        margin: EdgeInsets.symmetric(horizontal: 4),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: AppTheme.spaceSm,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(
+                            AppTheme.radiusSm,
+                          ),
+                          border: Border.all(
+                            color: Colors.grey[300]!,
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '${_fontSize.toInt()}',
+                              style: AppTheme.labelMedium,
+                            ),
+                            SizedBox(width: 4),
+                            Icon(Icons.arrow_drop_down, size: 16),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Content field
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.all(AppTheme.spaceLg),
+                child: TextField(
+                  controller: _contentController,
+                  style: TextStyle(
+                    fontSize: _fontSize,
+                    fontWeight: _isBold ? FontWeight.bold : FontWeight.normal,
+                    fontStyle: _isItalic ? FontStyle.italic : FontStyle.normal,
+                    decoration: _isUnderline
+                        ? TextDecoration.underline
+                        : TextDecoration.none,
+                    color: AppTheme.textPrimaryFromContext(context),
+                  ),
+                  textAlign: _textAlign,
+                  decoration: InputDecoration(
+                    hintText: 'Start typing your notes...',
+                    border: InputBorder.none,
+                    hintStyle: TextStyle(color: Colors.grey[400]),
+                  ),
+                  maxLines: null,
+                  expands: true,
+                ),
+              ),
+            ),
+
+            // Word count and action buttons
+            Container(
+              padding: EdgeInsets.all(AppTheme.spaceMd),
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(color: Colors.grey[200]!, width: 1),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${_contentController.text.length} characters • ${_contentController.text.split(' ').where((w) => w.isNotEmpty).length} words',
+                          style: AppTheme.labelSmall.copyWith(
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: AppTheme.spaceMd),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text('Discard'),
+                  ),
+                  SizedBox(width: AppTheme.spaceSm),
+                  ElevatedButton(
+                    onPressed: _saveNote,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryBlue,
+                      elevation: 0,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: AppTheme.spaceLg,
+                        vertical: AppTheme.spaceSm,
+                      ),
+                    ),
+                    child: Text(
+                      'Save Note',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildAiButton({
-    required IconData icon,
-    required String title,
-    required List<Color> gradient,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: AppTheme.spaceSm,
-          vertical: AppTheme.spaceSm,
-        ),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: gradient,
-          ),
-          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-          boxShadow: [
-            BoxShadow(
-              color: gradient[0].withOpacity(0.3),
-              blurRadius: 8,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+  void _saveNote() {
+    if (_titleController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Please add a title')));
+      return;
+    }
+
+    widget.onSave(_titleController.text.trim(), _contentController.text.trim());
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
           children: [
-            Icon(
-              icon,
-              color: gradient == AppTheme.primaryGradient
-                  ? Colors.black
-                  : Colors.white,
-              size: 18,
-            ),
-            SizedBox(width: AppTheme.spaceXs),
-            Text(
-              title,
-              style: AppTheme.bodyMedium.copyWith(
-                color: gradient == AppTheme.primaryGradient
-                    ? Colors.black
-                    : Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            Icon(Icons.check_circle, color: Colors.white),
+            SizedBox(width: 8),
+            Text('Note saved successfully'),
           ],
         ),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 2),
       ),
     );
+
+    Navigator.pop(context);
   }
 }

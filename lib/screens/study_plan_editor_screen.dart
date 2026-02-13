@@ -437,13 +437,17 @@ class _StudyPlanEditorScreenState extends State<StudyPlanEditorScreen> {
                                   decoration: BoxDecoration(
                                     color: isDarkMode
                                         ? Color(0xFF0F172A).withOpacity(0.6)
-                                        : Color(0xFFFBFDFF),
+                                        : Color(0xFFF0F7FF),
                                     borderRadius: BorderRadius.circular(
                                       AppTheme.radiusMd,
                                     ),
                                     border: Border.all(
-                                      color: _getBorderColor(isDarkMode),
-                                      width: 1,
+                                      color: isDarkMode
+                                          ? _getBorderColor(isDarkMode)
+                                          : AppTheme.primaryBlue.withOpacity(
+                                              0.25,
+                                            ),
+                                      width: 1.5,
                                     ),
                                   ),
                                   child: ListView.builder(

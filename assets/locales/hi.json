@@ -373,5 +373,22 @@
   },
   "common": {
     "comingSoon": "जल्द आ रहा है"
+  },
+  "topicSelection": {
+    "title": "अपना विषय चुनें",
+    "chooseExamBoard": "परीक्षा बोर्ड चुनें",
+    "chooseSatSubject": "SAT विषय चुनें",
+    "selectSatTopic": "SAT विषय चुनें",
+    "selectGceTopic": "GCE विषय चुनें",
+    "selectExamBoard": "उपलब्ध विषयों को देखने के लिए अपना परीक्षा बोर्ड चुनें",
+    "selectSatSubject": "मुख्य विषयों को देखने के लिए अपना विषय चुनें",
+    "satDescription": "शैक्षणिक मूल्यांकन परीक्षण",
+    "gceDescription": "शिक्षा का सामान्य प्रमाणपत्र",
+    "mathsDescription": "मुख्य गणितीय कौशल और उन्नत विषय",
+    "englishDescription": "पढ़ना, लिखना और समझ कौशल",
+    "satMaths": "SAT - गणित",
+    "satEnglish": "SAT - अंग्रेजी",
+    "gceMathematics": "GCE - गणित",
+    "gceEnglish": "GCE - अंग्रेजी"
   }
 }

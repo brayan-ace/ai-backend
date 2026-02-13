@@ -154,12 +154,25 @@ class _BotProcessingScreenState extends State<BotProcessingScreen> {
         '[BotProcessingScreen] Calling backend at $_backendUrl/api/create-study-bot',
       );
       final uri = Uri.parse('$_backendUrl/api/create-study-bot');
+
+      // Determine bot type based on topic
+      // If topic starts with "English - " and contains SAT categories, it's a SAT bot
+      String botType = 'standard';
+      if (widget.topic.contains('Information and Ideas') ||
+          widget.topic.contains('Craft and Structure') ||
+          widget.topic.contains('Expression of Ideas') ||
+          widget.topic.contains('Standard English Conventions')) {
+        botType = 'SAT';
+        print('[BotProcessingScreen] Detected SAT bot type');
+      }
+
       final payload = {
         'user_id': widget.userId,
         'name': widget.name,
         'description': widget.description,
         'topic': widget.topic,
         'grade_level': widget.gradeLevel,
+        'type': botType,
       };
 
       print('[BotProcessingScreen] Payload: $payload');

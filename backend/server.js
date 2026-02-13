@@ -548,6 +548,113 @@ Provide your enhanced answer:`;
 }
 
 /**
+ * Generate a SAT-specific study plan focused on the 4 SAT English categories
+ * Returns an object: { plan: { title, modules: [...] } }
+ */
+async function generateSATStudyPlan(
+  botName,
+  selectedCategory,
+  gradeLevel,
+  description,
+) {
+  try {
+    console.log("[SATStudyPlan] Generating SAT-specific study plan for:", {
+      botName,
+      selectedCategory,
+      gradeLevel,
+    });
+
+    // SAT English study plan with 4 main categories
+    const satPlan = {
+      plan: {
+        title: `SAT English Master Plan: ${selectedCategory}`,
+        subject: `SAT English - ${selectedCategory}`,
+        grade_level: gradeLevel,
+        description:
+          description ||
+          `Master the ${selectedCategory} category for SAT English`,
+        total_estimated_hours: 20,
+        exam_focus: "Standardized Test Preparation",
+        modules: [
+          {
+            id: "sat_module_1",
+            title: `${selectedCategory} - Foundation`,
+            objective: `Understand the core concepts and skills tested in ${selectedCategory}`,
+            key_topics: [
+              "Definition",
+              "Scope",
+              "Key Skills",
+              "Common Patterns",
+            ],
+            expected_outcome:
+              "Identify core concepts and understand question types",
+            estimated_effort: "90 minutes",
+            difficulty: "Easy",
+            order: 1,
+            sat_category: selectedCategory,
+          },
+          {
+            id: "sat_module_2",
+            title: `${selectedCategory} - Strategy & Technique`,
+            objective: `Learn effective strategies and techniques for ${selectedCategory}`,
+            key_topics: [
+              "Approach",
+              "Time Management",
+              "Elimination",
+              "Pattern Recognition",
+            ],
+            expected_outcome: "Apply strategic approaches to sample questions",
+            estimated_effort: "120 minutes",
+            difficulty: "Medium",
+            order: 2,
+            sat_category: selectedCategory,
+          },
+          {
+            id: "sat_module_3",
+            title: `${selectedCategory} - Practice & Analysis`,
+            objective: `Practice with real SAT questions and analyze mistakes`,
+            key_topics: [
+              "Sample Questions",
+              "Error Analysis",
+              "Weak Areas",
+              "Improvement",
+            ],
+            expected_outcome:
+              "Identify personal weak spots and improvement areas",
+            estimated_effort: "120 minutes",
+            difficulty: "Medium",
+            order: 3,
+            sat_category: selectedCategory,
+          },
+          {
+            id: "sat_module_4",
+            title: `${selectedCategory} - Mastery & Full Tests`,
+            objective: `Master the category and complete full-length practice tests`,
+            key_topics: [
+              "Advanced Questions",
+              "Full Tests",
+              "Timing",
+              "Final Refinement",
+            ],
+            expected_outcome: "Score confidently on actual SAT exam",
+            estimated_effort: "180 minutes",
+            difficulty: "Hard",
+            order: 4,
+            sat_category: selectedCategory,
+          },
+        ],
+      },
+    };
+
+    console.log("[SATStudyPlan] ✅ SAT study plan generated successfully");
+    return satPlan;
+  } catch (err) {
+    console.error("[generateSATStudyPlan] Error:", err.message);
+    return null;
+  }
+}
+
+/**
  * Generate a structured study plan JSON using the AI model.
  * Returns an object: { plan: { title, modules: [...] } } or null on failure.
  *
@@ -776,12 +883,36 @@ async function ensureTables() {
         description TEXT,
         topic TEXT,
         grade_level TEXT,
+        type TEXT DEFAULT 'standard',
         system_instructions JSONB,
         state JSONB,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
     console.log("[DB] study_bots table ensured");
+
+    // Add type column if it doesn't exist
+    await pool.query(`
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                       WHERE table_name='study_bots' AND column_name='type') THEN
+          ALTER TABLE study_bots ADD COLUMN type TEXT DEFAULT 'standard';
+        END IF;
+      END $$;
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS sat_notes (
+        id SERIAL PRIMARY KEY,
+        topic TEXT NOT NULL,
+        content TEXT NOT NULL,
+        category TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("[DB] sat_notes table ensured");
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS chat_messages (
@@ -1305,6 +1436,88 @@ app.post("/api/chat-enhanced", async (req, res) => {
       instructionSource = "fallback";
     }
 
+    // STEP 2.5: If this is a SAT bot, add special SAT instructions
+    let isSatBot = false;
+    try {
+      const botTypeCheck = await pool.query(
+        `SELECT type FROM study_bots WHERE bot_id = $1 LIMIT 1`,
+        [botId],
+      );
+
+      if (botTypeCheck.rows.length > 0 && botTypeCheck.rows[0].type === "SAT") {
+        isSatBot = true;
+        const satInstructions = `
+[SAT TUTOR MODE ACTIVE]
+You are an expert SAT English tutor.
+IMPORTANT RULES:
+1. Use ONLY the SAT study notes provided below when answering
+2. Stay strictly within the SAT English syllabus
+3. Focus on the four main categories: Information and Ideas, Craft and Structure, Expression of Ideas, and Standard English Conventions
+4. Explain concepts clearly with step-by-step examples from SAT material
+5. If a question is not covered in the SAT notes, say "This topic is not covered in the SAT English curriculum"
+6. Always relate answers back to SAT skills and test preparation
+`;
+        instructions = `${satInstructions}\n${instructions}`;
+        console.log("[Chat-Enhanced] ✅ SAT tutor mode enabled");
+      }
+    } catch (satCheckErr) {
+      console.warn(
+        "[Chat-Enhanced] SAT mode check failed:",
+        satCheckErr.message,
+      );
+    }
+
+    console.log(
+      "[Chat-Enhanced] Instructions ready:",
+      `${instructions.substring(0, 100)}... (source: ${instructionSource})`,
+    );
+
+    // ===== SAT NOTES FETCHING LOGIC =====
+    // Check bot type and fetch SAT notes if applicable
+    let satNotesContext = "";
+    try {
+      const botResult = await pool.query(
+        `SELECT type FROM study_bots WHERE bot_id = $1 LIMIT 1`,
+        [botId],
+      );
+
+      if (botResult.rows.length > 0) {
+        const botType = botResult.rows[0].type;
+        console.log("[Chat-Enhanced] Bot type:", botType);
+
+        if (botType === "SAT") {
+          console.log("[Chat-Enhanced] Fetching SAT notes for SAT bot...");
+          const satNotesResult = await pool.query(
+            `SELECT topic, content FROM sat_notes ORDER BY created_at ASC`,
+          );
+
+          if (satNotesResult.rows.length > 0) {
+            // Build formatted SAT notes string
+            const formattedNotes = satNotesResult.rows
+              .map(
+                (note, index) =>
+                  `${index + 1}. Topic: ${note.topic}\n${note.content}`,
+              )
+              .join("\n\n");
+
+            satNotesContext = `\n\n[SAT STUDY NOTES]\n${formattedNotes}\n[END SAT NOTES]`;
+            console.log(
+              "[Chat-Enhanced] ✅ Retrieved",
+              satNotesResult.rows.length,
+              "SAT notes",
+            );
+          } else {
+            console.warn("[Chat-Enhanced] No SAT notes found in database");
+          }
+        }
+      }
+    } catch (botTypeErr) {
+      console.warn(
+        "[Chat-Enhanced] Could not fetch bot type:",
+        botTypeErr.message,
+      );
+    }
+
     console.log(
       "[Chat-Enhanced] Instructions ready:",
       `${instructions.substring(0, 100)}... (source: ${instructionSource})`,
@@ -1328,6 +1541,12 @@ app.post("/api/chat-enhanced", async (req, res) => {
       const moodContext = `\n[LEARNER MOOD] Sentiment: ${currentMood.sentiment}, Action: ${currentMood.suggestedAction}`;
       enhancedInstructions = `${enhancedInstructions}${moodContext}`;
       console.log("[Chat-Enhanced] Instructions enhanced with mood context");
+    }
+
+    // STEP 4.2: Add SAT notes context if available
+    if (satNotesContext) {
+      enhancedInstructions = `${enhancedInstructions}${satNotesContext}`;
+      console.log("[Chat-Enhanced] Instructions enhanced with SAT notes");
     }
 
     // STEP 4.5: Fetch and include active study plan context with CONCEPT-LEVEL tracking
@@ -2384,6 +2603,33 @@ app.post("/api/generate-quiz", async (req, res) => {
       "[generate-quiz] 🧠 Starting ENHANCED quiz generation with deep learning analysis...",
     );
 
+    // Check if this is a SAT bot
+    let isSatBot = false;
+    let satCategory = "";
+    try {
+      const botTypeResult = await pool.query(
+        `SELECT type, topic FROM study_bots WHERE bot_id = $1 LIMIT 1`,
+        [botId],
+      );
+      if (
+        botTypeResult.rows.length > 0 &&
+        botTypeResult.rows[0].type === "SAT"
+      ) {
+        isSatBot = true;
+        satCategory =
+          botTypeResult.rows[0].topic?.split(" - ").pop() || "SAT English";
+        console.log(
+          "[generate-quiz] ✅ SAT bot detected, category:",
+          satCategory,
+        );
+      }
+    } catch (typeCheckErr) {
+      console.warn(
+        "[generate-quiz] Could not check bot type:",
+        typeCheckErr.message,
+      );
+    }
+
     // Generate enhanced quiz prompt based on comprehensive analysis
     let quizPrompt;
     try {
@@ -2398,6 +2644,17 @@ app.post("/api/generate-quiz", async (req, res) => {
         useWebSearch: useWebSearch !== false, // Enable web search to fetch relevant context online
         topic: topic, // Pass topic for web search queries
       });
+
+      // For SAT bots, prepend SAT-specific instructions
+      if (isSatBot) {
+        quizPrompt = `[SAT EXAM FORMAT]
+Generate questions aligned with SAT English standards for the "${satCategory}" category.
+Focus on: Reading comprehension, grammar, syntax, word choice, and context understanding.
+${quizPrompt}`;
+        console.log(
+          "[generate-quiz] Enhanced prompt with SAT-specific instructions",
+        );
+      }
     } catch (promptErr) {
       console.error(
         "[generate-quiz] Error generating quiz prompt:",
@@ -2597,7 +2854,14 @@ app.post("/api/generate-quiz", async (req, res) => {
 app.post("/api/create-study-bot", async (req, res) => {
   try {
     console.log("[POST /api/create-study-bot] Request received");
-    const { user_id, name, description, topic, grade_level } = req.body;
+    const {
+      user_id,
+      name,
+      description,
+      topic,
+      grade_level,
+      type = "standard",
+    } = req.body;
 
     if (!user_id || !name || !topic || !grade_level) {
       return res.status(400).json({
@@ -2620,10 +2884,10 @@ app.post("/api/create-study-bot", async (req, res) => {
       grade_level,
     );
 
-    // Save to database (include description as metadata inside system_instructions)
+    // Save to database with bot type
     await pool.query(
-      `INSERT INTO study_bots (bot_id, user_id, name, description, topic, grade_level, system_instructions)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      `INSERT INTO study_bots (bot_id, user_id, name, description, topic, grade_level, type, system_instructions)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
         botId,
         user_id,
@@ -2631,6 +2895,7 @@ app.post("/api/create-study-bot", async (req, res) => {
         description,
         topic,
         grade_level,
+        type,
         JSON.stringify({
           instructions: systemInstructions,
           description: description,
@@ -2645,7 +2910,12 @@ app.post("/api/create-study-bot", async (req, res) => {
       [botId, user_id, JSON.stringify({ modules: [] }), "intro"],
     );
 
-    console.log("[create-study-bot] Bot created successfully:", botId);
+    console.log(
+      "[create-study-bot] Bot created successfully:",
+      botId,
+      "with type:",
+      type,
+    );
 
     // GUARANTEE study plan generation - this is critical for bot functionality
     let generatedPlan = null;
@@ -2655,14 +2925,34 @@ app.post("/api/create-study-bot", async (req, res) => {
         name,
         topic,
         grade_level,
+        type,
       });
-      generatedPlan = await generateStructuredStudyPlan(
-        name,
-        topic,
-        description || "",
-        grade_level,
-        null,
-      );
+
+      // Check if this is a SAT bot and extract the category
+      if (type === "SAT") {
+        // Extract SAT category from topic (e.g., "English - Information and Ideas")
+        const satCategory = topic.split(" - ").pop() || topic;
+        console.log(
+          "[create-study-bot] Detected SAT bot, category:",
+          satCategory,
+        );
+
+        generatedPlan = await generateSATStudyPlan(
+          name,
+          satCategory,
+          grade_level,
+          description,
+        );
+      } else {
+        // Standard study plan for non-SAT bots
+        generatedPlan = await generateStructuredStudyPlan(
+          name,
+          topic,
+          description || "",
+          grade_level,
+          null,
+        );
+      }
 
       if (
         generatedPlan &&
@@ -2687,9 +2977,14 @@ app.post("/api/create-study-bot", async (req, res) => {
         planErr.message,
       );
       // Create a fallback plan if generation fails
+      const fallbackTitle =
+        type === "SAT"
+          ? `SAT English ${topic.split(" - ").pop() || "Study"} Plan`
+          : `${topic} Study Plan`;
+
       generatedPlan = {
         plan: {
-          title: `${topic} Study Plan`,
+          title: fallbackTitle,
           subject: topic,
           grade_level: grade_level,
           description: `A comprehensive study plan for ${topic} at ${grade_level} level`,
@@ -3974,6 +4269,107 @@ Don't just dump information—guide them through it. Make it click.`;
       reply: fallbackMsg,
       isErrorFallback: true,
       status: "error",
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// ============= SAT NOTES MANAGEMENT =============
+
+// Endpoint to add SAT notes
+app.post("/api/sat-notes/add", async (req, res) => {
+  try {
+    const { topic, content, category } = req.body;
+
+    if (!topic || !content) {
+      return res.status(400).json({
+        error: "Invalid request format",
+        message: "topic and content are required",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO sat_notes (topic, content, category, created_at, updated_at)
+       VALUES ($1, $2, $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+       RETURNING id, topic, content, category, created_at`,
+      [topic, content, category || null],
+    );
+
+    console.log("[SAT Notes] New note added:", result.rows[0].id);
+
+    res.json({
+      success: true,
+      message: "SAT note added successfully",
+      note: result.rows[0],
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("[SAT Notes] Error adding note:", err.message);
+    res.status(500).json({
+      error: "Failed to add SAT note",
+      message: err.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// Endpoint to fetch all SAT notes
+app.get("/api/sat-notes", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, topic, content, category, created_at, updated_at FROM sat_notes ORDER BY created_at ASC`,
+    );
+
+    console.log("[SAT Notes] Fetched", result.rows.length, "notes");
+
+    res.json({
+      success: true,
+      notes: result.rows,
+      count: result.rows.length,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("[SAT Notes] Error fetching notes:", err.message);
+    res.status(500).json({
+      error: "Failed to fetch SAT notes",
+      message: err.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// Endpoint to delete a SAT note
+app.delete("/api/sat-notes/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      `DELETE FROM sat_notes WHERE id = $1 RETURNING id, topic`,
+      [id],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "SAT note not found",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    console.log("[SAT Notes] Note deleted:", id);
+
+    res.json({
+      success: true,
+      message: "SAT note deleted successfully",
+      deletedNote: result.rows[0],
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("[SAT Notes] Error deleting note:", err.message);
+    res.status(500).json({
+      error: "Failed to delete SAT note",
+      message: err.message,
       timestamp: new Date().toISOString(),
     });
   }

@@ -4,6 +4,7 @@ import '../utils/theme.dart';
 import '../utils/app_localizations.dart';
 import 'bot_processing_screen.dart';
 import 'recent_study_bots_screen.dart';
+import 'topic_selection_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class BotCreationScreen extends StatefulWidget {
@@ -398,6 +399,8 @@ class _BotCreationScreenState extends State<BotCreationScreen>
     required IconData icon,
     int maxLines = 1,
     VoidCallback? onChanged,
+    VoidCallback? onIconTap,
+    bool isIconTapable = false,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -440,9 +443,44 @@ class _BotCreationScreenState extends State<BotCreationScreen>
             fontWeight: FontWeight.w500,
             letterSpacing: 0.2,
           ),
-          prefixIcon: Icon(icon, color: AppTheme.primaryBlue, size: 22),
+          prefixIcon: isIconTapable && onIconTap != null
+              ? GestureDetector(
+                  onTap: onIconTap,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: 1.0,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 12),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppTheme.primaryBlue.withOpacity(0.1),
+                        ),
+                        child: Icon(
+                          icon,
+                          color: AppTheme.primaryBlue,
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              : Align(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: 1.0,
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 12),
+                    child: Icon(icon, color: AppTheme.primaryBlue, size: 22),
+                  ),
+                ),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.all(16),
+          contentPadding: EdgeInsets.only(
+            left: isIconTapable ? 50 : 16,
+            right: 16,
+            top: maxLines > 1 ? 16 : 12,
+            bottom: maxLines > 1 ? 16 : 12,
+          ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide(
@@ -621,6 +659,22 @@ class _BotCreationScreenState extends State<BotCreationScreen>
                             context,
                           ).t('botCreation.studyTopicLabel'),
                           icon: Icons.book_rounded,
+                          isIconTapable: true,
+                          onIconTap: () async {
+                            final selectedTopic = await Navigator.of(context)
+                                .push<String>(
+                                  MaterialPageRoute(
+                                    builder: (context) => TopicSelectionScreen(
+                                      onTopicSelected: (_) {},
+                                    ),
+                                  ),
+                                );
+                            if (selectedTopic != null && mounted) {
+                              setState(() {
+                                _planNameCtrl.text = selectedTopic;
+                              });
+                            }
+                          },
                         ),
                       ],
                     ),

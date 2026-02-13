@@ -8,6 +8,7 @@ import '../utils/language_provider.dart';
 import '../utils/app_localizations.dart';
 import '../services/settings_service.dart';
 import '../services/user_profile_service.dart';
+import '../services/push_notification_service.dart';
 import '../services/onboarding_service.dart';
 import '../widgets/social_media_icons.dart';
 
@@ -21,14 +22,17 @@ class SettingsScreenNew extends StatefulWidget {
 class _SettingsScreenNewState extends State<SettingsScreenNew> {
   late SettingsService _settingsService;
   late UserProfileService _userProfileService;
+  late PushNotificationService _notificationService;
   String _colorMode = 'dark';
   String _username = 'User';
+  bool _notificationsEnabled = true;
 
   @override
   void initState() {
     super.initState();
     _settingsService = SettingsService.instance;
     _userProfileService = UserProfileService.instance;
+    _notificationService = PushNotificationService();
     _loadSettings();
   }
 
@@ -38,10 +42,13 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
 
     final colorMode = await _settingsService.getColorMode();
     final username = await _userProfileService.getDisplayName();
+    final notificationsEnabled = await _notificationService
+        .getNotificationsEnabled();
 
     setState(() {
       _colorMode = colorMode;
       _username = username;
+      _notificationsEnabled = notificationsEnabled;
     });
   }
 
@@ -61,6 +68,82 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
           behavior: SnackBarBehavior.floating,
         ),
       );
+    }
+  }
+
+  /// Toggle notifications on/off with robust error handling and reinitialization
+  Future<void> _toggleNotifications(bool enabled) async {
+    try {
+      setState(() => _notificationsEnabled = enabled);
+
+      if (enabled) {
+        // When enabling, ensure notification service is fully initialized
+        // This is critical for proper scheduling
+        print('[Settings] Initializing notification service...');
+        await _notificationService.initialize();
+
+        // Wait a moment for initialization to complete
+        await Future.delayed(Duration(milliseconds: 300));
+
+        // Now save the enabled state
+        await _notificationService.setNotificationsEnabled(true);
+        print('[Settings] Notification service re-initialized and enabled');
+      } else {
+        // Disable notifications
+        await _notificationService.setNotificationsEnabled(false);
+        print('[Settings] Notifications disabled');
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(
+                  enabled
+                      ? Icons.notifications_active
+                      : Icons.notifications_off,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                SizedBox(width: 8),
+                Text(
+                  enabled ? 'Notifications enabled' : 'Notifications disabled',
+                ),
+              ],
+            ),
+            backgroundColor: enabled ? AppTheme.success : AppTheme.textTertiary,
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+
+      print(
+        '[Settings] Notifications ${enabled ? 'enabled' : 'disabled'} successfully',
+      );
+    } catch (e) {
+      // Revert state on error
+      setState(() => _notificationsEnabled = !enabled);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.error, color: Colors.white, size: 20),
+                SizedBox(width: 8),
+                Expanded(child: Text('Failed to update notifications: $e')),
+              ],
+            ),
+            backgroundColor: AppTheme.error,
+            duration: Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+
+      print('[Settings] Error toggling notifications: $e');
     }
   }
 
@@ -88,8 +171,9 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
     Widget? trailing,
     List<Color>? gradient,
   }) {
-    final iconColor =
-        gradient != null ? Colors.white : AppTheme.textPrimaryFromContext(context);
+    final iconColor = gradient != null
+        ? Colors.white
+        : AppTheme.textPrimaryFromContext(context);
     return ListTile(
       leading: Container(
         width: 44,
@@ -98,8 +182,7 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors:
-                gradient ?? AppTheme.surfaceGradientFromContext(context),
+            colors: gradient ?? AppTheme.surfaceGradientFromContext(context),
           ),
           borderRadius: BorderRadius.circular(AppTheme.radiusSm),
           boxShadow: gradient != null
@@ -167,7 +250,9 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
     return Divider(
       height: 1,
       thickness: 1,
-      color: AppTheme.surfaceElevatedFromContext(context).withValues(alpha: 0.3),
+      color: AppTheme.surfaceElevatedFromContext(
+        context,
+      ).withValues(alpha: 0.3),
       indent: AppTheme.spaceMd,
       endIndent: AppTheme.spaceMd,
     );
@@ -230,9 +315,7 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     context,
                     icon: Icons.person,
                     title: AppLocalizations.of(context).t('nav.profile'),
-                    subtitle: AppLocalizations.of(
-                      context,
-                    ).t('settings.editProfileInfo'),
+                    subtitle: 'Manage your account',
                     gradient: AppTheme.accentGradient,
                     onTap: () =>
                         Navigator.pushNamed(context, '/profile-settings'),
@@ -274,18 +357,22 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     onTap: () => _showColorModeDialog(),
                   ),
                   _buildDivider(),
-                  // Notifications
+                  // Notifications Toggle
                   _tile(
                     context,
                     icon: Icons.notifications_active,
                     title: AppLocalizations.of(
                       context,
                     ).t('settings.notifications'),
-                    subtitle: AppLocalizations.of(
-                      context,
-                    ).t('settings.manageNotifications'),
-                    onTap: () =>
-                        Navigator.pushNamed(context, '/notification-settings'),
+                    subtitle: _notificationsEnabled
+                        ? 'Notifications are enabled'
+                        : 'Notifications are disabled',
+                    trailing: Switch(
+                      value: _notificationsEnabled,
+                      onChanged: _toggleNotifications,
+                      activeColor: AppTheme.primaryBlue,
+                      inactiveThumbColor: AppTheme.textTertiary,
+                    ),
                   ),
                   _buildDivider(),
                   // Language Selection
@@ -303,9 +390,7 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     context,
                     icon: Icons.logout,
                     title: AppLocalizations.of(context).t('settings.logout'),
-                    subtitle: AppLocalizations.of(
-                      context,
-                    ).t('settings.signOutAccount'),
+                    subtitle: 'Securely sign out',
                     onTap: () => _showLogoutConfirmation(),
                   ),
                 ],
@@ -323,9 +408,7 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     title: AppLocalizations.of(
                       context,
                     ).t('settings.capabilities'),
-                    subtitle: AppLocalizations.of(
-                      context,
-                    ).t('settings.exploreFeatures'),
+                    subtitle: 'Discover all features',
                     onTap: () => Navigator.pushNamed(context, '/capabilities'),
                   ),
                   _buildDivider(),
@@ -335,9 +418,7 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     title: AppLocalizations.of(
                       context,
                     ).t('settings.showOnboarding'),
-                    subtitle: AppLocalizations.of(
-                      context,
-                    ).t('settings.viewWalkthrough'),
+                    subtitle: 'See how to use Nexa',
                     onTap: () {
                       _showOnboardingConfirmation();
                     },
@@ -356,9 +437,7 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     context,
                     icon: Icons.message,
                     title: AppLocalizations.of(context).t('settings.whatsapp'),
-                    subtitle: AppLocalizations.of(
-                      context,
-                    ).t('settings.joinWhatsapp'),
+                    subtitle: 'Join our community',
                     trailing: SocialMediaIcon(platform: 'whatsapp', size: 32),
                     onTap: () => _launchUrl(
                       'https://chat.whatsapp.com/BSwumdCdeLF7txFxw3jGdW',
@@ -369,9 +448,7 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     context,
                     icon: Icons.thumb_up,
                     title: AppLocalizations.of(context).t('settings.facebook'),
-                    subtitle: AppLocalizations.of(
-                      context,
-                    ).t('settings.followFacebook'),
+                    subtitle: 'Follow us',
                     trailing: SocialMediaIcon(platform: 'facebook', size: 32),
                     onTap: () => _launchUrl(
                       'https://www.facebook.com/share/17untMVSDD/',
@@ -382,9 +459,7 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     context,
                     icon: Icons.camera_alt,
                     title: AppLocalizations.of(context).t('settings.instagram'),
-                    subtitle: AppLocalizations.of(
-                      context,
-                    ).t('settings.followInstagram'),
+                    subtitle: 'Follow us',
                     trailing: SocialMediaIcon(platform: 'instagram', size: 32),
                     onTap: () => _launchUrl(
                       'https://www.instagram.com/nexasmartai?igsh=YTJ1eGlneGxtZ2Zn',
@@ -395,9 +470,7 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     context,
                     icon: Icons.music_video,
                     title: AppLocalizations.of(context).t('settings.tiktok'),
-                    subtitle: AppLocalizations.of(
-                      context,
-                    ).t('settings.followTiktok'),
+                    subtitle: 'Follow us',
                     trailing: SocialMediaIcon(platform: 'tiktok', size: 32),
                     onTap: () => _launchUrl(
                       'https://www.tiktok.com/@nexa.2035?_r=1&_t=ZM-93F28qgfiV2',
@@ -419,9 +492,6 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     title: AppLocalizations.of(
                       context,
                     ).t('settings.privacyPolicy'),
-                    subtitle: AppLocalizations.of(
-                      context,
-                    ).t('settings.readPrivacy'),
                     onTap: () => Navigator.pushNamed(context, '/privacy'),
                   ),
                   _buildDivider(),
@@ -431,9 +501,6 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     title: AppLocalizations.of(
                       context,
                     ).t('settings.termsOfService'),
-                    subtitle: AppLocalizations.of(
-                      context,
-                    ).t('settings.readTerms'),
                     onTap: () async {
                       // You can add a terms screen later or link to external URL
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -454,9 +521,6 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     context,
                     icon: Icons.info_outline,
                     title: AppLocalizations.of(context).t('settings.about'),
-                    subtitle: AppLocalizations.of(
-                      context,
-                    ).t('settings.appInfo'),
                     onTap: () => _showAboutDialog(),
                   ),
                 ],

@@ -373,5 +373,22 @@
   },
   "common": {
     "comingSoon": "Próximamente"
+  },
+  "topicSelection": {
+    "title": "Selecciona Tu Tema",
+    "chooseExamBoard": "Elige Junta de Examen",
+    "chooseSatSubject": "Elige Asignatura SAT",
+    "selectSatTopic": "Selecciona Tema SAT",
+    "selectGceTopic": "Selecciona Tema GCE",
+    "selectExamBoard": "Elige tu junta de examen para ver los temas disponibles",
+    "selectSatSubject": "Elige tu asignatura para ver los temas principales",
+    "satDescription": "Prueba de Evaluación Académica",
+    "gceDescription": "Certificado General de Educación",
+    "mathsDescription": "Habilidades Matemáticas Principales y Temas Avanzados",
+    "englishDescription": "Habilidades de Lectura, Escritura y Comprensión",
+    "satMaths": "SAT - Matemáticas",
+    "satEnglish": "SAT - Inglés",
+    "gceMathematics": "GCE - Matemáticas",
+    "gceEnglish": "GCE - Inglés"
   }
 }

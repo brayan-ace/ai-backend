@@ -373,5 +373,22 @@
   },
   "common": {
     "comingSoon": "قادم قريباً"
+  },
+  "topicSelection": {
+    "title": "اختر موضوعك",
+    "chooseExamBoard": "اختر مجلس الامتحن",
+    "chooseSatSubject": "اختر مادة SAT",
+    "selectSatTopic": "اختر موضوع SAT",
+    "selectGceTopic": "اختر موضوع GCE",
+    "selectExamBoard": "اختر مجلس امتحنك لعرض المواضيع المتاحة",
+    "selectSatSubject": "اختر مادتك لعرض المواضيع الأساسية",
+    "satDescription": "اختبار التقييم الأكاديمي",
+    "gceDescription": "شهادة التعليم العام",
+    "mathsDescription": "المهارات الرياضية الأساسية والمواضيع المتقدمة",
+    "englishDescription": "مهارات القراءة والكتابة والفهم",
+    "satMaths": "SAT - الرياضيات",
+    "satEnglish": "SAT - الإنجليزية",
+    "gceMathematics": "GCE - الرياضيات",
+    "gceEnglish": "GCE - الإنجليزية"
   }
 }

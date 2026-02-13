@@ -380,5 +380,22 @@
     "minutesAgo": "Il y a {count}m",
     "hoursAgo": "Il y a {count}h",
     "daysAgo": "Il y a {count}j"
+  },
+  "topicSelection": {
+    "title": "Sélectionnez Votre Sujet",
+    "chooseExamBoard": "Choisissez un Conseil d'Examen",
+    "chooseSatSubject": "Choisissez une Matière SAT",
+    "selectSatTopic": "Sélectionnez un Sujet SAT",
+    "selectGceTopic": "Sélectionnez un Sujet GCE",
+    "selectExamBoard": "Choisissez votre conseil d'examen pour voir les sujets disponibles",
+    "selectSatSubject": "Choisissez votre matière pour voir les sujets principaux",
+    "satDescription": "Test d'Évaluation Scolastique",
+    "gceDescription": "Certificat Général d'Études",
+    "mathsDescription": "Compétences Mathématiques Fondamentales et Sujets Avancés",
+    "englishDescription": "Compétences en Lecture, Écriture et Compréhension",
+    "satMaths": "SAT - Mathématiques",
+    "satEnglish": "SAT - Anglais",
+    "gceMathematics": "GCE - Mathématiques",
+    "gceEnglish": "GCE - Anglais"
   }
 }
