@@ -1218,12 +1218,7 @@ Remember: The user is learning ${modules.length} interconnected modules. Each su
             if (streakData.streakIncremented) {
               final currentStreak = streakData.currentStreak;
 
-              // Send immediate streak increment notification
-              await _studyNotificationService.notifyStreakIncrement(
-                currentStreak,
-              );
-
-              // Also check if this is a milestone that should be celebrated
+              // Check if this is a milestone that should be celebrated
               if (_studyActivityService.shouldNotifyMilestone(currentStreak)) {
                 await _studyNotificationService.notifyStreakMilestone(
                   currentStreak,

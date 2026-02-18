@@ -83,7 +83,7 @@ void main() async {
 
     // Send notification if streak incremented
     if (appOpenData.streakIncremented) {
-      await StudyNotificationService().notifyStreakIncrement(
+      await PushNotificationService().sendStreakNotification(
         appOpenData.currentStreak,
       );
     }
