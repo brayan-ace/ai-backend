@@ -4391,8 +4391,10 @@ app.post("/transcribe", upload.single("audio"), async (req, res) => {
       return res.status(400).json({ error: "No audio file uploaded" });
     }
 
-    // Create a new SpeechClient
-    const speechClient = new speech.SpeechClient();
+    // Create a new SpeechClient with credentials from environment variable
+    const speechClient = new speech.SpeechClient({
+      credentials: JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON),
+    });
 
     // Read the uploaded audio file
     const audioBuffer = fs.readFileSync(req.file.path);
