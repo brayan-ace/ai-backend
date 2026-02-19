@@ -1,19 +1,31 @@
 {
-  "name": "backend",
+  "name": "flutter-voice-backend",
   "version": "1.0.0",
-  "description": "Backend for AI API calls",
-  "main": "server.js",
+  "description": "Backend for Flutter Voice AI application - Speech-to-Text and AI API integration",
+  "main": "index.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "node server.js"
   },
-  "keywords": [],
+  "keywords": [
+    "express",
+    "api",
+    "voice",
+    "flutter",
+    "speech-to-text"
+  ],
   "author": "",
   "license": "ISC",
+  "engines": {
+    "node": "18.x"
+  },
   "dependencies": {
     "axios": "^1.13.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
-    "pg": "^8.17.2"
+    "pg": "^8.17.2",
+    "multer": "^1.4.5",
+    "@google-cloud/speech": "^5.7.0"
   }
 }

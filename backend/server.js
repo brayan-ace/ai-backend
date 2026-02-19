@@ -11,6 +11,10 @@ if (process.env.NODE_ENV !== "production") {
 const express = require("express");
 const cors = require("cors");
 const axios = require("axios");
+const multer = require("multer");
+const speech = require("@google-cloud/speech");
+const fs = require("fs");
+const path = require("path");
 
 const app = express();
 app.use(cors());
@@ -244,7 +248,9 @@ function detectUserConstraints(message, instructions = {}) {
 
   return result;
 }
-
+//set up multer for file uploads (for voice input)
+const upload = multer({ dest: "uploads/" });
+7;
 /**
  * Sanitize text by removing unwanted characters and formatting issues.
  */
@@ -4369,6 +4375,73 @@ app.delete("/api/sat-notes/:id", async (req, res) => {
     console.error("[SAT Notes] Error deleting note:", err.message);
     res.status(500).json({
       error: "Failed to delete SAT note",
+      message: err.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// ============= SPEECH-TO-TEXT ROUTE =============
+
+// POST /transcribe - Convert audio file to text using Google Cloud Speech API
+app.post("/transcribe", upload.single("audio"), async (req, res) => {
+  try {
+    // Check if file was uploaded
+    if (!req.file) {
+      return res.status(400).json({ error: "No audio file uploaded" });
+    }
+
+    // Create a new SpeechClient
+    const speechClient = new speech.SpeechClient();
+
+    // Read the uploaded audio file
+    const audioBuffer = fs.readFileSync(req.file.path);
+
+    // Convert to base64
+    const base64String = audioBuffer.toString("base64");
+
+    // Configure audio
+    const audio = {
+      content: base64String,
+    };
+
+    // Configure speech recognition
+    const config = {
+      encoding: "LINEAR16",
+      sampleRateHertz: 16000,
+      languageCode: "en-US",
+    };
+
+    // Call Google Cloud Speech API
+    const response = await speechClient.recognize({ audio, config });
+
+    // Extract transcription from response
+    const transcription = response[0].results
+      .map((result) => result.alternatives[0].transcript)
+      .join("\n");
+
+    // Delete temporary file
+    fs.unlinkSync(req.file.path);
+
+    // Send response
+    res.json({
+      text: transcription || "No speech detected",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("[Transcription] Error:", err.message);
+
+    // Clean up file if it exists
+    if (req.file && fs.existsSync(req.file.path)) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (e) {
+        console.error("[Transcription] Error deleting file:", e.message);
+      }
+    }
+
+    res.status(500).json({
+      error: "Transcription failed",
       message: err.message,
       timestamp: new Date().toISOString(),
     });
