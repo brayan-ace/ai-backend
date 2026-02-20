@@ -447,16 +447,9 @@ async function searchTopicOnline(topic, gradeLevel) {
     const searchQuery = `${topic} educational content ${gradeLevel} level learning`;
 
     const response = await axios.post(
-      "https://api.exa.ai/search",
+      "https://api.exa.ai/answer",
       {
         query: searchQuery,
-        type: "auto",
-        num_results: 5,
-        contents: {
-          text: {
-            max_characters: 20000,
-          },
-        },
       },
       {
         headers: {
@@ -3403,7 +3396,7 @@ app.post("/api/ask", async (req, res) => {
             console.log("[Web Search] Enhanced query:", enhancedSearchQuery);
 
             console.log(
-              "[Web Search] 🚀 Calling Exa API at https://api.exa.ai/search",
+              "[Web Search] 🚀 Calling Exa API at https://api.exa.ai/answer",
             );
             console.log(
               "[Web Search] 🔑 Using EXA_API_KEY:",
@@ -3411,16 +3404,9 @@ app.post("/api/ask", async (req, res) => {
             );
 
             const resp = await axios.post(
-              "https://api.exa.ai/search",
+              "https://api.exa.ai/answer",
               {
                 query: enhancedSearchQuery,
-                type: "auto",
-                num_results: 5,
-                contents: {
-                  text: {
-                    max_characters: 20000,
-                  },
-                },
               },
               {
                 headers: {
@@ -3431,30 +3417,16 @@ app.post("/api/ask", async (req, res) => {
               },
             );
 
-            console.log(
-              `[Web Search] ✅ SUCCESS! Found ${resp.data.results?.length || 0} results`,
-            );
+            console.log(`[Web Search] ✅ SUCCESS! Got answer from Exa`);
 
-            const resultsText = resp.data.answer
-              ? resp.data.answer
-              : JSON.stringify(resp.data, null, 2);
-            const structured = structureTextResponse(resultsText);
-            const formattedResults = formatResponseForReadability(resultsText);
-
-            // Enhance with AI
-            const enhancedAnswer = await enhanceSearchResultsWithAI(
-              originalQuery,
-              resp.data,
-              conversationMessages,
-              data.model || data.provider || "groq",
-            );
+            // /answer endpoint returns synthesized answer directly - no need for additional AI enhancement
+            const exaAnswer = resp.data.answer || resp.data;
 
             return res.json({
               provider: "exa",
               results: resp.data,
-              reply: formattedResults,
-              structured: structured,
-              enhancedAnswer: enhancedAnswer,
+              reply: exaAnswer,
+              enhancedAnswer: exaAnswer,
               originalQuery: originalQuery,
               enhancedQuery: enhancedSearchQuery,
               timestamp: new Date().toISOString(),
@@ -4279,16 +4251,9 @@ Don't just dump information—guide them through it. Make it click.`;
           console.log("[Search] Final search query:", enhancedSearchQuery);
 
           const resp = await axios.post(
-            "https://api.exa.ai/search",
+            "https://api.exa.ai/answer",
             {
               query: enhancedSearchQuery,
-              type: "auto",
-              num_results: 5,
-              contents: {
-                text: {
-                  max_characters: 20000,
-                },
-              },
             },
             {
               headers: {
@@ -4299,30 +4264,14 @@ Don't just dump information—guide them through it. Make it click.`;
             },
           );
 
-          // Build a text representation of results for structuring
-          const resultsText =
-            typeof resp.data === "string"
-              ? resp.data
-              : JSON.stringify(resp.data, null, 2);
-          const structured = structureTextResponse(resultsText);
-          // FORMATTING: Apply readability improvements
-          const formattedResults = formatResponseForReadability(resultsText);
-
-          // Send the search results to the AI model for enhancement
-          // Pass both original query and conversation context for better answers
-          const enhancedAnswer = await enhanceSearchResultsWithAI(
-            originalQuery,
-            resp.data,
-            conversationMessages,
-            data.model || data.provider || "groq",
-          );
+          // /answer endpoint returns synthesized answer directly - no need for additional AI enhancement
+          const exaAnswer = resp.data.answer || resp.data;
 
           return res.json({
             provider: "exa",
             results: resp.data,
-            reply: formattedResults,
-            structured: structured,
-            enhancedAnswer: enhancedAnswer,
+            reply: exaAnswer,
+            enhancedAnswer: exaAnswer,
             originalQuery: originalQuery,
             enhancedQuery: enhancedSearchQuery,
             timestamp: new Date().toISOString(),
