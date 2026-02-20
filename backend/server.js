@@ -3317,8 +3317,13 @@ app.post("/api/create-study-bot", async (req, res) => {
 
 app.post("/api/ask", async (req, res) => {
   try {
-    console.log("[POST /api/ask] Request received");
+    console.log("[POST /api/ask] ✅ REQUEST RECEIVED");
     const { type, data } = req.body;
+
+    console.log("[POST /api/ask] Request Type:", type);
+    console.log("[POST /api/ask] Data Keys:", Object.keys(data));
+    console.log("[POST /api/ask] webSearchEnabled:", data?.webSearchEnabled);
+    console.log("[POST /api/ask] useWebSearch:", data?.useWebSearch);
 
     // Initialize conversation memory for chat requests
     let conversationMemory;
@@ -3337,11 +3342,26 @@ app.post("/api/ask", async (req, res) => {
 
     switch (type) {
       case "chat":
-        console.log("[Chat Case] Processing chat request:", data);
+        console.log("[Chat Case] Processing chat request:", {
+          webSearchEnabled: data.webSearchEnabled,
+          useWebSearch: data.useWebSearch,
+          message: data.message ? data.message.substring(0, 50) : "none",
+          model: data.model || data.provider,
+        });
 
         // If web search is enabled, route to search case instead
         if (data.webSearchEnabled || data.useWebSearch) {
-          console.log("[Chat] Web search enabled, routing to search handler");
+          console.log(
+            "[Chat] ✅ Web search enabled, routing to search handler",
+          );
+          console.log(
+            "[Chat] 🔑 EXA_API_KEY exists:",
+            !!process.env.EXA_API_KEY,
+          );
+          console.log(
+            "[Chat] 🔑 GROQ_API_KEY exists:",
+            !!process.env.GROQ_API_KEY,
+          );
           // Convert chat message to search query
           const searchData = {
             query: data.message || data.query || "Search",
@@ -3381,6 +3401,14 @@ app.post("/api/ask", async (req, res) => {
 
             console.log("[Web Search] Enhanced query:", enhancedSearchQuery);
 
+            console.log(
+              "[Web Search] 🚀 Calling Exa API at https://api.exa.ai/search",
+            );
+            console.log(
+              "[Web Search] 🔑 Using EXA_API_KEY:",
+              process.env.EXA_API_KEY ? "SET" : "NOT SET",
+            );
+
             const resp = await axios.post(
               "https://api.exa.ai/search",
               {
@@ -3403,7 +3431,7 @@ app.post("/api/ask", async (req, res) => {
             );
 
             console.log(
-              `[Web Search] Found ${resp.data.results.length} results`,
+              `[Web Search] ✅ SUCCESS! Found ${resp.data.results?.length || 0} results`,
             );
 
             const resultsText = resp.data.answer
@@ -3432,15 +3460,32 @@ app.post("/api/ask", async (req, res) => {
               status: "success",
             });
           } catch (searchError) {
+            console.error("[Web Search] ❌ ERROR CAUGHT:");
             console.error(
-              "[Web Search] Error:",
-              searchError?.response?.data || searchError.message || searchError,
+              "[Web Search] Error Type:",
+              searchError?.constructor?.name,
             );
+            console.error("[Web Search] Error Message:", searchError?.message);
+            console.error("[Web Search] Error Code:", searchError?.code);
+            console.error(
+              "[Web Search] HTTP Status:",
+              searchError?.response?.status,
+            );
+            console.error(
+              "[Web Search] Response Data:",
+              searchError?.response?.data,
+            );
+            console.error("[Web Search] Full Error:", searchError);
+
             const fallbackMsg = getFallbackMessage();
             return res.status(500).json({
               error: "Search temporarily unavailable",
               reply: fallbackMsg,
               provider: "exa",
+              errorDetails: {
+                message: searchError?.message,
+                status: searchError?.response?.status,
+              },
               timestamp: new Date().toISOString(),
               isErrorFallback: true,
               status: "error",
