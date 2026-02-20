@@ -11,7 +11,7 @@ class CapabilitiesScreen extends StatefulWidget {
 
 class _CapabilitiesScreenState extends State<CapabilitiesScreen> {
   late SettingsService _settingsService;
-  bool _webSearchEnabled = true;
+  bool _webSearchEnabled = false; // Default to false, will load from settings
   bool _quizArtifactEnabled = true;
   bool _isLoading = false;
 
@@ -23,26 +23,37 @@ class _CapabilitiesScreenState extends State<CapabilitiesScreen> {
   }
 
   Future<void> _loadCapabilities() async {
-    await _settingsService.init();
+    try {
+      await _settingsService.init();
 
-    final webSearch = await _settingsService.getWebSearchCapability();
-    final quizArtifact = await _settingsService.getQuizArtifactCapability();
+      final webSearch = await _settingsService.getWebSearchCapability();
+      final quizArtifact = await _settingsService.getQuizArtifactCapability();
 
-    setState(() {
-      _webSearchEnabled = webSearch;
-      _quizArtifactEnabled = quizArtifact;
-    });
+      if (mounted) {
+        setState(() {
+          _webSearchEnabled = webSearch;
+          _quizArtifactEnabled = quizArtifact;
+          print(
+            '[Capabilities] Loaded - WebSearch: $webSearch, QuizArtifact: $quizArtifact',
+          );
+        });
+      }
+    } catch (e) {
+      print('Error loading capabilities: $e');
+    }
   }
 
   Future<void> _toggleWebSearch(bool value) async {
     setState(() => _isLoading = true);
 
     try {
+      print('[Capabilities] Toggling WebSearch to: $value');
       await _settingsService.setWebSearchCapability(value);
       setState(() {
         _webSearchEnabled = value;
         _isLoading = false;
       });
+      print('[Capabilities] WebSearch toggled successfully to: $value');
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -52,6 +63,7 @@ class _CapabilitiesScreenState extends State<CapabilitiesScreen> {
         ),
       );
     } catch (e) {
+      print('[Capabilities] Error toggling WebSearch: $e');
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

@@ -101,30 +101,24 @@ class StudyNotificationService {
   }
 
   /// Schedule daily study reminder
-  /// Schedule daily study reminders at 6 AM and 6 PM
-  /// Only sends if the user hasn't studied in the last 24 hours
+  /// Schedule UNCONDITIONAL daily reminders at 6 AM and 6 PM EVERY DAY
+  /// These notifications will be sent regardless of whether user has studied or opened the app
   /// Scheduled for 6 AM and 6 PM every day in the user's timezone
   Future<void> scheduleDailyReminder() async {
     _ensureInitialized();
 
     try {
-      // Check if reminder should be sent
-      if (!_activityService.shouldSendDailyReminder()) {
-        print('[StudyNotification] Daily reminder skipped (recent study)');
-        return;
-      }
-
       // Get user's timezone
       final tzLocation = tz.local;
 
-      // Schedule for 6 AM
+      // Schedule for 6 AM - UNCONDITIONAL
       await _scheduleReminderAtTime(6, 0, tzLocation);
 
-      // Schedule for 6 PM (18:00)
+      // Schedule for 6 PM (18:00) - UNCONDITIONAL
       await _scheduleReminderAtTime(18, 0, tzLocation);
 
       print(
-        '[StudyNotification] 📅 Daily reminders scheduled for 6 AM and 6 PM',
+        '[StudyNotification] ✅ UNCONDITIONAL Daily reminders scheduled for 6 AM and 6 PM (will send every day)',
       );
     } catch (e) {
       print('[StudyNotification] ❌ Error scheduling daily reminder: $e');

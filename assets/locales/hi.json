@@ -40,6 +40,10 @@
     "renameButton": "नाम बदलें",
     "deleteButton": "हटाएं",
     "cancelButton": "रद्द करें",
+    "okButton": "ठीक है",
+    "deleteConfirmTitle": "चैट को हटाएँ?",
+    "deleteConfirmMessage": "यह चैट को स्थायी रूप से हटा देगा। आप इस क्रिया को पूर्ववत नहीं कर सकते।",
+    "doNotShowAgain": "दोबारा न दिखाएं",
     "chatRenamed": "✓ चैट का नाम बदल दिया गया",
     "renameError": "नाम बदलने में त्रुटि: {error}",
     "deleteError": "हटाने में त्रुटि: {error}"
@@ -390,5 +394,22 @@
     "satEnglish": "SAT - अंग्रेजी",
     "gceMathematics": "GCE - गणित",
     "gceEnglish": "GCE - अंग्रेजी"
+  },
+  "voiceInput": {
+    "tapToRecord": "🎙️ रिकॉर्ड करने के लिए टैप करें",
+    "listening": "🎙️ सुन रहे हैं...",
+    "done": "हो गया!",
+    "error": "त्रुटि",
+    "tapToRetry": "🎙️ पुनः प्रयास के लिए टैप करें",
+    "permissionNeeded": "🔒 अनुमति आवश्यक\nसेटिंग्स > ऐप > अनुमतियाँ",
+    "micPermissionRequired": "🔒 माइक्रोफोन की अनुमति आवश्यक\nसेटिंग्स > ऐप > अनुमतियाँ खोलें",
+    "initError": "प्रारंभीकरण त्रुटि",
+    "recordingFailed": "रिकॉर्डिंग शुरू करने में विफल",
+    "recordingFailedToStop": "रिकॉर्डिंग बंद करने में विफल",
+    "couldNotUnderstand": "🔇 समझ नहीं आया। अधिक स्पष्ट रूप से बोलें",
+    "serverTimeout": "⏱️ सर्वर धीमा। 10 सेकंड में पुनः प्रयास करें",
+    "noInternet": "🌐 कोई इंटरनेट नहीं। कनेक्शन जांचें",
+    "serviceError": "⚠️ सेवा त्रुटि। पुनः प्रयास करें",
+    "startSpeaking": "बोलना शुरू करें..."
   }
 }

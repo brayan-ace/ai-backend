@@ -1,9 +1,9 @@
 import "package:flutter/material.dart";
 import "package:flutter_test/flutter_test.dart";
 import "package:provider/provider.dart";
-import "package:myai/main.dart";
-import "package:myai/utils/theme_provider.dart";
-import "package:myai/utils/globals.dart" as globals; // Import globals
+import "package:nexa_smart_ai/main.dart";
+import "package:nexa_smart_ai/utils/theme_provider.dart";
+import "package:nexa_smart_ai/utils/globals.dart" as globals; // Import globals
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized(); // Ensure Flutter binding is initialized for tests

@@ -4,7 +4,7 @@ import 'api_service.dart';
 class WebSearchService {
   /// Performs a web search by delegating to the backend. The backend
   /// can call Tavily or other search providers securely.
-  /// 
+  ///
   /// [conversationHistory] - Optional list of conversation messages to provide
   /// context for the search. This helps the AI understand what the user was
   /// discussing and return more relevant search results.
@@ -61,13 +61,19 @@ class WebSearchService {
   }
 
   /// Creates an enhanced prompt combining AI knowledge with web search results
+  /// The model's intelligence comes first - web results are supplementary
   String createEnhancedPrompt(String originalQuery, String searchResults) {
     return '''
-Web search results for: "$originalQuery"
+$originalQuery
 
+Use your knowledge and understanding to answer this question. The following information from web search is provided to supplement and improve your answer - use it if relevant to provide the most current and accurate information:
+
+---
+Web Search Results:
 $searchResults
+---
 
-Provide a clear, accurate answer based on these results. Be natural and conversational - only use special formatting (markdown, LaTeX) when it genuinely improves clarity. Focus on answering the question directly.
+Respond naturally and conversationally. Base your answer primarily on your knowledge and reasoning, and incorporate the web results only where they add value or provide current information. Do not simply repeat the search results - synthesize them with your understanding.
 ''';
   }
 }

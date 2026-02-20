@@ -348,11 +348,11 @@ function reformatLeadingNumberedDefinition(text) {
   return text;
 }
 
-// ============= TAVILY WEB SEARCH =============
+// ============= EXA WEB SEARCH =============
 
 /**
  * Summarize conversation history to provide context for web searches.
- * This ensures Tavily searches are relevant to the ongoing conversation.
+ * This ensures Exa searches are relevant to the ongoing conversation.
  * @param {Array} messages - Array of {role, content} message objects
  * @param {string} currentQuery - The current search query from the user
  * @returns {Promise<string>} - A concise summary + enhanced query for search
@@ -436,36 +436,44 @@ Create an enhanced search query that incorporates relevant conversation context:
 
 async function searchTopicOnline(topic, gradeLevel) {
   try {
-    const tavilyApiKey = process.env.TAVILY_API_KEY;
-    if (!tavilyApiKey) {
-      console.warn(
-        "[Tavily] TAVILY_API_KEY environment variable not configured",
-      );
+    const exaApiKey = process.env.EXA_API_KEY;
+    if (!exaApiKey) {
+      console.warn("[Exa] EXA_API_KEY environment variable not configured");
       return null;
     }
 
-    console.log(`[Tavily] Searching for: ${topic} at ${gradeLevel} level`);
+    console.log(`[Exa] Searching for: ${topic} at ${gradeLevel} level`);
 
     const searchQuery = `${topic} educational content ${gradeLevel} level learning`;
 
     const response = await axios.post(
-      "https://api.tavily.com/search",
+      "https://api.exa.ai/search",
       {
-        api_key: tavilyApiKey,
         query: searchQuery,
-        include_answer: true,
-        max_results: 5,
+        type: "auto",
+        num_results: 5,
+        contents: {
+          text: {
+            max_characters: 20000,
+          },
+        },
       },
-      { timeout: 10000 },
+      {
+        headers: {
+          "x-api-key": exaApiKey,
+          "Content-Type": "application/json",
+        },
+        timeout: 10000,
+      },
     );
 
     if (response.data?.results?.length > 0) {
-      console.log(`[Tavily] Found ${response.data.results.length} results`);
+      console.log(`[Exa] Found ${response.data.results.length} results`);
       const searchContext = {
-        answer: response.data.answer || "",
+        answer: response.data.results.map((r) => r.text).join("\n\n") || "",
         sources: response.data.results.slice(0, 3).map((r) => ({
           title: r.title,
-          content: r.content,
+          content: r.text || r.summary || "",
           url: r.url,
         })),
       };
@@ -473,7 +481,7 @@ async function searchTopicOnline(topic, gradeLevel) {
     }
     return null;
   } catch (err) {
-    console.warn("[Tavily] Search error:", err.message);
+    console.warn("[Exa] Search error:", err.message);
     return null;
   }
 }
@@ -482,71 +490,221 @@ async function enhanceSearchResultsWithAI(
   query,
   searchResults,
   conversationMessages = [],
+  selectedModel = "groq",
 ) {
   try {
-    const groqApiKey = process.env.GROQ_API_KEY;
-    if (!groqApiKey) {
-      console.warn("[AI Enhancement] GROQ_API_KEY not configured");
-      return null;
-    }
-
-    const searchResultsText = JSON.stringify(searchResults, null, 2);
+    // Extract just the text content from Exa results for cleaner formatting
+    const exaResultsText = searchResults.results
+      ? searchResults.results
+          .slice(0, 5)
+          .map(
+            (r, idx) =>
+              `**Source ${idx + 1}: ${r.title}**\nURL: ${r.url}\n${r.text || r.summary || ""}`,
+          )
+          .join("\n\n---\n\n")
+      : JSON.stringify(searchResults, null, 2);
 
     // Build conversation context if available
     let conversationContext = "";
     if (conversationMessages && conversationMessages.length > 0) {
-      const recentMessages = conversationMessages.slice(-8);
-      conversationContext = `
-CONVERSATION CONTEXT (use this to understand what the user has been discussing):
-${recentMessages.map((m) => `${m.role.toUpperCase()}: ${m.content}`).join("\n")}
-
-`;
+      const recentMessages = conversationMessages.slice(-6);
+      conversationContext = `\n\n**CONVERSATION HISTORY:**\n${recentMessages
+        .map((m) => `**${m.role.toUpperCase()}:** ${m.content}`)
+        .join("\n\n")}`;
     }
 
-    const prompt = `You are an expert assistant helping a user who has been having a conversation. Your task is to provide a helpful answer based on web search results while considering the conversation context.
+    // Create the smart prompt template - exactly as user requested
+    const prompt = `**User's Question:** "${query}"
+
+**Search Type:** This question required web search to get current, accurate information.
+
+**Web Search Results from Exa:**
+${exaResultsText}
 ${conversationContext}
-USER'S SEARCH QUERY: "${query}"
 
-SEARCH RESULTS:
-${searchResultsText}
+---
 
-INSTRUCTIONS:
-1. Provide a clear, informative answer that directly addresses the user's query
-2. If there's conversation context, make sure your answer is relevant to what they were discussing
-3. Use the search results to provide accurate, up-to-date information
-4. Format your response with markdown for readability (bold for key terms, bullet points for lists)
-5. If the search results don't fully answer the query in the context of the conversation, acknowledge this
+**Your Task:**
+Using the conversation history to understand the context and what the user has been discussing, please:
+1. Synthesize these web search results into a beautiful, natural, conversational response
+2. Answer the user's question directly and clearly
+3. Reference the sources when appropriate (use inline citations like "According to [Source 1]...")
+4. Make it flow naturally - don't just list the search results
+5. Consider what the user was discussing before to provide relevant context
+6. Use markdown formatting to make it easy to read
 
-Provide your enhanced answer:`;
+Now, please draft a comprehensive and beautiful response:`;
 
-    const response = await axios.post(
-      "https://api.groq.com/openai/v1/chat/completions",
-      {
-        model: "openai/gpt-oss-20b",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a helpful assistant that synthesizes web search results into clear, contextual answers. You consider the user's conversation history to provide relevant responses.",
-          },
-          { role: "user", content: prompt },
-        ],
-        max_tokens: 1500,
-        temperature: 0.5,
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${groqApiKey}`,
+    const systemPrompt =
+      "You are an expert conversational assistant. Your strength is taking raw web search results and synthesizing them into beautiful, natural, engaging responses that directly address the user's question while considering their conversation context. You provide accurate information with proper attribution.";
+
+    const normalizedModel = (selectedModel || "groq").toLowerCase().trim();
+
+    if (normalizedModel === "groq") {
+      const groqApiKey = process.env.GROQ_API_KEY;
+      if (!groqApiKey) {
+        console.warn("[AI Enhancement] GROQ_API_KEY not configured");
+        return null;
+      }
+
+      console.log(
+        "[AI Enhancement] Sending smart prompt to Groq for enhancement",
+      );
+
+      const response = await axios.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        {
+          model: "openai/gpt-oss-20b",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: prompt },
+          ],
+          max_tokens: 2000,
+          temperature: 0.7,
         },
-        timeout: 30000,
-      },
-    );
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${groqApiKey}`,
+          },
+          timeout: 30000,
+        },
+      );
 
-    const enhancedAnswer =
-      response.data.choices?.[0]?.message?.content ||
-      "No enhanced answer from AI";
-    return enhancedAnswer;
+      const enhancedAnswer =
+        response.data.choices?.[0]?.message?.content ||
+        "No enhanced answer from AI";
+      console.log("[AI Enhancement] Groq response received and processed");
+      return enhancedAnswer;
+    } else if (normalizedModel === "gemini") {
+      const geminiApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+      if (!geminiApiKey) {
+        console.warn(
+          "[AI Enhancement] GOOGLE_GENERATIVE_AI_API_KEY not configured",
+        );
+        return null;
+      }
+
+      console.log(
+        "[AI Enhancement] Sending smart prompt to Gemini for enhancement",
+      );
+
+      const response = await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+        {
+          contents: [
+            {
+              role: "user",
+              parts: [
+                {
+                  text: prompt,
+                },
+              ],
+            },
+          ],
+          systemInstruction: {
+            parts: [
+              {
+                text: systemPrompt,
+              },
+            ],
+          },
+          generationConfig: {
+            maxOutputTokens: 2000,
+            temperature: 0.7,
+          },
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          timeout: 30000,
+        },
+      );
+
+      const enhancedAnswer =
+        response.data.candidates?.[0]?.content?.parts?.[0]?.text ||
+        "No enhanced answer from AI";
+      console.log("[AI Enhancement] Gemini response received and processed");
+      return enhancedAnswer;
+    } else if (
+      normalizedModel === "sonnet" ||
+      normalizedModel === "sonnet-3.5"
+    ) {
+      const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+      if (!anthropicApiKey) {
+        console.warn("[AI Enhancement] ANTHROPIC_API_KEY not configured");
+        return null;
+      }
+
+      console.log(
+        "[AI Enhancement] Sending smart prompt to Claude Sonnet for enhancement",
+      );
+
+      const response = await axios.post(
+        "https://api.anthropic.com/v1/messages",
+        {
+          model: "claude-3-5-sonnet-20241022",
+          max_tokens: 2000,
+          system: systemPrompt,
+          messages: [
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+        },
+        {
+          headers: {
+            "x-api-key": anthropicApiKey,
+            "content-type": "application/json",
+            "anthropic-version": "2023-06-01",
+          },
+          timeout: 30000,
+        },
+      );
+
+      const enhancedAnswer =
+        response.data.content?.[0]?.text || "No enhanced answer from AI";
+      console.log(
+        "[AI Enhancement] Claude Sonnet response received and processed",
+      );
+      return enhancedAnswer;
+    } else {
+      console.warn(
+        `[AI Enhancement] Unknown model '${normalizedModel}'. Supported: groq, gemini, sonnet. Falling back to Groq.`,
+      );
+      // Fallback to Groq
+      const groqApiKey = process.env.GROQ_API_KEY;
+      if (!groqApiKey) {
+        return null;
+      }
+
+      const response = await axios.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        {
+          model: "openai/gpt-oss-20b",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: prompt },
+          ],
+          max_tokens: 2000,
+          temperature: 0.7,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${groqApiKey}`,
+          },
+          timeout: 30000,
+        },
+      );
+
+      const enhancedAnswer =
+        response.data.choices?.[0]?.message?.content ||
+        "No enhanced answer from AI";
+      return enhancedAnswer;
+    }
   } catch (err) {
     console.error("[AI Enhancement] Error:", err.message);
     return null;
@@ -3190,21 +3348,21 @@ app.post("/api/ask", async (req, res) => {
             messages: data.messages || [],
             botId: data.botId,
             userId: data.userId,
+            model: data.model || data.provider || "groq",
           };
           // Execute search case logic
           type = "search";
           // Fall through to search case
           // We'll use a workaround by setting type and letting it fall through
-          const TAVILY_KEY = process.env.TAVILY_API_KEY;
-          if (!TAVILY_KEY) {
+          const EXA_KEY = process.env.EXA_API_KEY;
+          if (!EXA_KEY) {
             console.error(
-              "[Search] TAVILY key not configured (env 'TAVILY_API_KEY')",
+              "[Search] EXA key not configured (env 'EXA_API_KEY')",
             );
             return res.status(500).json({
               error: "API configuration error",
-              message:
-                "Tavily API key not configured. Set env var 'TAVILY_API_KEY'",
-              provider: "tavily",
+              message: "Exa API key not configured. Set env var 'EXA_API_KEY'",
+              provider: "exa",
               timestamp: new Date().toISOString(),
             });
           }
@@ -3215,24 +3373,33 @@ app.post("/api/ask", async (req, res) => {
             : [];
 
           try {
-            // Call Tavily search
+            // Call Exa search
             const enhancedSearchQuery = await summarizeConversationForSearch(
-              originalQuery,
               conversationMessages,
+              originalQuery,
             );
 
             console.log("[Web Search] Enhanced query:", enhancedSearchQuery);
 
             const resp = await axios.post(
-              "https://api.tavily.com/search",
+              "https://api.exa.ai/search",
               {
-                api_key: TAVILY_KEY,
                 query: enhancedSearchQuery,
-                include_answer: true,
-                topic: "general",
-                max_results: 5,
+                type: "auto",
+                num_results: 5,
+                contents: {
+                  text: {
+                    max_characters: 20000,
+                  },
+                },
               },
-              { timeout: 15000 },
+              {
+                headers: {
+                  "x-api-key": EXA_KEY,
+                  "Content-Type": "application/json",
+                },
+                timeout: 15000,
+              },
             );
 
             console.log(
@@ -3250,10 +3417,11 @@ app.post("/api/ask", async (req, res) => {
               originalQuery,
               resp.data,
               conversationMessages,
+              data.model || data.provider || "groq",
             );
 
             return res.json({
-              provider: "tavily",
+              provider: "exa",
               results: resp.data,
               reply: formattedResults,
               structured: structured,
@@ -3272,7 +3440,7 @@ app.post("/api/ask", async (req, res) => {
             return res.status(500).json({
               error: "Search temporarily unavailable",
               reply: fallbackMsg,
-              provider: "tavily",
+              provider: "exa",
               timestamp: new Date().toISOString(),
               isErrorFallback: true,
               status: "error",
@@ -4018,15 +4186,15 @@ Don't just dump information—guide them through it. Make it click.`;
       case "search":
         console.log("[Search Case] Processing search request:", data);
         try {
-          const TAVILY_KEY = process.env.TAVILY_API_KEY;
-          if (!TAVILY_KEY) {
+          const EXA_KEY = process.env.EXA_API_KEY;
+          if (!EXA_KEY) {
             console.error(
-              "[Search] TAVILY key not configured (env 'TAVILY_API_KEY')",
+              "[Search] EXA key not configured (env 'EXA_API_KEY')",
             );
             return res.status(500).json({
               error: "API configuration error",
-              message: "Tavily API key not configured. Set env var 'tavily'",
-              provider: "tavily",
+              message: "Exa API key not configured. Set env var 'EXA_API_KEY'",
+              provider: "exa",
               timestamp: new Date().toISOString(),
             });
           }
@@ -4065,14 +4233,22 @@ Don't just dump information—guide them through it. Make it click.`;
           console.log("[Search] Final search query:", enhancedSearchQuery);
 
           const resp = await axios.post(
-            "https://api.tavily.com/search",
+            "https://api.exa.ai/search",
             {
-              api_key: TAVILY_KEY,
               query: enhancedSearchQuery,
-              include_answer: true,
-              max_results: 5,
+              type: "auto",
+              num_results: 5,
+              contents: {
+                text: {
+                  max_characters: 20000,
+                },
+              },
             },
             {
+              headers: {
+                "x-api-key": EXA_KEY,
+                "Content-Type": "application/json",
+              },
               timeout: 30000,
             },
           );
@@ -4092,10 +4268,11 @@ Don't just dump information—guide them through it. Make it click.`;
             originalQuery,
             resp.data,
             conversationMessages,
+            data.model || data.provider || "groq",
           );
 
           return res.json({
-            provider: "tavily",
+            provider: "exa",
             results: resp.data,
             reply: formattedResults,
             structured: structured,
@@ -4115,7 +4292,7 @@ Don't just dump information—guide them through it. Make it click.`;
           return res.status(500).json({
             error: "Search temporarily unavailable",
             reply: fallbackMsg,
-            provider: "tavily",
+            provider: "exa",
             timestamp: new Date().toISOString(),
             isErrorFallback: true,
             status: "error",

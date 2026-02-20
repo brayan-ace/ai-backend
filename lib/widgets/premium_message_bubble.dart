@@ -129,7 +129,7 @@ class _PremiumMessageBubbleState extends State<PremiumMessageBubble>
           Padding(
             padding: EdgeInsets.only(
               left: widget.showAvatar ? 56 : 12,
-              bottom: 4,
+              bottom: 12,
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,

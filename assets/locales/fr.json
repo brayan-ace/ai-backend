@@ -281,6 +281,10 @@
     "renameButton": "Renommer",
     "deleteButton": "Supprimer",
     "cancelButton": "Annuler",
+    "okButton": "OK",
+    "deleteConfirmTitle": "Supprimer le Chat?",
+    "deleteConfirmMessage": "Cela supprimera définitivement le chat. Vous ne pouvez pas annuler cette action.",
+    "doNotShowAgain": "Ne plus afficher ceci",
     "chatRenamed": "✓ Chat renommé",
     "renameError": "Erreur lors du renommage : {error}",
     "deleteError": "Erreur lors de la suppression : {error}"
@@ -397,5 +401,22 @@
     "satEnglish": "SAT - Anglais",
     "gceMathematics": "GCE - Mathématiques",
     "gceEnglish": "GCE - Anglais"
+  },
+  "voiceInput": {
+    "tapToRecord": "🎙️ Appuyez pour enregistrer",
+    "listening": "🎙️ Écoute...",
+    "done": "Terminé!",
+    "error": "Erreur",
+    "tapToRetry": "🎙️ Appuyez pour réessayer",
+    "permissionNeeded": "🔒 Permission requise\nParamètres > Application > Permissions",
+    "micPermissionRequired": "🔒 Permission du microphone requise\nOuvrez Paramètres > Application > Permissions",
+    "initError": "Erreur d'initialisation",
+    "recordingFailed": "Impossible de commencer l'enregistrement",
+    "recordingFailedToStop": "Impossible d'arrêter l'enregistrement",
+    "couldNotUnderstand": "🔇 N'a pas pu comprendre. Parlez plus clairement",
+    "serverTimeout": "⏱️ Serveur lent. Réessayez dans 10s",
+    "noInternet": "🌐 Pas internet. Vérifiez votre connexion",
+    "serviceError": "⚠️ Erreur du service. Réessayez",
+    "startSpeaking": "Commencez à parler..."
   }
 }

@@ -40,6 +40,10 @@
     "renameButton": "Renombrar",
     "deleteButton": "Eliminar",
     "cancelButton": "Cancelar",
+    "okButton": "OK",
+    "deleteConfirmTitle": "¿Eliminar Chat?",
+    "deleteConfirmMessage": "Esto eliminará permanentemente el chat. No puedes deshacer esta acción.",
+    "doNotShowAgain": "No mostrar esto de nuevo",
     "chatRenamed": "✓ Chat renombrado",
     "renameError": "Error al renombrar: {error}",
     "deleteError": "Error al eliminar: {error}"
@@ -390,5 +394,22 @@
     "satEnglish": "SAT - Inglés",
     "gceMathematics": "GCE - Matemáticas",
     "gceEnglish": "GCE - Inglés"
+  },
+  "voiceInput": {
+    "tapToRecord": "🎙️ Toca para grabar",
+    "listening": "🎙️ Escuchando...",
+    "done": "¡Hecho!",
+    "error": "Error",
+    "tapToRetry": "🎙️ Toca para reintentar",
+    "permissionNeeded": "🔒 Permiso necesario\nAjustes > Aplicación > Permisos",
+    "micPermissionRequired": "🔒 Permiso de micrófono necesario\nAbre Ajustes > Aplicación > Permisos",
+    "initError": "Error de inicialización",
+    "recordingFailed": "Error al iniciar grabación",
+    "recordingFailedToStop": "Error al detener grabación",
+    "couldNotUnderstand": "🔇 No se pudo entender. Habla más claro",
+    "serverTimeout": "⏱️ Servidor lento. Intenta de nuevo en 10s",
+    "noInternet": "🌐 Sin internet. Verifica conexión",
+    "serviceError": "⚠️ Error del servicio. Intenta de nuevo",
+    "startSpeaking": "Comienza a hablar..."
   }
 }

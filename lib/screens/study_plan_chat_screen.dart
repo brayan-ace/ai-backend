@@ -25,6 +25,7 @@ import '../widgets/premium_typing_indicator.dart';
 import '../widgets/premium_message_bubble.dart';
 import '../services/study_activity_service.dart';
 import '../services/study_notification_service.dart';
+import '../services/push_notification_service.dart';
 import '../services/text_to_speech_service.dart';
 import 'main_tabs.dart';
 
@@ -212,6 +213,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   late AnalyticsService _analyticsService;
   late StudyActivityService _studyActivityService;
   late StudyNotificationService _studyNotificationService;
+  late PushNotificationService _pushNotificationService;
 
   bool _isPhase1 = false;
   bool _isPhase2 = false;
@@ -287,6 +289,7 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     _analyticsService = AnalyticsService();
     _studyActivityService = StudyActivityService();
     _studyNotificationService = StudyNotificationService();
+    _pushNotificationService = PushNotificationService();
     _storageService = StudyBotStorageService();
     _firebaseService = StudyBotFirebaseService();
 
@@ -1218,7 +1221,12 @@ Remember: The user is learning ${modules.length} interconnected modules. Each su
             if (streakData.streakIncremented) {
               final currentStreak = streakData.currentStreak;
 
-              // Check if this is a milestone that should be celebrated
+              // Send major milestone notifications (7, 30, 100 days)
+              await _pushNotificationService.sendStreakNotification(
+                currentStreak,
+              );
+
+              // Send milestone notifications (3-day, 7-day streaks)
               if (_studyActivityService.shouldNotifyMilestone(currentStreak)) {
                 await _studyNotificationService.notifyStreakMilestone(
                   currentStreak,

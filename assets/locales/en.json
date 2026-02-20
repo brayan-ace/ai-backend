@@ -253,6 +253,10 @@
     "renameButton": "Rename",
     "deleteButton": "Delete",
     "cancelButton": "Cancel",
+    "okButton": "OK",
+    "deleteConfirmTitle": "Remove Chat?",
+    "deleteConfirmMessage": "This will permanently delete the chat. You cannot undo this action.",
+    "doNotShowAgain": "Don't show this again",
     "chatRenamed": "✓ Chat renamed",
     "renameError": "Error renaming: {error}",
     "deleteError": "Error deleting: {error}"
@@ -369,5 +373,22 @@
     "satEnglish": "SAT - English",
     "gceMathematics": "GCE - Mathematics",
     "gceEnglish": "GCE - English"
+  },
+  "voiceInput": {
+    "tapToRecord": "🎙️ Tap to record",
+    "listening": "🎙️ Listening...",
+    "done": "Done!",
+    "error": "Error",
+    "tapToRetry": "🎙️ Tap to retry",
+    "permissionNeeded": "🔒 Permission needed\nSettings > App > Permissions",
+    "micPermissionRequired": "🔒 Microphone permission needed\nOpen Settings > App > Permissions",
+    "initError": "Init error",
+    "recordingFailed": "Failed to start recording",
+    "recordingFailedToStop": "Failed to stop recording",
+    "couldNotUnderstand": "🔇 Couldn't understand. Speak clearer",
+    "serverTimeout": "⏱️ Server slow. Try again in 10s",
+    "noInternet": "🌐 No internet. Check connection",
+    "serviceError": "⚠️ Service error. Try again",
+    "startSpeaking": "Start speaking..."
   }
 }

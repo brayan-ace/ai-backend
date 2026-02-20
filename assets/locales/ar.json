@@ -40,6 +40,10 @@
     "renameButton": "إعادة تسمية",
     "deleteButton": "حذف",
     "cancelButton": "إلغاء",
+    "okButton": "حسناً",
+    "deleteConfirmTitle": "هل تريد حذف الدردشة؟",
+    "deleteConfirmMessage": "سيؤدي هذا إلى حذف الدردشة بشكل دائم. لا يمكنك التراجع عن هذا الإجراء.",
+    "doNotShowAgain": "عدم الظهور مرة أخرى",
     "chatRenamed": "✓ تمت إعادة تسمية الدردشة",
     "renameError": "خطأ في إعادة التسمية: {error}",
     "deleteError": "خطأ في الحذف: {error}"
@@ -390,5 +394,22 @@
     "satEnglish": "SAT - الإنجليزية",
     "gceMathematics": "GCE - الرياضيات",
     "gceEnglish": "GCE - الإنجليزية"
+  },
+  "voiceInput": {
+    "tapToRecord": "🎙️ اضغط للتسجيل",
+    "listening": "🎙️ جاري الاستماع...",
+    "done": "تم!",
+    "error": "خطأ",
+    "tapToRetry": "🎙️ اضغط للمحاولة مجددا",
+    "permissionNeeded": "🔒 الإذن مطلوب\nالإعدادات > التطبيق > الأذونات",
+    "micPermissionRequired": "🔒 إذن الميكروفون مطلوب\nافتح الإعدادات > التطبيق > الأذونات",
+    "initError": "خطأ في الإشتغيل",
+    "recordingFailed": "فشل بدء التسجيل",
+    "recordingFailedToStop": "فشل إيقاف التسجيل",
+    "couldNotUnderstand": "🔇 لم يتمكن من الفهم. تحدث بوضوح أكثر",
+    "serverTimeout": "⏱️ الخادم بطيء. حاول مجددا في 10 ثانية",
+    "noInternet": "🌐 لا يوجد إنترنت. تحقق من الاتصال",
+    "serviceError": "⚠️ خطأ الخدمة. حاول مجددا",
+    "startSpeaking": "ابدأ التحدث..."
   }
 }

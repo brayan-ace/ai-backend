@@ -4,6 +4,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../utils/theme.dart';
 import '../utils/theme_provider.dart';
+import 'theme_selection_screen.dart';
+import 'language_selection_screen.dart';
 import '../utils/language_provider.dart';
 import '../utils/app_localizations.dart';
 import '../services/settings_service.dart';
@@ -325,7 +327,7 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                   _tile(
                     context,
                     icon: Icons.palette,
-                    title: AppLocalizations.of(context).t('settings.appTheme'),
+                    title: AppLocalizations.of(context).t('Theme'),
                     subtitle: _colorMode == 'dark'
                         ? AppLocalizations.of(context).t('settings.dark')
                         : AppLocalizations.of(context).t('settings.light'),
@@ -354,16 +356,19 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                         ),
                       ),
                     ),
-                    onTap: () => _showColorModeDialog(),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ThemeSelectionScreen(),
+                      ),
+                    ),
                   ),
                   _buildDivider(),
                   // Notifications Toggle
                   _tile(
                     context,
                     icon: Icons.notifications_active,
-                    title: AppLocalizations.of(
-                      context,
-                    ).t('settings.notifications'),
+                    title: AppLocalizations.of(context).t('notifications'),
                     subtitle: _notificationsEnabled
                         ? 'Notifications are enabled'
                         : 'Notifications are disabled',
@@ -382,7 +387,12 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     title: AppLocalizations.of(context).t('settings.language'),
                     subtitle: _getLanguageSubtitle(),
                     gradient: AppTheme.accentGradient,
-                    onTap: () => _showLanguageDialog(),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => LanguageSelectionScreen(),
+                      ),
+                    ),
                   ),
                   _buildDivider(),
                   // Logout
@@ -410,18 +420,6 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     ).t('settings.capabilities'),
                     subtitle: 'Discover all features',
                     onTap: () => Navigator.pushNamed(context, '/capabilities'),
-                  ),
-                  _buildDivider(),
-                  _tile(
-                    context,
-                    icon: Icons.school_outlined,
-                    title: AppLocalizations.of(
-                      context,
-                    ).t('settings.showOnboarding'),
-                    subtitle: 'See how to use Nexa',
-                    onTap: () {
-                      _showOnboardingConfirmation();
-                    },
                   ),
                 ],
               ),
@@ -476,6 +474,15 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                       'https://www.tiktok.com/@nexa.2035?_r=1&_t=ZM-93F28qgfiV2',
                     ),
                   ),
+                  _buildDivider(),
+                  _tile(
+                    context,
+                    icon: Icons.language,
+                    title: 'Visit Website',
+                    subtitle: 'Explore our website',
+                    onTap: () =>
+                        _launchUrl('https://lucky-granita-36fd10.netlify.app/'),
+                  ),
                 ],
               ),
 
@@ -492,7 +499,9 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     title: AppLocalizations.of(
                       context,
                     ).t('settings.privacyPolicy'),
-                    onTap: () => Navigator.pushNamed(context, '/privacy'),
+                    onTap: () => _launchUrl(
+                      'https://lucky-granita-36fd10.netlify.app/privacy',
+                    ),
                   ),
                   _buildDivider(),
                   _tile(
@@ -501,20 +510,9 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     title: AppLocalizations.of(
                       context,
                     ).t('settings.termsOfService'),
-                    onTap: () async {
-                      // You can add a terms screen later or link to external URL
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            AppLocalizations.of(
-                              context,
-                            ).t('settings.comingSoon'),
-                          ),
-                          backgroundColor: AppTheme.primaryBlue,
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    },
+                    onTap: () => _launchUrl(
+                      'https://lucky-granita-36fd10.netlify.app/terms',
+                    ),
                   ),
                   _buildDivider(),
                   _tile(
@@ -558,7 +556,15 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                 ),
               ],
             ),
-            child: Icon(Icons.stars_rounded, color: Colors.white, size: 60),
+            child: Padding(
+              padding: EdgeInsets.all(8),
+              child: ClipOval(
+                child: Image.asset(
+                  'assets/images/app_icon.jpg',
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
           ),
           SizedBox(height: AppTheme.spaceMd),
           Text(
@@ -979,111 +985,6 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
           ),
         );
       },
-    );
-  }
-
-  void _showColorModeDialog() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        return AlertDialog(
-          backgroundColor: isDark
-              ? AppTheme.surfaceElevated
-              : Color(0xFFFFFFFF),
-          surfaceTintColor: isDark ? null : Color(0xFFFFFFFF),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-            side: BorderSide(
-              color: isDark ? AppTheme.surfaceElevated : Color(0xFFE5E7EB),
-              width: 1,
-            ),
-          ),
-          title: Text(
-            AppLocalizations.of(context).t('settings.colorMode'),
-            style: AppTheme.headlineMedium.copyWith(
-              color: isDark ? AppTheme.textPrimary : Color(0xFF000000),
-            ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildColorOption(
-                AppLocalizations.of(context).t('settings.light'),
-                'light',
-                Icons.light_mode,
-                isDark,
-              ),
-              SizedBox(height: AppTheme.spaceSm),
-              _buildColorOption(
-                AppLocalizations.of(context).t('settings.dark'),
-                'dark',
-                Icons.dark_mode,
-                isDark,
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildColorOption(
-    String label,
-    String value,
-    IconData icon,
-    bool isDark,
-  ) {
-    final isSelected = _colorMode == value;
-    return InkWell(
-      onTap: () {
-        _setColorMode(value);
-        Navigator.pop(context);
-      },
-      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-      child: Container(
-        padding: EdgeInsets.all(AppTheme.spaceMd),
-        decoration: BoxDecoration(
-          gradient: isSelected
-              ? LinearGradient(colors: AppTheme.primaryGradient)
-              : LinearGradient(
-                  colors: isDark
-                      ? AppTheme.surfaceGradient
-                      : [Color(0xFFF3F4F6), Color(0xFFF9FAFB)],
-                ),
-          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-          border: Border.all(
-            color: isSelected
-                ? AppTheme.primaryBlue
-                : (isDark ? AppTheme.surfaceElevated : Color(0xFFE5E7EB)),
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              color: isSelected
-                  ? Colors.white
-                  : (isDark ? AppTheme.textPrimary : Color(0xFF1F2937)),
-              size: 24,
-            ),
-            SizedBox(width: AppTheme.spaceMd),
-            Text(
-              label,
-              style: AppTheme.bodyLarge.copyWith(
-                color: isSelected
-                    ? Colors.white
-                    : (isDark ? AppTheme.textPrimary : Color(0xFF000000)),
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
-            Spacer(),
-            if (isSelected)
-              Icon(Icons.check_circle, color: Colors.white, size: 20),
-          ],
-        ),
-      ),
     );
   }
 

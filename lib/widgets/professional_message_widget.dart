@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import '../utils/theme.dart';
@@ -296,6 +297,11 @@ class ProfessionalMessageWidget extends StatelessWidget {
         text.contains('\n') &&
         RegExp(r'\|[^\n]+\|').hasMatch(text);
 
+    // If it's a table, render it as a proper styled table
+    if (isTable) {
+      return _buildStyledTable(text, context);
+    }
+
     final spans = _parseInlineContent(text, context);
 
     final textWidget = SelectableText.rich(
@@ -311,20 +317,184 @@ class ProfessionalMessageWidget extends StatelessWidget {
       ),
     );
 
-    // Wrap tables in horizontal scroll
-    if (isTable) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12.0),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: textWidget,
-        ),
-      );
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3.0),
+      child: textWidget,
+    );
+  }
+
+  /// Build a beautifully styled markdown table
+  /// Parses markdown table format and renders as a professional table with
+  /// headers, borders, alternating row colors, and proper alignment
+  Widget _buildStyledTable(String content, BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final lines = content
+        .split('\n')
+        .where((l) => l.trim().isNotEmpty)
+        .toList();
+
+    if (lines.isEmpty) return SizedBox.shrink();
+
+    // Parse table rows
+    final List<List<String>> rows = [];
+
+    for (final line in lines) {
+      if (line.contains('|')) {
+        // Skip the separator line (|----|)
+        if (RegExp(r'^\s*\|\s*[-:\s]+\|\s*$').hasMatch(line)) {
+          continue;
+        }
+
+        // Parse cells
+        final cells = line
+            .split('|')
+            .where((c) => c.isNotEmpty)
+            .map((c) => c.trim())
+            .toList();
+
+        if (cells.isNotEmpty) {
+          rows.add(cells);
+        }
+      }
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12.0),
-      child: textWidget,
+    if (rows.isEmpty) return SizedBox.shrink();
+
+    // Calculate column widths
+    final List<double> columnWidths = [];
+    for (int i = 0; i < (rows.isNotEmpty ? rows[0].length : 0); i++) {
+      double maxWidth = 0;
+      for (final row in rows) {
+        if (i < row.length) {
+          final cellWidth = (row[i].length * 8.0).clamp(80.0, 300.0);
+          maxWidth = max(maxWidth, cellWidth);
+        }
+      }
+      columnWidths.add(maxWidth);
+    }
+
+    // Build table UI
+    return Container(
+      margin: EdgeInsets.symmetric(vertical: 16.0),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark
+              ? AppTheme.surfaceElevated.withOpacity(0.3)
+              : Color(0xFFE5E7EB),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (int rowIndex = 0; rowIndex < rows.length; rowIndex++)
+                _buildTableRow(
+                  rows[rowIndex],
+                  columnWidths: columnWidths,
+                  isHeader: rowIndex == 0,
+                  isDark: isDark,
+                  isLastRow: rowIndex == rows.length - 1,
+                  context: context,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Build a single table row with styled cells
+  Widget _buildTableRow(
+    List<String> cells, {
+    required List<double> columnWidths,
+    required bool isHeader,
+    required bool isDark,
+    required bool isLastRow,
+    required BuildContext context,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isHeader
+            ? (isDark
+                  ? AppTheme.primaryBlue.withOpacity(0.2)
+                  : AppTheme.primaryBlue.withOpacity(0.1))
+            : (isDark
+                  ? AppTheme.surfaceElevated.withOpacity(0.05)
+                  : Colors.white),
+        border: Border(
+          bottom: BorderSide(
+            color: isDark
+                ? AppTheme.surfaceElevated.withOpacity(0.2)
+                : Color(0xFFE5E7EB),
+            width: isLastRow ? 0 : 1,
+          ),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (int i = 0; i < cells.length; i++)
+            Container(
+              width: i < columnWidths.length ? columnWidths[i] : 100,
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                border: Border(
+                  right: BorderSide(
+                    color: isDark
+                        ? AppTheme.surfaceElevated.withOpacity(0.2)
+                        : Color(0xFFE5E7EB),
+                    width: i < cells.length - 1 ? 1 : 0,
+                  ),
+                ),
+              ),
+              child: _buildTableCell(
+                cells[i],
+                isHeader: isHeader,
+                isDark: isDark,
+                context: context,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Build a table cell with plain text (no markdown, asterisks removed)
+  Widget _buildTableCell(
+    String cellText, {
+    required bool isHeader,
+    required bool isDark,
+    required BuildContext context,
+  }) {
+    // Remove markdown symbols from cell text for clean display
+    String cleanText = cellText
+        .replaceAll(RegExp(r'\*\*'), '') // Remove bold markers (**)
+        .replaceAll(RegExp(r'\*'), '') // Remove italic markers (*)
+        .replaceAll(RegExp(r'`'), '') // Remove code markers (`)
+        .replaceAll(RegExp(r'\$'), ''); // Remove LaTeX markers ($)
+
+    return Text(
+      cleanText,
+      style: TextStyle(
+        fontSize: 14,
+        fontWeight: isHeader ? FontWeight.w600 : FontWeight.w400,
+        color: isDark
+            ? (isHeader ? AppTheme.textPrimary : AppTheme.textSecondary)
+            : (isHeader ? AppTheme.primaryBlue : Color(0xFF374151)),
+        height: 1.5,
+      ),
     );
   }
 
@@ -551,18 +721,31 @@ class ProfessionalMessageWidget extends StatelessWidget {
     return content.length > 1;
   }
 
-  /// Build inline LaTeX widget with horizontal scroll support for long equations
-  /// This prevents overflow errors on portrait mode and long expressions
+  /// Build inline LaTeX widget with dual-axis scroll support for long equations
+  /// Build inline LaTeX widget with dual-axis scroll support for long equations
+  /// Premium enhancement: Supports both horizontal scrolling (for equation width)
+  /// and vertical scrolling (for multi-line expressions) to maintain reading flow
+  /// CRITICAL: Has explicit constraints to enable vertical scrolling capability
   Widget _buildInlineLatexWidget(String mathContent, bool isDark) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 2, vertical: 0),
-        child: _buildLatexWithFallback(
-          mathContent,
-          isDark,
-          fontSize: 15,
-          isInline: true,
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight:
+            250, // Allow inline math to scroll vertically up to 250 logical pixels
+        minHeight: 30,
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.vertical,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 2, vertical: 0),
+            child: _buildLatexWithFallback(
+              mathContent,
+              isDark,
+              fontSize: 15,
+              isInline: true,
+            ),
+          ),
         ),
       ),
     );
@@ -598,46 +781,50 @@ class ProfessionalMessageWidget extends StatelessWidget {
         onErrorFallback: (error) {
           // Graceful fallback: render as code box when LaTeX parsing fails
           // This prevents crashes on malformed LaTeX while showing formatted content
+          // With dual-axis scrolling support for better user experience
           return SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: isInline ? 6 : 14,
-                vertical: isInline ? 3 : 10,
-              ),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? AppTheme.surfaceElevated.withOpacity(0.2)
-                    : Color(0xFFF0F9FF),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: isDark
-                      ? AppTheme.primaryBlue.withOpacity(0.2)
-                      : Color(0xFF93C5FD),
-                  width: 1,
+            scrollDirection: Axis.vertical,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isInline ? 6 : 14,
+                  vertical: isInline ? 3 : 10,
                 ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.calculate_outlined,
-                    size: isInline ? 14 : 16,
-                    color: AppTheme.primaryBlue,
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? AppTheme.surfaceElevated.withOpacity(0.2)
+                      : Color(0xFFF0F9FF),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isDark
+                        ? AppTheme.primaryBlue.withOpacity(0.2)
+                        : Color(0xFF93C5FD),
+                    width: 1,
                   ),
-                  SizedBox(width: isInline ? 4 : 8),
-                  Text(
-                    '[Math: Formula too complex to display]',
-                    style: TextStyle(
-                      fontSize: isInline ? 12 : 14,
-                      color: isDark
-                          ? AppTheme.textSecondary
-                          : Color(0xFF1E40AF),
-                      fontFamily: 'monospace',
-                      letterSpacing: 0.3,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.calculate_outlined,
+                      size: isInline ? 14 : 16,
+                      color: AppTheme.primaryBlue,
                     ),
-                  ),
-                ],
+                    SizedBox(width: isInline ? 4 : 8),
+                    Text(
+                      '[Math: Formula too complex to display]',
+                      style: TextStyle(
+                        fontSize: isInline ? 12 : 14,
+                        color: isDark
+                            ? AppTheme.textSecondary
+                            : Color(0xFF1E40AF),
+                        fontFamily: 'monospace',
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           );
@@ -646,44 +833,48 @@ class ProfessionalMessageWidget extends StatelessWidget {
     } catch (e) {
       // Emergency fallback if Math.tex throws an exception
       // Prevents app crash on unexpected LaTeX errors
+      // With dual-axis scrolling for better content browsing
       return SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: isInline ? 6 : 14,
-            vertical: isInline ? 3 : 10,
-          ),
-          decoration: BoxDecoration(
-            color: isDark
-                ? Color(0xFF7F1D1D).withOpacity(0.2)
-                : Color(0xFFFEF2F2),
-            border: Border.all(
-              color: isDark
-                  ? Color(0xFFDC2626).withOpacity(0.3)
-                  : Color(0xFFFECACA),
-              width: 1,
+        scrollDirection: Axis.vertical,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: isInline ? 6 : 14,
+              vertical: isInline ? 3 : 10,
             ),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.warning_outlined,
-                size: isInline ? 14 : 16,
-                color: isDark ? Color(0xFFFCA5A5) : Color(0xFFDC2626),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Color(0xFF7F1D1D).withOpacity(0.2)
+                  : Color(0xFFFEF2F2),
+              border: Border.all(
+                color: isDark
+                    ? Color(0xFFDC2626).withOpacity(0.3)
+                    : Color(0xFFFECACA),
+                width: 1,
               ),
-              SizedBox(width: isInline ? 4 : 8),
-              Text(
-                '[Math rendering error]',
-                style: TextStyle(
-                  fontSize: isInline ? 12 : 14,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.warning_outlined,
+                  size: isInline ? 14 : 16,
                   color: isDark ? Color(0xFFFCA5A5) : Color(0xFFDC2626),
-                  fontFamily: 'monospace',
-                  letterSpacing: 0.3,
                 ),
-              ),
-            ],
+                SizedBox(width: isInline ? 4 : 8),
+                Text(
+                  '[Math rendering error]',
+                  style: TextStyle(
+                    fontSize: isInline ? 12 : 14,
+                    color: isDark ? Color(0xFFFCA5A5) : Color(0xFFDC2626),
+                    fontFamily: 'monospace',
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -898,8 +1089,11 @@ class ProfessionalMessageWidget extends StatelessWidget {
     );
   }
 
-  /// Build math block (display mode) with enhanced styling and horizontal scroll support
-  /// Prevents overflow errors on long equations in portrait mode
+  /// Build math block (display mode) with dual-axis scrolling support
+  /// Premium feature: Allows vertical scrolling for multi-step solutions and
+  /// horizontal scrolling for long equations within the same box
+  /// This keeps the solution flow connected while handling equation length
+  /// CRITICAL: Has explicit constraints to enable vertical scrolling capability
   Widget _buildMathBlock(String content, BuildContext context) {
     final math = content
         .replaceAll(RegExp(r'^\$\$'), '')
@@ -911,7 +1105,10 @@ class ProfessionalMessageWidget extends StatelessWidget {
 
     return Container(
       margin: EdgeInsets.symmetric(vertical: 16.0),
-      padding: EdgeInsets.all(18.0),
+      constraints: BoxConstraints(
+        maxHeight: 400, // Allow scrolling up to 400 logical pixels vertically
+        minHeight: 60,
+      ),
       decoration: BoxDecoration(
         color: isDark
             ? AppTheme.surfaceElevated.withOpacity(0.08)
@@ -931,16 +1128,25 @@ class ProfessionalMessageWidget extends StatelessWidget {
           ),
         ],
       ),
-      // Wrap in SingleChildScrollView with horizontal scroll capability
-      // This allows long equations to scroll horizontally on small screens
+      // Dual-axis scrolling: vertical for solution flow, horizontal for long equations
+      // This creates a premium experience where users can:
+      // 1. Scroll vertically to see the full solution/multi-step process
+      // 2. Scroll horizontally to see long equations that exceed screen width
+      // The nested SingleChildScrollView allows independent control on both axes
       child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Center(
-          child: _buildLatexWithFallback(
-            math,
-            isDark,
-            fontSize: 18,
-            isInline: false,
+        scrollDirection: Axis.vertical,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Padding(
+            padding: EdgeInsets.all(18.0),
+            child: Center(
+              child: _buildLatexWithFallback(
+                math,
+                isDark,
+                fontSize: 18,
+                isInline: false,
+              ),
+            ),
           ),
         ),
       ),

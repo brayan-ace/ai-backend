@@ -382,7 +382,7 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
         // Action buttons attached directly to AI message bubble
         if (!widget.fromUser && !widget.text.contains('Welcome —'))
           Padding(
-            padding: EdgeInsets.only(left: 16, top: 12, bottom: 12, right: 16),
+            padding: EdgeInsets.only(left: 16, top: 3, bottom: 6, right: 16),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
@@ -393,13 +393,13 @@ class _AiMessageBubbleState extends State<AiMessageBubble> {
                     messageText: widget.text,
                     isAiMessage: true,
                   ),
-                  SizedBox(width: 8),
+                  SizedBox(width: 16),
                   _buildCopyButton(),
-                  SizedBox(width: 8),
+                  SizedBox(width: 16),
                   _buildReactionButton('👍', Icons.thumb_up_rounded),
-                  SizedBox(width: 8),
+                  SizedBox(width: 16),
                   _buildReactionButton('👎', Icons.thumb_down_rounded),
-                  SizedBox(width: 8),
+                  SizedBox(width: 16),
                   _buildRegenerateButton(),
                 ],
               ),

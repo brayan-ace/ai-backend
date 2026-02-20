@@ -69,32 +69,10 @@ void main() async {
     print('Firebase initialization skipped or failed: $e');
   }
 
-  // Initialize premium services
-  try {
-    await PushNotificationService().initialize();
-    await AnalyticsService().initialize();
-    await GamificationService().initialize();
-    await StudyActivityService().initialize();
-    await StudyNotificationService().initialize();
-    await TextToSpeechService().initialize();
-
-    // Record app open to increment streak
-    final appOpenData = await StudyActivityService().recordAppOpen();
-
-    // Send notification if streak incremented
-    if (appOpenData.streakIncremented) {
-      await PushNotificationService().sendStreakNotification(
-        appOpenData.currentStreak,
-      );
-    }
-
-    // Schedule daily notifications
-    await StudyNotificationService().scheduleDailyReminder();
-
-    print('[Main] ✅ Premium services initialized');
-  } catch (e) {
-    print('[Main] ⚠️ Premium services initialization failed: $e');
-  }
+  // Defer non-critical service initialization to run after UI appears
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    _initializeBackgroundServices();
+  });
 
   runApp(
     MultiProvider(
@@ -105,6 +83,40 @@ void main() async {
       child: const MyApp(),
     ),
   );
+}
+
+Future<void> _initializeBackgroundServices() async {
+  try {
+    await PushNotificationService().initialize();
+    await AnalyticsService().initialize();
+    await GamificationService().initialize();
+    await StudyActivityService().initialize();
+    await StudyNotificationService().initialize();
+    await TextToSpeechService().initialize();
+
+    // Record app open to increment streak (calendar day based)
+    final appOpenData = await StudyActivityService().recordAppOpen();
+
+    // Send notifications if streak incremented
+    if (appOpenData.streakIncremented) {
+      // Send major milestone notifications (7, 30, 100 days)
+      await PushNotificationService().sendStreakNotification(
+        appOpenData.currentStreak,
+      );
+
+      // Send milestone notifications (3-day, 7-day)
+      await StudyNotificationService().notifyStreakMilestone(
+        appOpenData.currentStreak,
+      );
+    }
+
+    // Schedule UNCONDITIONAL daily reminders (6 AM and 6 PM every day)
+    await StudyNotificationService().scheduleDailyReminder();
+
+    print('[Main] ✅ Premium services initialized');
+  } catch (e) {
+    print('[Main] ⚠️ Premium services initialization failed: $e');
+  }
 }
 
 class MyApp extends StatelessWidget {
