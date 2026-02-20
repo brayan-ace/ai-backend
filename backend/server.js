@@ -479,6 +479,28 @@ async function searchTopicOnline(topic, gradeLevel) {
   }
 }
 
+/**
+ * Strip all URLs and http/https links from text
+ * This removes inline URLs and markdown links while preserving the rest of the content
+ */
+function stripUrlsFromText(text) {
+  if (!text) return text;
+
+  // Remove markdown links [text](url) - do this FIRST
+  let cleaned = text.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
+
+  // Remove http/https URLs
+  cleaned = cleaned.replace(/https?:\/\/[^\s)\]]+/g, "");
+
+  // Remove www. links (including multi-part domains)
+  cleaned = cleaned.replace(/www\.[^\s)]+/g, "");
+
+  // Clean up multiple spaces left by removed URLs
+  cleaned = cleaned.replace(/\s+/g, " ").trim();
+
+  return cleaned;
+}
+
 async function enhanceSearchResultsWithAI(
   query,
   searchResults,
@@ -486,54 +508,80 @@ async function enhanceSearchResultsWithAI(
   selectedModel = "groq",
 ) {
   try {
-    // Extract just the text content from Exa results for cleaner formatting
-    const exaResultsText = searchResults.results
-      ? searchResults.results
-          .slice(0, 5)
-          .map(
-            (r, idx) =>
-              `**Source ${idx + 1}: ${r.title}**\nURL: ${r.url}\n${r.text || r.summary || ""}`,
-          )
-          .join("\n\n---\n\n")
-      : JSON.stringify(searchResults, null, 2);
+    console.log(
+      "[AI Enhancement] Starting enhancement with model:",
+      selectedModel,
+    );
+    console.log(
+      "[AI Enhancement] searchResults keys:",
+      Object.keys(searchResults),
+    );
+
+    // CASE 1: Exa provides answerText (pre-synthesized answer with links)
+    // Strip URLs and use as context/reference for AI model
+    let contextFromExa = "";
+    if (searchResults.answerText) {
+      console.log("[AI Enhancement] Found answerText from Exa, stripping URLs");
+      contextFromExa = stripUrlsFromText(searchResults.answerText);
+      console.log(
+        "[AI Enhancement] Context after URL stripping:",
+        contextFromExa.substring(0, 200),
+      );
+    }
+    // CASE 2: Exa provides results array (fallback)
+    else if (searchResults.results && Array.isArray(searchResults.results)) {
+      console.log("[AI Enhancement] Found results array, extracting text");
+      contextFromExa = searchResults.results
+        .slice(0, 5)
+        .map(
+          (r, idx) =>
+            `**Source ${idx + 1}: ${r.title}**\n${r.text || r.summary || ""}`,
+        )
+        .join("\n\n---\n\n");
+      // Strip URLs from results too
+      contextFromExa = stripUrlsFromText(contextFromExa);
+    }
+    // CASE 3: Last resort - stringify (shouldn't happen now)
+    else {
+      console.log("[AI Enhancement] No answerText or results, using fallback");
+      contextFromExa = JSON.stringify(searchResults, null, 2);
+    }
 
     // Build conversation context if available
     let conversationContext = "";
     if (conversationMessages && conversationMessages.length > 0) {
       const recentMessages = conversationMessages.slice(-6);
-      conversationContext = `\n\n**CONVERSATION HISTORY:**\n${recentMessages
-        .map((m) => `**${m.role.toUpperCase()}:** ${m.content}`)
-        .join("\n\n")}`;
+      conversationContext = `\n\nRecent conversation:\n${recentMessages
+        .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
+        .join("\n")}`;
     }
 
-    // Create the smart prompt template for beautiful synthesis WITHOUT sources
-    const prompt = `You have access to recent web search information about this topic:
+    // Create prompt: Exa context + conversation history + user question -> AI answers with detail
+    const prompt = `You are a helpful AI assistant. You have access to recent information about the topic below.
+
+**Recent Information (from web search):**
+${contextFromExa}
+${conversationContext}
 
 **User's Question:** "${query}"
 
-**Web Search Context:**
-${exaResultsText}
-${conversationContext}
-
 ---
 
-**Your Task - IMPORTANT:**
-Synthesize the information above into a beautiful, natural, conversational response. 
+**Your Task:**
+Using the information above AND your training knowledge, answer the user's question with helpful detail.
 
-CRITICAL RULES:
-1. Do NOT include URLs, links, or source citations in your response
-2. Do NOT use phrases like "According to", "Source says", or "Wikipedia states"
-3. Do NOT mention source numbers or attribution
-4. Write as if you naturally know this information from your training
-5. Focus on being helpful, conversational, and directly answering the question
-6. Use the context from the conversation to make your answer relevant
-7. Make it flow naturally - no lists unless specifically asked
-8. If you have multiple pieces of information, weave them together naturally
+Guidelines:
+1. Do NOT include URLs or links in your answer
+2. Use the context as a reference to provide accurate, up-to-date information
+3. Combine the context with your knowledge to give a detailed, natural response
+4. Answer conversationally - don't cite sources or say "According to..."
+5. If you have conversation history, make your answer relevant to the discussion
+6. Focus on being helpful and directly addressing the question
 
-Just provide a beautiful, natural response to the question:`;
+Provide a detailed, helpful answer:`;
 
     const systemPrompt =
-      "You are an expert conversational assistant. Your strength is taking raw web search results and synthesizing them into beautiful, natural, engaging responses that directly address the user's question while considering their conversation context. You provide accurate information with proper attribution.";
+      "You are an expert conversational AI assistant. Your role is to help users by combining recent web search information with your training knowledge to provide detailed, accurate, and helpful answers. Always be conversational and natural - never cite sources or mention where information comes from. Focus on being useful and directly addressing what the user asks.";
 
     const normalizedModel = (selectedModel || "groq").toLowerCase().trim();
 
@@ -3419,14 +3467,21 @@ app.post("/api/ask", async (req, res) => {
 
             console.log(`[Web Search] ✅ SUCCESS! Got answer from Exa`);
 
-            // /answer endpoint returns synthesized answer directly - no need for additional AI enhancement
+            // Send Exa answer to AI model to remove links and synthesize into pure response
             const exaAnswer = resp.data.answer || resp.data;
+
+            const enhancedAnswer = await enhanceSearchResultsWithAI(
+              originalQuery,
+              { answerText: exaAnswer }, // Convert to format AI enhancement expects
+              conversationMessages,
+              data.model || data.provider || "groq",
+            );
 
             return res.json({
               provider: "exa",
               results: resp.data,
-              reply: exaAnswer,
-              enhancedAnswer: exaAnswer,
+              reply: enhancedAnswer || exaAnswer,
+              enhancedAnswer: enhancedAnswer || exaAnswer,
               originalQuery: originalQuery,
               enhancedQuery: enhancedSearchQuery,
               timestamp: new Date().toISOString(),
@@ -4264,14 +4319,21 @@ Don't just dump information—guide them through it. Make it click.`;
             },
           );
 
-          // /answer endpoint returns synthesized answer directly - no need for additional AI enhancement
+          // Send Exa answer to AI model to remove links and synthesize into pure response
           const exaAnswer = resp.data.answer || resp.data;
+
+          const enhancedAnswer = await enhanceSearchResultsWithAI(
+            originalQuery,
+            { answerText: exaAnswer }, // Convert to format AI enhancement expects
+            conversationMessages,
+            data.model || data.provider || "groq",
+          );
 
           return res.json({
             provider: "exa",
             results: resp.data,
-            reply: exaAnswer,
-            enhancedAnswer: exaAnswer,
+            reply: enhancedAnswer || exaAnswer,
+            enhancedAnswer: enhancedAnswer || exaAnswer,
             originalQuery: originalQuery,
             enhancedQuery: enhancedSearchQuery,
             timestamp: new Date().toISOString(),
