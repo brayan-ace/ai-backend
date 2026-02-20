@@ -513,27 +513,31 @@ async function enhanceSearchResultsWithAI(
         .join("\n\n")}`;
     }
 
-    // Create the smart prompt template - exactly as user requested
-    const prompt = `**User's Question:** "${query}"
+    // Create the smart prompt template for beautiful synthesis WITHOUT sources
+    const prompt = `You have access to recent web search information about this topic:
 
-**Search Type:** This question required web search to get current, accurate information.
+**User's Question:** "${query}"
 
-**Web Search Results from Exa:**
+**Web Search Context:**
 ${exaResultsText}
 ${conversationContext}
 
 ---
 
-**Your Task:**
-Using the conversation history to understand the context and what the user has been discussing, please:
-1. Synthesize these web search results into a beautiful, natural, conversational response
-2. Answer the user's question directly and clearly
-3. Reference the sources when appropriate (use inline citations like "According to [Source 1]...")
-4. Make it flow naturally - don't just list the search results
-5. Consider what the user was discussing before to provide relevant context
-6. Use markdown formatting to make it easy to read
+**Your Task - IMPORTANT:**
+Synthesize the information above into a beautiful, natural, conversational response. 
 
-Now, please draft a comprehensive and beautiful response:`;
+CRITICAL RULES:
+1. Do NOT include URLs, links, or source citations in your response
+2. Do NOT use phrases like "According to", "Source says", or "Wikipedia states"
+3. Do NOT mention source numbers or attribution
+4. Write as if you naturally know this information from your training
+5. Focus on being helpful, conversational, and directly answering the question
+6. Use the context from the conversation to make your answer relevant
+7. Make it flow naturally - no lists unless specifically asked
+8. If you have multiple pieces of information, weave them together naturally
+
+Just provide a beautiful, natural response to the question:`;
 
     const systemPrompt =
       "You are an expert conversational assistant. Your strength is taking raw web search results and synthesizing them into beautiful, natural, engaging responses that directly address the user's question while considering their conversation context. You provide accurate information with proper attribution.";
