@@ -1650,7 +1650,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
         }
       }
 
-      // Check if question needs web search
+      // Check if question needs web search based on keywords
       final questionNeedsSearch = _questionNeedsWebSearch(prompt);
 
       // Track if we auto-enabled for this request
@@ -1672,7 +1672,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
       }
 
       // Determine if web search should be used
-      final shouldUseWebSearch = _webSearchEnabled && questionNeedsSearch;
+      // If user manually toggled ON, respect that choice regardless of keywords
+      // If user toggles OFF, only auto-enable based on keyword detection
+      final shouldUseWebSearch = _webSearchEnabled;
 
       final input = {
         'messages': convo, // Always include conversation history

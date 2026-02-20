@@ -3370,10 +3370,7 @@ app.post("/api/ask", async (req, res) => {
             userId: data.userId,
             model: data.model || data.provider || "groq",
           };
-          // Execute search case logic
-          type = "search";
-          // Fall through to search case
-          // We'll use a workaround by setting type and letting it fall through
+          // Execute search case logic INLINE (don't reassign const type)
           const EXA_KEY = process.env.EXA_API_KEY;
           if (!EXA_KEY) {
             console.error(
