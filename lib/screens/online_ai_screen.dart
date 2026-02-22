@@ -2560,9 +2560,13 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                   thickness: 0.5,
                 ),
 
-                Expanded(
-                  child: SingleChildScrollView(
+                SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(ctx).size.height * 0.6,
+                    ),
                     child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Padding(
                           padding: EdgeInsets.symmetric(
