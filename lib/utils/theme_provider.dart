@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'theme.dart';
 
 class ThemeProvider extends ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.dark;
   double _textScaleFactor = 1.0;
+  String _fontFamily = 'Roboto';
 
   ThemeMode get themeMode => _themeMode;
   double get textScaleFactor => _textScaleFactor;
+  String get fontFamily => _fontFamily;
 
   ThemeProvider() {
     _loadFromPreferences();
@@ -16,6 +19,7 @@ class ThemeProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final themeModeStr = prefs.getString('theme_mode') ?? 'dark';
     _textScaleFactor = prefs.getDouble('text_size') ?? 1.0;
+    _fontFamily = prefs.getString('font_family') ?? 'Roboto';
 
     switch (themeModeStr) {
       case 'light':
@@ -30,6 +34,9 @@ class ThemeProvider extends ChangeNotifier {
       default:
         _themeMode = ThemeMode.dark;
     }
+
+    // Update AppTheme's current font family
+    AppTheme.updateFontFamily(_fontFamily);
 
     notifyListeners();
   }
@@ -57,6 +64,14 @@ class ThemeProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('text_size', scale);
     _textScaleFactor = scale;
+    notifyListeners();
+  }
+
+  Future<void> setFontFamily(String fontFamily) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('font_family', fontFamily);
+    _fontFamily = fontFamily;
+    AppTheme.updateFontFamily(fontFamily);
     notifyListeners();
   }
 }

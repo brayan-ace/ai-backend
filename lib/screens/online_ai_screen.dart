@@ -1132,6 +1132,8 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
     setState(() {
       _currentStatusMessage = hasImage
           ? 'Analyzing image...'
+          : _webSearchEnabled
+          ? 'Searching the web...'
           : 'Generating response...';
       _messages.add(_Message(text: '', fromUser: false, isTyping: true));
     });
@@ -1315,6 +1317,8 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
       }
       _currentStatusMessage = userImage != null
           ? 'Analyzing image...'
+          : _webSearchEnabled
+          ? 'Searching the web...'
           : 'Regenerating response...';
       _messages.add(_Message(text: '', fromUser: false, isTyping: true));
     });
@@ -1427,53 +1431,116 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
     });
   }
 
-  bool _shouldSuggestWebSearch(String response, String query) {
-    final lowerResponse = response.toLowerCase();
-
-    if (lowerResponse.contains('don\'t have') ||
-        lowerResponse.contains('cannot provide') ||
-        lowerResponse.contains('do not have information') ||
-        lowerResponse.contains('my knowledge was last updated') ||
-        lowerResponse.contains('as of my last update') ||
-        lowerResponse.contains('i don\'t have access')) {
-      return true;
-    }
-
-    return _webSearchService.shouldSuggestWebSearch(query);
-  }
-
   /// Intelligent web search detection: determines if a question needs recent information
   /// This analyzes the user's query to decide if web search is necessary
   /// Returns true only if the question implies a need for current/recent data
   bool _questionNeedsWebSearch(String userQuery) {
     final lower = userQuery.toLowerCase().trim();
 
-    // Keywords that indicate need for current information
+    // Keywords that indicate need for current information (EXPANDED to 120+ keywords)
     final recentInfoKeywords = [
-      // Time-based
-      'today', 'tomorrow', 'tonight', 'now', 'currently', 'latest',
-      'recent', 'this week', 'this month', 'this year',
-      'yesterday', 'last week', 'last month',
-      // News/Events
-      'news', 'breaking', 'trending', 'viral', 'happening',
-      'announced', 'released', 'launched',
-      // Prices/Stocks
-      'price', 'cost', 'stock', 'bitcoin', 'crypto', 'exchange rate',
-      'usd', 'eur', 'gbp', 'market', 'investment',
-      // Weather/Location-based
-      'weather', 'temperature', 'forecast', 'climate',
-      'location', 'nearby', 'where',
-      // Live events
-      'live', 'happening now', 'schedule', 'match', 'game',
-      // Updates
-      'update', 'version', 'release', 'new', 'new features',
-      'improvement', 'patch',
+      // Time-based (current, recent, upcoming)
+      'today',
+      'tomorrow',
+      'tonight',
+      'now',
+      'currently',
+      'latest',
+      'recent',
+      'right now',
+      'this week',
+      'this month',
+      'this year',
+      'next week',
+      'next month',
+      'next year',
+      'yesterday',
+      'last week',
+      'last month',
+      'last year',
+      'past week',
+      'past month',
+      'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august',
+      'september', 'october', 'november', 'december', '2024', '2025', '2026',
+      // News/Events/Breaking
+      'news',
+      'breaking',
+      'trending',
+      'viral',
+      'happening',
+      'announced',
+      'released',
+      'launched',
+      'breaking news',
+      'just happened',
+      'just announced',
+      'recent news',
+      'reported', 'according to', 'latest news', 'press release', 'headline',
+      // Prices/Stocks/Finance
+      'price', 'cost', 'stock', 'bitcoin', 'crypto', 'exchange rate', 'rate',
+      'usd', 'eur', 'gbp', 'market', 'investment', 'ipo', 'earnings', 'revenue',
+      'profit', 'loss', 'stock price', 'cryptocurrency', 'ethereum', 'dogecoin',
+      'trading', 'forex', 'commodities', 'oil price', 'gas price',
+      // Weather/Location/Travel
+      'weather', 'temperature', 'forecast', 'climate', 'rain', 'snow', 'sunny',
+      'location',
+      'nearby',
+      'where',
+      'how to get',
+      'directions',
+      'travel',
+      'flight',
+      'hotel',
+      'restaurant',
+      'flight prices',
+      'hotel prices',
+      'flights available',
+      // Live events/Entertainment
+      'live', 'happening now', 'schedule', 'match', 'game', 'concert', 'event',
+      'streaming',
+      'broadcast',
+      'air time',
+      'airing',
+      'movie times',
+      'show times',
+      'playing now', 'on air', 'opening this', 'premieres', 'coming soon',
+      // Updates/Releases/Versions
+      'update',
+      'version',
+      'release',
+      'new',
+      'new features',
+      'new release',
+      'update available',
+      'improvement',
+      'patch',
+      'upgrade',
+      'latest version',
+      'current version',
+      'newest',
+      'feature launch', 'product launch', 'beta', 'alpha',
       // Sports
-      'score', 'result', 'standings', 'league', 'match', 'tournament',
-      // People/Fame
-      'dead', 'died', 'still alive', 'recent interview',
-      // Specific dates
-      '2024', '2025', '2026',
+      'score', 'result', 'standings', 'league', 'tournament', 'match', 'game',
+      'win', 'loss', 'championship', 'playoffs', 'season', 'draft', 'trade',
+      'team', 'player stats', 'performance', 'won', 'loses',
+      // People/Celebrities/Politics
+      'dead', 'died', 'death', 'still alive', 'recent interview', 'politician',
+      'president', 'election', 'candidate', 'celebrity', 'famous', 'person who',
+      'where is', 'what happened to', 'current', 'is alive',
+      // Science/Research
+      'research',
+      'study',
+      'discovery',
+      'breakthrough',
+      'experiment',
+      'clinical trial',
+      'nasa', 'space', 'covid', 'vaccine', 'medical', 'disease', 'cure',
+      // Current events/Culture
+      'festival', 'holiday', 'celebration', 'event', 'awards', 'ceremony',
+      'oscars', 'grammy', 'championship', 'world cup', 'olympics',
+      // Social/Trends
+      'trending', 'viral', 'meme', 'twitter', 'social media', 'instagram',
+      'tiktok', 'reddit', 'what is everyone', 'popular right now',
     ];
 
     // Check if query contains any recent info keywords
@@ -1486,36 +1553,95 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
     // Keywords that indicate knowledge-based questions (no web search needed)
     final knowledgeKeywords = [
       'how to',
+      'how do i',
+      'how can i',
+      'how do you',
       'explain',
+      'explain the',
+      'tell me about',
       'what is',
+      'what are',
+      'what does',
+      'what is the',
       'define',
+      'definition of',
+      'meaning of',
       'meaning',
       'history of',
+      'history of the',
+      'background of',
       'who was',
+      'who were',
+      'biography of',
+      'biography',
       'what was',
+      'what were',
+      'describe',
       'why do',
+      'why does',
+      'why is',
+      'reason',
       'concept',
       'theory',
+      'principle',
+      'law of',
       'mathematics',
+      'math',
       'physics',
-      'biology',
       'chemistry',
+      'biology',
+      'anatomy',
+      'physiology',
       'algorithm',
+      'data structure',
       'process',
       'method',
       'technique',
+      'procedure',
+      'approach',
       'tips',
       'advice',
+      'best practices',
+      'guide',
       'write code',
-      'how do i code',
+      'code',
       'programming',
+      'python',
+      'javascript',
+      'java',
+      'c++',
+      'typescript',
+      'how do i code',
+      'how to code',
+      'coding',
       'solve',
+      'solution',
+      'answer to',
       'calculate',
       'derive',
       'proof',
+      'demonstrate',
       'difference between',
+      'difference',
       'compare',
+      'comparison',
       'vs',
+      'versus',
+      'explain how',
+      'explain why',
+      'outline',
+      'summarize',
+      'summary',
+      'overview',
+      'example of',
+      'example',
+      'sample',
+      'characteristics of',
+      'features of',
+      'properties of',
+      'is there',
+      'are there',
+      'does there exist',
     ];
 
     // If it's a knowledge-based question, don't search the web
@@ -1689,15 +1815,16 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
 
       final fullResp = await ApiService.sendRaw('chat', input);
 
-      // If we auto-enabled for this request, disable it back after response is received
-      if (_wasWebSearchAutoEnabledThisRequest && _webSearchEnabled) {
+      // REMOVED: Auto-disable web search toggle after response
+      // Keep the toggle state as the user set it (or as it was auto-enabled)
+      // Only disable if user explicitly toggled it off, don't auto-toggle it down
+      if (_wasWebSearchAutoEnabledThisRequest) {
+        // If we auto-enabled it for this query, keep it enabled for follow-ups
+        // User can manually disable if they don't want it anymore
         print(
-          '[SMART WEB SEARCH] Request sent - disabling web search toggle back off',
+          '[SMART WEB SEARCH] Web search was auto-enabled, keeping toggle ON for follow-up questions',
         );
-        setState(() {
-          _webSearchEnabled = false;
-          _wasWebSearchAutoEnabledThisRequest = false;
-        });
+        _wasWebSearchAutoEnabledThisRequest = false;
       }
 
       if (fullResp['webSearchAutoTriggered'] == true && !shouldUseWebSearch) {
@@ -1719,14 +1846,16 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
             searchResults,
           );
 
-          return await _callWithSearchResults(
+          final response = await _callWithSearchResults(
             enhancedPrompt,
             instructions: instructions,
           );
+
+          // Keep toggle ON - don't auto-disable
+          return response;
         } catch (e) {
           _showSnackBar('Auto web search failed: $e', isError: true);
           setState(() {
-            _webSearchEnabled = false;
             _wasWebSearchAutoEnabledThisRequest = false;
           });
         }

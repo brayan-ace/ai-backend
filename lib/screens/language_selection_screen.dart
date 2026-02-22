@@ -20,6 +20,11 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
     'fr': '🇫🇷',
     'ar': '🇸🇦',
     'hi': '🇮🇳',
+    'zh': '🇨🇳',
+    'bn': '🇧🇩',
+    'pt': '🇵🇹',
+    'ru': '🇷🇺',
+    'id': '🇮🇩',
   };
 
   @override

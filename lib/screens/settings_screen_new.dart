@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/theme.dart';
 import '../utils/theme_provider.dart';
 import 'theme_selection_screen.dart';
 import 'language_selection_screen.dart';
+import 'text_size_selection_screen.dart';
+import 'font_selection_screen.dart';
 import '../utils/language_provider.dart';
 import '../utils/app_localizations.dart';
 import '../services/settings_service.dart';
@@ -166,39 +169,50 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
 
   Widget _tile(
     BuildContext context, {
-    required IconData icon,
+    IconData? icon,
     required String title,
     String? subtitle,
     VoidCallback? onTap,
     Widget? trailing,
+    Widget? leading,
     List<Color>? gradient,
   }) {
     final iconColor = gradient != null
         ? Colors.white
         : AppTheme.textPrimaryFromContext(context);
-    return ListTile(
-      leading: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: gradient ?? AppTheme.surfaceGradientFromContext(context),
-          ),
-          borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-          boxShadow: gradient != null
-              ? [
-                  BoxShadow(
-                    color: gradient[0].withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: Offset(0, 2),
+
+    // Use custom leading widget if provided, otherwise use icon
+    final leadingWidget =
+        leading ??
+        (icon != null
+            ? Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors:
+                        gradient ??
+                        AppTheme.surfaceGradientFromContext(context),
                   ),
-                ]
-              : null,
-        ),
-        child: Icon(icon, color: iconColor, size: 22),
-      ),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                  boxShadow: gradient != null
+                      ? [
+                          BoxShadow(
+                            color: gradient[0].withValues(alpha: 0.3),
+                            blurRadius: 8,
+                            offset: Offset(0, 2),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Icon(icon, color: iconColor, size: 22),
+              )
+            : null);
+
+    return ListTile(
+      leading: leadingWidget,
       title: Text(
         title,
         style: AppTheme.bodyLarge.copyWith(
@@ -307,9 +321,7 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
               _buildAccessPlansCard(context),
 
               // GENERAL SETTINGS Section
-              _sectionHeader(
-                AppLocalizations.of(context).t('settings.general'),
-              ),
+              _sectionHeader('General'),
               _buildCard(
                 children: [
                   // Edit Profile
@@ -395,6 +407,38 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     ),
                   ),
                   _buildDivider(),
+                  // Text Size / Accessibility
+                  _tile(
+                    context,
+                    icon: Icons.text_fields,
+                    title: 'Text Size',
+                    subtitle: 'Adjust for accessibility',
+                    gradient: AppTheme.accentGradient,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => TextSizeSelectionScreen(),
+                      ),
+                    ),
+                  ),
+                  _buildDivider(),
+                  // Font Selection
+                  _tile(
+                    context,
+                    icon: Icons.font_download,
+                    title: AppLocalizations.of(context).t('settings.font'),
+                    subtitle: AppLocalizations.of(
+                      context,
+                    ).t('settings.selectFont'),
+                    gradient: AppTheme.accentGradient,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => FontSelectionScreen(),
+                      ),
+                    ),
+                  ),
+                  _buildDivider(),
                   // Logout
                   _tile(
                     context,
@@ -433,10 +477,9 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                 children: [
                   _tile(
                     context,
-                    icon: Icons.message,
+                    leading: SocialMediaIcon(platform: 'whatsapp', size: 44),
                     title: AppLocalizations.of(context).t('settings.whatsapp'),
                     subtitle: 'Join our community',
-                    trailing: SocialMediaIcon(platform: 'whatsapp', size: 32),
                     onTap: () => _launchUrl(
                       'https://chat.whatsapp.com/BSwumdCdeLF7txFxw3jGdW',
                     ),
@@ -444,10 +487,9 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                   _buildDivider(),
                   _tile(
                     context,
-                    icon: Icons.thumb_up,
+                    leading: SocialMediaIcon(platform: 'facebook', size: 44),
                     title: AppLocalizations.of(context).t('settings.facebook'),
                     subtitle: 'Follow us',
-                    trailing: SocialMediaIcon(platform: 'facebook', size: 32),
                     onTap: () => _launchUrl(
                       'https://www.facebook.com/share/17untMVSDD/',
                     ),
@@ -455,10 +497,9 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                   _buildDivider(),
                   _tile(
                     context,
-                    icon: Icons.camera_alt,
+                    leading: SocialMediaIcon(platform: 'instagram', size: 44),
                     title: AppLocalizations.of(context).t('settings.instagram'),
                     subtitle: 'Follow us',
-                    trailing: SocialMediaIcon(platform: 'instagram', size: 32),
                     onTap: () => _launchUrl(
                       'https://www.instagram.com/nexasmartai?igsh=YTJ1eGlneGxtZ2Zn',
                     ),
@@ -466,10 +507,9 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                   _buildDivider(),
                   _tile(
                     context,
-                    icon: Icons.music_video,
+                    leading: SocialMediaIcon(platform: 'tiktok', size: 44),
                     title: AppLocalizations.of(context).t('settings.tiktok'),
                     subtitle: 'Follow us',
-                    trailing: SocialMediaIcon(platform: 'tiktok', size: 32),
                     onTap: () => _launchUrl(
                       'https://www.tiktok.com/@nexa.2035?_r=1&_t=ZM-93F28qgfiV2',
                     ),
@@ -480,8 +520,7 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     icon: Icons.language,
                     title: 'Visit Website',
                     subtitle: 'Explore our website',
-                    onTap: () =>
-                        _launchUrl('https://lucky-granita-36fd10.netlify.app/'),
+                    onTap: () => _launchUrl('https://nexasmartai.org'),
                   ),
                 ],
               ),
@@ -499,9 +538,7 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     title: AppLocalizations.of(
                       context,
                     ).t('settings.privacyPolicy'),
-                    onTap: () => _launchUrl(
-                      'https://lucky-granita-36fd10.netlify.app/privacy',
-                    ),
+                    onTap: () => _launchUrl('https://nexasmartai.org/privacy'),
                   ),
                   _buildDivider(),
                   _tile(
@@ -510,9 +547,7 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     title: AppLocalizations.of(
                       context,
                     ).t('settings.termsOfService'),
-                    onTap: () => _launchUrl(
-                      'https://lucky-granita-36fd10.netlify.app/terms',
-                    ),
+                    onTap: () => _launchUrl('https://nexasmartai.org/terms'),
                   ),
                   _buildDivider(),
                   _tile(
@@ -525,6 +560,23 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
               ),
 
               SizedBox(height: AppTheme.spaceLg),
+
+              // Copyright Footer
+              Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppTheme.spaceMd,
+                  vertical: AppTheme.spaceLg,
+                ),
+                child: Center(
+                  child: Text(
+                    '© 2026 Nexa Smart AI. All rights reserved',
+                    style: AppTheme.bodySmall.copyWith(
+                      color: AppTheme.textTertiaryFromContext(context),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
             ],
           ),
         ),

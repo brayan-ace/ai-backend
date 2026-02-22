@@ -146,6 +146,11 @@ class MyApp extends StatelessWidget {
         Locale('fr'),
         Locale('ar'),
         Locale('hi'),
+        Locale('zh'),
+        Locale('bn'),
+        Locale('pt'),
+        Locale('ru'),
+        Locale('id'),
       ],
       builder: (context, child) {
         return MediaQuery(

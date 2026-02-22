@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   // Dark Blue Color Palette - Clean & Professional
@@ -55,6 +56,102 @@ class AppTheme {
   static const double spaceXl = 32.0;
   static const double space2xl = 48.0;
   static const double space3xl = 64.0;
+
+  // Responsive Spacing - Adapt to text scale factor (for accessibility)
+  // Example: getScaledSpacing(spaceMd, 1.5) returns 16 * 1.5 = 24
+  static double getScaledSpacing(double baseValue, double scaleFactor) {
+    return baseValue * scaleFactor;
+  }
+
+  // Responsive Icon Sizes - Scale with text size for visual consistency
+  // Base sizes: xs=16, sm=20, md=24, lg=32, xl=40
+  static double getScaledIconSize(double baseSize, double scaleFactor) {
+    final scaled = baseSize * scaleFactor;
+    // Cap at reasonable limits to prevent excessive icon sizes
+    return scaled > 64
+        ? 64
+        : scaled < 12
+        ? 12
+        : scaled;
+  }
+
+  // Preset scaled icon sizes
+  static double getIconXs(double scaleFactor) =>
+      getScaledIconSize(16, scaleFactor);
+  static double getIconSm(double scaleFactor) =>
+      getScaledIconSize(20, scaleFactor);
+  static double getIconMd(double scaleFactor) =>
+      getScaledIconSize(24, scaleFactor);
+  static double getIconLg(double scaleFactor) =>
+      getScaledIconSize(32, scaleFactor);
+  static double getIconXl(double scaleFactor) =>
+      getScaledIconSize(40, scaleFactor);
+
+  // Font Family Management (for app-wide font selection)
+  static String currentFontFamily = 'Roboto';
+
+  // Available fonts for selection
+  static const List<String> availableFonts = [
+    'Roboto',
+    'Georgia',
+    'Open Sans',
+    'Poppins',
+    'Playfair Display',
+    'Inter',
+    'Courier Prime',
+    'Roboto Mono',
+  ];
+
+  // Update the current font family (called when user selects new font)
+  static void updateFontFamily(String fontFamily) {
+    if (availableFonts.contains(fontFamily)) {
+      currentFontFamily = fontFamily;
+    }
+  }
+
+  // Helper to apply font family to a text style
+  static TextStyle applyFontFamily(TextStyle baseStyle, String fontFamily) {
+    return baseStyle.copyWith(fontFamily: _getFontFamilyName(fontFamily));
+  }
+
+  // Map display names to Google Fonts family names
+  static String _getFontFamilyName(String displayName) {
+    switch (displayName) {
+      case 'Roboto':
+        return GoogleFonts.roboto().fontFamily ?? 'Roboto';
+      case 'Georgia':
+        return GoogleFonts.lora().fontFamily ?? 'Lora'; // Georgia-like serif
+      case 'Open Sans':
+        return GoogleFonts.openSans().fontFamily ?? 'Open Sans';
+      case 'Poppins':
+        return GoogleFonts.poppins().fontFamily ?? 'Poppins';
+      case 'Playfair Display':
+        return GoogleFonts.playfairDisplay().fontFamily ?? 'Playfair Display';
+      case 'Inter':
+        return GoogleFonts.inter().fontFamily ?? 'Inter';
+      case 'Courier Prime':
+        return GoogleFonts.courierPrime().fontFamily ?? 'Courier Prime';
+      case 'Roboto Mono':
+        return GoogleFonts.robotoMono().fontFamily ?? 'Roboto Mono';
+      default:
+        return GoogleFonts.roboto().fontFamily ?? 'Roboto';
+    }
+  }
+
+  // Get Google Fonts TextTheme for the current font family
+  static TextTheme getTextTheme(String fontFamily) {
+    final baseTheme = switch (fontFamily) {
+      'Georgia' => GoogleFonts.loraTextTheme(),
+      'Open Sans' => GoogleFonts.openSansTextTheme(),
+      'Poppins' => GoogleFonts.poppinsTextTheme(),
+      'Playfair Display' => GoogleFonts.playfairDisplayTextTheme(),
+      'Inter' => GoogleFonts.interTextTheme(),
+      'Courier Prime' => GoogleFonts.courierPrimeTextTheme(),
+      'Roboto Mono' => GoogleFonts.robotoMonoTextTheme(),
+      _ => GoogleFonts.robotoTextTheme(), // Default to Roboto
+    };
+    return baseTheme;
+  }
 
   // Border Radius
   static const double radiusSm = 12.0;
@@ -425,17 +522,9 @@ class AppTheme {
       onError: Colors.white,
     ),
     scaffoldBackgroundColor: backgroundDeep,
-    textTheme: TextTheme(
-      displayLarge: displayLarge,
-      displayMedium: displayMedium,
-      headlineLarge: headlineLarge,
-      headlineMedium: headlineMedium,
-      bodyLarge: bodyLarge,
-      bodyMedium: bodyMedium,
-      bodySmall: bodySmall,
-      labelLarge: labelLarge,
-      labelMedium: labelMedium,
-    ),
+    textTheme: getTextTheme(
+      currentFontFamily,
+    ).apply(bodyColor: textSecondary, displayColor: textPrimary),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: surfaceCard,
@@ -500,31 +589,9 @@ class AppTheme {
       onError: Colors.white,
     ),
     scaffoldBackgroundColor: Color(0xFFFFFFFF), // Pure white scaffold
-    textTheme: TextTheme(
-      displayLarge: displayLarge.copyWith(
-        color: Color(0xFF1F2937),
-      ), // Dark text
-      displayMedium: displayMedium.copyWith(
-        color: Color(0xFF1F2937),
-      ), // Dark text
-      headlineLarge: headlineLarge.copyWith(
-        color: Color(0xFF1F2937),
-      ), // Dark text
-      headlineMedium: headlineMedium.copyWith(
-        color: Color(0xFF1F2937),
-      ), // Dark text
-      bodyLarge: bodyLarge.copyWith(color: Color(0xFF374151)), // Dark gray text
-      bodyMedium: bodyMedium.copyWith(
-        color: Color(0xFF374151),
-      ), // Dark gray text
-      bodySmall: bodySmall.copyWith(
-        color: Color(0xFF6B7280),
-      ), // Medium gray text
-      labelLarge: labelLarge.copyWith(color: Color(0xFF1F2937)), // Dark text
-      labelMedium: labelMedium.copyWith(
-        color: Color(0xFF374151),
-      ), // Dark gray text
-    ),
+    textTheme: getTextTheme(
+      currentFontFamily,
+    ).apply(bodyColor: Color(0xFF374151), displayColor: Color(0xFF1F2937)),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: Color(0xFFF9FAFB), // Very light input background

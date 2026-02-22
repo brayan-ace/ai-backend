@@ -11,6 +11,11 @@ class LanguageProvider extends ChangeNotifier {
     'fr': {'native': 'Français', 'code': 'fr'},
     'ar': {'native': 'العربية', 'code': 'ar'},
     'hi': {'native': 'हिंदी', 'code': 'hi'},
+    'zh': {'native': '中文', 'code': 'zh'},
+    'bn': {'native': 'বাংলা', 'code': 'bn'},
+    'pt': {'native': 'Português', 'code': 'pt'},
+    'ru': {'native': 'Русский', 'code': 'ru'},
+    'id': {'native': 'Bahasa Indonesia', 'code': 'id'},
   };
 
   late SharedPreferences _prefs;
