@@ -2564,6 +2564,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
                       maxHeight: MediaQuery.of(ctx).size.height * 0.6,
+                      maxWidth: MediaQuery.of(ctx).size.width - 32,
                     ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -2574,6 +2575,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                             vertical: 8,
                           ),
                           child: Column(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               _buildMenuItemAdvanced(
                                 ctx,
@@ -2783,6 +2785,8 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                   children: [
                     Text(
                       title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -2795,6 +2799,8 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                     SizedBox(height: 2),
                     Text(
                       subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 12,
                         color: Theme.of(context).brightness == Brightness.dark
