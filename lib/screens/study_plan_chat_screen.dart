@@ -28,6 +28,8 @@ import '../services/study_notification_service.dart';
 import '../services/push_notification_service.dart';
 import '../services/text_to_speech_service.dart';
 import 'main_tabs.dart';
+import '../services/checkpoint_quiz_service.dart';
+import '../widgets/checkpoint_quiz_widget.dart';
 
 // Premium color palette matching bot creation and processing screens
 class PremiumColors {
@@ -277,6 +279,9 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
 
   late StudyBotStorageService _storageService;
   late StudyBotFirebaseService _firebaseService;
+
+  // Spaced Repetition - Checkpoint Quiz
+  CheckpointQuiz? _pendingCheckpointQuiz;
 
   @override
   void initState() {
@@ -1268,6 +1273,17 @@ Remember: The user is learning ${modules.length} interconnected modules. Each su
             _showQuizPopup();
           }
 
+          // Handle checkpoint quiz requirement (new spaced repetition)
+          if (body['checkpointQuizRequired'] == true) {
+            _handleCheckpointQuizRequired(body, userId);
+          }
+
+          // Display struggle signals if detected
+          if (body['struggles'] != null &&
+              (body['struggles'] as List).isNotEmpty) {
+            _handleStruggleSignals(body['struggles'] as List, botResponse);
+          }
+
           // If backend returned a generated study plan, save it and show in hamburger AND chat
           if (body['showStudyPlan'] == true) {
             final planPayload = body['studyPlan'] ?? body['study_plan'];
@@ -1328,6 +1344,205 @@ Remember: The user is learning ${modules.length} interconnected modules. Each su
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  // Spaced Repetition Integration Methods
+
+  void _handleCheckpointQuizRequired(
+    Map<String, dynamic> response,
+    String userId,
+  ) {
+    try {
+      final quizData = response['checkpointQuiz'] as Map<String, dynamic>?;
+      if (quizData == null) {
+        print('[ChatScreen] ⚠️ Checkpoint quiz data is null');
+        return;
+      }
+
+      final checkpointQuiz = CheckpointQuiz.fromJson(quizData);
+      print(
+        '[ChatScreen] 📋 Checkpoint quiz required: ${checkpointQuiz.questions.length} questions',
+      );
+
+      if (mounted) {
+        setState(() {
+          _pendingCheckpointQuiz = checkpointQuiz;
+        });
+      }
+
+      // Show checkpoint quiz in modal
+      Future.delayed(Duration(milliseconds: 500), () {
+        _showCheckpointQuizModal(userId);
+      });
+    } catch (e) {
+      print('[ChatScreen] ❌ Error handling checkpoint quiz: $e');
+    }
+  }
+
+  void _showCheckpointQuizModal(String userId) {
+    if (_pendingCheckpointQuiz == null) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: PremiumColors.cardBg,
+          insetPadding: EdgeInsets.all(AppTheme.spaceMd),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+            side: BorderSide(
+              color: PremiumColors.focusBorder.withOpacity(0.5),
+              width: 1.5,
+            ),
+          ),
+          child: CheckpointQuizWidget(
+            quiz: _pendingCheckpointQuiz!,
+            botId: widget.botId ?? 'unknown',
+            userId: userId,
+            moduleIndex: 0,
+            conceptIndex: 0,
+            onCompleted: (result) {
+              Navigator.of(context).pop();
+              _handleCheckpointQuizResult(result);
+            },
+            onSkipped: () {
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Quiz skipped. Keep practicing!'),
+                  backgroundColor: Colors.orange,
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  void _handleCheckpointQuizResult(CheckpointQuizResult result) {
+    print(
+      '[ChatScreen] 📊 Checkpoint quiz result: passed=${result.passed}, score=${result.scorePercentage}%',
+    );
+
+    if (result.passed) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Text(
+                '✅ ${result.message}',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: PremiumColors.successGreen,
+          duration: Duration(seconds: 3),
+        ),
+      );
+
+      if (mounted) {
+        setState(() {
+          // Quiz completed - review scheduled
+        });
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '📚 ${result.message}\n${result.scorePercentage}% - Need 70% to pass',
+            style: TextStyle(color: Colors.white),
+          ),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 4),
+        ),
+      );
+    }
+  }
+
+  void _handleStruggleSignals(List<dynamic> strugglesData, String botResponse) {
+    try {
+      final struggles = strugglesData
+          .map((s) => StruggleSignal.fromJson(s as Map<String, dynamic>))
+          .toList();
+
+      print('[ChatScreen] 🤔 Detected ${struggles.length} struggle signals');
+      if (struggles.isNotEmpty) {
+        print(
+          '[ChatScreen] 🤔 Primary struggle: ${struggles.first.signalType} (confidence: ${struggles.first.confidence})',
+        );
+      }
+
+      if (mounted) {
+        setState(() {
+          // Struggle signals received - intervention triggered
+        });
+      }
+
+      if (struggles.isNotEmpty && struggles.first.confidence >= 0.7) {
+        _showStruggleIntervention(struggles.first);
+      }
+    } catch (e) {
+      print('[ChatScreen] ❌ Error handling struggle signals: $e');
+    }
+  }
+
+  void _showStruggleIntervention(StruggleSignal signal) {
+    final interventionType = signal.recommendation ?? 'alternative_explanation';
+
+    String interventionMessage = '';
+    IconData interventionIcon = Icons.lightbulb;
+
+    switch (interventionType) {
+      case 'alternative_explanation':
+        interventionMessage =
+            '💡 Let me explain this from a different angle...';
+        interventionIcon = Icons.lightbulb;
+        break;
+      case 'multi_modal':
+        interventionMessage = '🖼️ Let me show you with examples...';
+        interventionIcon = Icons.image;
+        break;
+      case 'emotional_support':
+        interventionMessage =
+            '💪 You\'re doing great! Let\'s break this down...';
+        interventionIcon = Icons.favorite;
+        break;
+      case 'interactive_question':
+        interventionMessage = '❓ Let me ask you a question to clarify...';
+        interventionIcon = Icons.quiz;
+        break;
+      default:
+        interventionMessage = '🤝 I noticed this might be challenging.';
+        interventionIcon = Icons.lightbulb;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(interventionIcon, color: Colors.white),
+            SizedBox(width: AppTheme.spaceSm),
+            Expanded(
+              child: Text(
+                interventionMessage,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.blue,
+        duration: Duration(seconds: 3),
+      ),
+    );
   }
 
   @override

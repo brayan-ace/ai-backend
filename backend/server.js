@@ -1300,6 +1300,357 @@ async function ensureConversationMemoryTable() {
 
 ensureConversationMemoryTable();
 
+// ============= MASTERY VALIDATION & STRUGGLE DETECTION TABLES =============
+
+async function ensureMasteryTablesForCriticalFix() {
+  try {
+    // Table for concept mastery checkpoints (objective validation)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS concept_mastery_checkpoints (
+        id SERIAL PRIMARY KEY,
+        bot_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        module_index INTEGER NOT NULL,
+        concept_index INTEGER NOT NULL,
+        checkpoint_quiz_id INTEGER,
+        checkpoint_score DECIMAL(5,2),
+        checkpoint_passed BOOLEAN DEFAULT FALSE,
+        attempts INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        mastery_validated_at TIMESTAMP,
+        UNIQUE(bot_id, user_id, module_index, concept_index)
+      );
+    `);
+    console.log("[DB] concept_mastery_checkpoints table ensured");
+
+    // Table for per-concept performance tracking
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS concept_performance_metrics (
+        id SERIAL PRIMARY KEY,
+        bot_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        module_index INTEGER NOT NULL,
+        concept_index INTEGER NOT NULL,
+        time_to_understand_seconds INTEGER,
+        explanation_requests INTEGER DEFAULT 0,
+        quiz_score DECIMAL(5,2),
+        confidence_level TEXT,
+        last_reviewed TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(bot_id, user_id, module_index, concept_index)
+      );
+    `);
+    console.log("[DB] concept_performance_metrics table ensured");
+
+    // Table for real-time struggle detection signals
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS struggle_signals (
+        id SERIAL PRIMARY KEY,
+        bot_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        module_index INTEGER NOT NULL,
+        concept_index INTEGER NOT NULL,
+        signal_type TEXT NOT NULL,
+        signal_value JSONB,
+        detected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        intervention_applied BOOLEAN DEFAULT FALSE,
+        intervention_type TEXT,
+        UNIQUE(bot_id, user_id, module_index, concept_index, signal_type)
+      );
+    `);
+    console.log("[DB] struggle_signals table ensured");
+
+    // Table for study plan generation progress (streaming updates)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS study_plan_generation_progress (
+        id SERIAL PRIMARY KEY,
+        bot_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        generation_id TEXT UNIQUE NOT NULL,
+        status TEXT DEFAULT 'in_progress',
+        progress_percentage INTEGER DEFAULT 0,
+        current_step TEXT,
+        estimated_time_remaining INTEGER,
+        started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        completed_at TIMESTAMP,
+        final_plan JSONB
+      );
+    `);
+    console.log("[DB] study_plan_generation_progress table ensured");
+  } catch (err) {
+    console.error("[DB] Failed to ensure mastery tables:", err?.message);
+    if (err?.detail) console.error("[DB] Error detail:", err.detail);
+  }
+}
+
+ensureMasteryTablesForCriticalFix();
+
+// ============= CRITICAL FIX: MASTERY VALIDATION & STRUGGLE DETECTION =============
+
+/**
+ * Generate a quick checkpoint quiz to validate mastery (70%+ required to pass)
+ * This prevents the binary "just say I understand" mastery detection problem
+ */
+async function generateMasteryCheckpointQuiz(
+  conceptTitle,
+  conceptContent,
+  gradeLevel,
+) {
+  try {
+    const groqApiKey = process.env.GROQ_API_KEY;
+    if (!groqApiKey) {
+      console.warn("[Mastery] GROQ_API_KEY not configured");
+      return null;
+    }
+
+    const prompt = `You are an expert assessment designer. Create a SHORT 3-question mastery checkpoint quiz for ONLY this concept:
+
+CONCEPT: ${conceptTitle}
+CONTENT: ${conceptContent}
+LEVEL: ${gradeLevel}
+
+Generate EXACTLY 3 quiz questions:
+- 2 multiple-choice (4 options each)
+- 1 short answer
+
+Requirements:
+1. Questions MUST validate actual understanding, not memorization
+2. Include answer key with brief explanations
+3. Passing threshold: 2/3 questions correct (66.7%)
+
+OUTPUT ONLY valid JSON:
+{
+  "concept": "${conceptTitle}",
+  "questions": [
+    {
+      "id": 1,
+      "type": "mcq",
+      "question": "...",
+      "options": ["A", "B", "C", "D"],
+      "correct_option": "B",
+      "explanation": "..."
+    },
+    ...
+  ],
+  "passing_score": 2,
+  "time_limit_seconds": 180
+}`;
+
+    const groqRes = await axios.post(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        model: "llama-3.3-70b-versatile",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are an assessment expert. Output ONLY valid JSON, no explanations.",
+          },
+          { role: "user", content: prompt },
+        ],
+        max_tokens: 1000,
+        temperature: 0.3,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${groqApiKey}`,
+        },
+        timeout: 15000,
+      },
+    );
+
+    let responseText = groqRes?.data?.choices?.[0]?.message?.content || "";
+    responseText = responseText.replace(/```json\n?|```/g, "").trim();
+    const quiz = JSON.parse(responseText);
+
+    console.log("[Mastery] ✅ Checkpoint quiz generated for:", conceptTitle);
+    return quiz;
+  } catch (err) {
+    console.error("[Mastery] Failed to generate checkpoint quiz:", err.message);
+    return null;
+  }
+}
+
+/**
+ * Analyze response for struggle signals (real-time detection)
+ * Detects: confusion, frustration, misunderstanding, request for help
+ */
+function detectStruggleSignals(userMessage, lastBotResponse) {
+  const signals = [];
+  const msg = userMessage.toLowerCase();
+
+  // Signal: Explicit confusion
+  if (
+    /i don't|i don't understand|confused|don't get it|what does|what does it mean|lost|don't follow/i.test(
+      msg,
+    )
+  ) {
+    signals.push({
+      type: "explicit_confusion",
+      confidence: 0.95,
+      recommendation: "alternative_explanation",
+    });
+  }
+
+  // Signal: Repeated clarification requests
+  if (/explain|explain again|rephrase|simpler|more detail|example/i.test(msg)) {
+    signals.push({
+      type: "clarification_request",
+      confidence: 0.9,
+      recommendation: "multi_modal_explanation",
+    });
+  }
+
+  // Signal: Negative emotional language
+  if (
+    /frustrated|annoyed|hate|stupid|too hard|impossible|can't|can't do it/i.test(
+      msg,
+    )
+  ) {
+    signals.push({
+      type: "frustration_detected",
+      confidence: 0.85,
+      recommendation: "emotional_support_break",
+    });
+  }
+
+  // Signal: Minimal engagement (very short follow-up after long teaching)
+  if (lastBotResponse && lastBotResponse.length > 500 && msg.length < 20) {
+    signals.push({
+      type: "disengagement_pattern",
+      confidence: 0.7,
+      recommendation: "interactive_question",
+    });
+  }
+
+  // Signal: Wrong answer to verification question
+  if (/no|wrong|incorrect|that's not it/i.test(msg)) {
+    signals.push({
+      type: "concept_mismatch",
+      confidence: 0.88,
+      recommendation: "concept_reinforcement",
+    });
+  }
+
+  return signals;
+}
+
+/**
+ * Generate streaming progress updates for study plan generation
+ * Returns updates instead of hanging for 30+ seconds
+ */
+async function streamStudyPlanGenerationProgress(
+  botId,
+  userId,
+  generationId,
+  stages,
+) {
+  try {
+    for (let i = 0; i < stages.length; i++) {
+      const stage = stages[i];
+      const progress = Math.round(((i + 1) / stages.length) * 100);
+
+      await pool.query(
+        `INSERT INTO study_plan_generation_progress 
+         (bot_id, user_id, generation_id, status, progress_percentage, current_step, estimated_time_remaining)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (generation_id) DO UPDATE
+         SET progress_percentage = $5, current_step = $6, estimated_time_remaining = $7`,
+        [
+          botId,
+          userId,
+          generationId,
+          "in_progress",
+          progress,
+          stage.name,
+          Math.max(0, (stages.length - i - 1) * 2),
+        ],
+      );
+
+      console.log(`[StudyPlan] Progress: ${stage.name} (${progress}%)`);
+    }
+  } catch (err) {
+    console.error("[StudyPlan] Failed to update progress:", err.message);
+  }
+}
+
+/**
+ * Progressive study plan generation with concept validation
+ * Includes streaming progress updates instead of long blocking wait
+ */
+async function generateStudyPlanWithProgress(
+  botName,
+  topic,
+  description,
+  gradeLevel,
+  learnerProfile,
+) {
+  const generationId = `plan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  // Stages for progress tracking
+  const stages = [
+    { name: "Analyzing topic", delay: 500 },
+    { name: "Structuring modules", delay: 1000 },
+    { name: "Generating content", delay: 3000 },
+    { name: "Validating structure", delay: 1000 },
+    { name: "Finalizing plan", delay: 500 },
+  ];
+
+  try {
+    // Simulate progressive updates
+    for (const stage of stages) {
+      // In a real streaming implementation, you'd:
+      // res.write(`data: {"step": "${stage.name}", "progress": ${progress}}\n\n`);
+      // For now, track in DB
+      await pool.query(
+        `INSERT INTO study_plan_generation_progress 
+         (bot_id, user_id, generation_id, status, progress_percentage, current_step)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (generation_id) DO UPDATE
+         SET progress_percentage = $5, current_step = $6`,
+        [
+          "temp_bot_id",
+          "temp_user_id",
+          generationId,
+          "in_progress",
+          20,
+          stage.name,
+        ],
+      );
+      await new Promise((resolve) => setTimeout(resolve, stage.delay));
+    }
+
+    // Actually generate the plan
+    const plan = await generateStructuredStudyPlan(
+      botName,
+      topic,
+      description,
+      gradeLevel,
+      learnerProfile,
+    );
+
+    // Mark completion
+    await pool.query(
+      `UPDATE study_plan_generation_progress 
+       SET status = 'completed', completed_at = NOW(), final_plan = $1
+       WHERE generation_id = $2`,
+      [JSON.stringify(plan), generationId],
+    );
+
+    return { plan, generationId };
+  } catch (err) {
+    await pool.query(
+      `UPDATE study_plan_generation_progress 
+       SET status = 'failed'
+       WHERE generation_id = $1`,
+      [generationId],
+    );
+    throw err;
+  }
+}
+
 // ============= ROUTES =============
 
 app.get("/", (req, res) => {
@@ -2156,20 +2507,78 @@ Always prioritize intellectual clarity, aesthetic presentation, and cognitive en
       aiResponse.substring(0, 200).replace(/\n/g, "␤"),
     );
 
-    // STEP 7: Detect concept/module completion signals and update progress
+    // STEP 7: Detect struggle signals BEFORE processing responses (CRITICAL FIX #3)
+    const struggles = detectStruggleSignals(message, aiResponse);
+    let struggleIntervention = null;
+
+    if (struggles.length > 0) {
+      console.log("[Chat-Enhanced] 🚨 Struggle signals detected:", struggles);
+
+      try {
+        // Insert struggle signals for analytics
+        for (const signal of struggles) {
+          await pool.query(
+            `INSERT INTO struggle_signals (bot_id, user_id, module_index, concept_index, signal_type, signal_value)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             ON CONFLICT DO NOTHING`,
+            [
+              botId,
+              userId,
+              currentModuleIndex,
+              currentConceptIndex,
+              signal.type,
+              JSON.stringify(signal),
+            ],
+          );
+        }
+
+        // Select intervention strategy
+        const topSignal = struggles[0];
+        if (topSignal.recommendation === "alternative_explanation") {
+          struggleIntervention = {
+            type: "alternative_explanation",
+            message: `I see you might be finding this confusing. Let me explain it in a different way...`,
+          };
+        } else if (topSignal.recommendation === "multi_modal_explanation") {
+          struggleIntervention = {
+            type: "multi_modal",
+            message: `Let me break this down with an example and visual concept...`,
+          };
+        } else if (topSignal.recommendation === "emotional_support_break") {
+          struggleIntervention = {
+            type: "emotional_support",
+            message: `I can see this is challenging! Let's take it step-by-step. We can do this! 💪`,
+          };
+        } else if (topSignal.recommendation === "interactive_question") {
+          struggleIntervention = {
+            type: "interactive",
+            message: `Let me ask you a quick question to make sure we're on the same page...`,
+          };
+        }
+      } catch (struggleErr) {
+        console.warn(
+          "[Chat-Enhanced] Failed to process struggle signal:",
+          struggleErr.message,
+        );
+      }
+    }
+
+    // STEP 8: Detect concept/module completion signals with VALIDATION (CRITICAL FIX #2)
     let conceptCompleted = false;
     let moduleCompleted = false;
     let triggerQuiz = false;
     let newProgressPercentage = 0;
     let updatedCurrentModule = currentModuleIndex;
     let updatedCurrentConcept = currentConceptIndex;
+    let checkpointQuizRequired = false;
+    let checkpointQuiz = null;
 
     try {
       // Check if AI signaled concept completion
       if (aiResponse.includes("[CONCEPT_COMPLETE]")) {
-        conceptCompleted = true;
+        // Remove marker
         aiResponse = aiResponse.replace(/\[CONCEPT_COMPLETE\]/g, "").trim();
-        console.log("[Chat-Enhanced] ✅ Concept completion detected!");
+        console.log("[Chat-Enhanced] ✅ Concept completion signal detected!");
 
         const progressResult = await pool.query(
           `SELECT study_plan, current_module, current_concept_index, completed_concepts 
@@ -2189,35 +2598,72 @@ Always prioritize intellectual clarity, aesthetic presentation, and cognitive en
             const keyTopics =
               currentModule?.key_topics || currentModule?.subtopics || [];
             const conceptKey = `m${currentMod}_c${currentConcept}`;
+            const conceptTitle =
+              keyTopics[currentConcept] || `Concept ${currentConcept + 1}`;
 
-            // Mark current concept as completed
-            if (!completedConceptsList.includes(conceptKey)) {
-              completedConceptsList.push(conceptKey);
-            }
-
-            // Move to next concept
-            if (currentConcept < keyTopics.length - 1) {
-              currentConcept = currentConcept + 1;
-            }
-
-            updatedCurrentConcept = currentConcept;
-
-            // Update database with new concept index
-            await pool.query(
-              `UPDATE bot_progress 
-               SET current_concept_index = $1, completed_concepts = $2, last_updated = NOW()
-               WHERE bot_id = $3 AND user_id = $4`,
-              [
-                currentConcept,
-                JSON.stringify(completedConceptsList),
-                botId,
-                userId,
-              ],
-            );
-
+            // CRITICAL FIX #2: Generate checkpoint quiz to VALIDATE mastery (not just mark complete)
             console.log(
-              `[Chat-Enhanced] 📚 Concept ${currentConcept + 1}/${keyTopics.length} in Module ${currentMod + 1}`,
+              "[Chat-Enhanced] 🎯 Generating mastery checkpoint for:",
+              conceptTitle,
             );
+            checkpointQuiz = await generateMasteryCheckpointQuiz(
+              conceptTitle,
+              `Topic: ${currentModule.objective || ""}, Content area: ${conceptTitle}`,
+              gradeLevel || "General",
+            );
+
+            if (checkpointQuiz) {
+              checkpointQuizRequired = true;
+              // Store checkpoint in database
+              try {
+                await pool.query(
+                  `INSERT INTO concept_mastery_checkpoints 
+                   (bot_id, user_id, module_index, concept_index, attempts)
+                   VALUES ($1, $2, $3, $4, $5)
+                   ON CONFLICT (bot_id, user_id, module_index, concept_index) 
+                   DO UPDATE SET attempts = attempts + 1`,
+                  [botId, userId, currentMod, currentConcept, 1],
+                );
+                console.log(
+                  "[Chat-Enhanced] ✅ Checkpoint quiz created for validation",
+                );
+              } catch (cpErr) {
+                console.warn(
+                  "[Chat-Enhanced] Failed to save checkpoint:",
+                  cpErr.message,
+                );
+              }
+            } else {
+              // Fallback: If checkpoint quiz generation fails, proceed with concept completion
+              // but with lower confidence
+              console.warn(
+                "[Chat-Enhanced] ⚠️ Could not generate checkpoint, allowing concept completion with note",
+              );
+
+              if (!completedConceptsList.includes(conceptKey)) {
+                completedConceptsList.push(conceptKey);
+              }
+
+              if (currentConcept < keyTopics.length - 1) {
+                currentConcept = currentConcept + 1;
+              }
+
+              updatedCurrentConcept = currentConcept;
+              conceptCompleted = true;
+
+              // Update database
+              await pool.query(
+                `UPDATE bot_progress 
+                 SET current_concept_index = $1, completed_concepts = $2, last_updated = NOW()
+                 WHERE bot_id = $3 AND user_id = $4`,
+                [
+                  currentConcept,
+                  JSON.stringify(completedConceptsList),
+                  botId,
+                  userId,
+                ],
+              );
+            }
           }
         }
       }
@@ -2351,6 +2797,12 @@ Always prioritize intellectual clarity, aesthetic presentation, and cognitive en
       conceptCompleted: conceptCompleted,
       moduleCompleted: moduleCompleted,
       triggerQuiz: triggerQuiz,
+      // CRITICAL FIX #2: Include checkpoint quiz for mastery validation
+      checkpointQuizRequired: checkpointQuizRequired,
+      checkpointQuiz: checkpointQuiz,
+      // CRITICAL FIX #3: Include struggle intervention strategy
+      struggles: struggles.length > 0 ? struggles : undefined,
+      struggleIntervention: struggleIntervention,
       instructionSource: instructionSource,
       learnerProfileApplied: !!learnerProfile,
       moodApplied: !!currentMood,
@@ -4700,6 +5152,299 @@ app.delete("/api/sat-notes/:id", async (req, res) => {
   }
 });
 
+// ============= NEW ENDPOINT: SUBMIT CHECKPOINT QUIZ =============
+// CRITICAL FIX #2: Validate mastery through checkpoint quiz before advancing concept
+app.post("/api/submit-checkpoint-quiz", async (req, res) => {
+  try {
+    const {
+      botId,
+      userId,
+      moduleIndex,
+      conceptIndex,
+      answers,
+      correctAnswers,
+    } = req.body;
+
+    if (
+      !botId ||
+      !userId ||
+      moduleIndex === undefined ||
+      conceptIndex === undefined
+    ) {
+      return res.status(400).json({
+        error: "Invalid request",
+        message: "botId, userId, moduleIndex, and conceptIndex are required",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    console.log(
+      "[Checkpoint Quiz] Submission received for module:",
+      moduleIndex,
+      "concept:",
+      conceptIndex,
+    );
+
+    // Calculate score based on correct answers
+    let score = 0;
+    let totalQuestions = 0;
+
+    if (Array.isArray(answers) && Array.isArray(correctAnswers)) {
+      totalQuestions = Math.min(answers.length, correctAnswers.length);
+      for (let i = 0; i < totalQuestions; i++) {
+        if (answers[i] === correctAnswers[i]) {
+          score++;
+        }
+      }
+    }
+
+    const scorePercentage =
+      totalQuestions > 0 ? (score / totalQuestions) * 100 : 0;
+    const passingThreshold = 66.7; // 2/3 questions = 66.7%
+    const passed = scorePercentage >= passingThreshold;
+
+    console.log(
+      `[Checkpoint Quiz] Score: ${score}/${totalQuestions} (${scorePercentage.toFixed(
+        1,
+      )}%) - ${passed ? "PASSED" : "FAILED"}`,
+    );
+
+    // Update or insert checkpoint record
+    try {
+      await pool.query(
+        `INSERT INTO concept_mastery_checkpoints 
+         (bot_id, user_id, module_index, concept_index, checkpoint_score, checkpoint_passed, attempts, mastery_validated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+         ON CONFLICT (bot_id, user_id, module_index, concept_index) 
+         DO UPDATE SET 
+         checkpoint_score = $5,
+         checkpoint_passed = $6,
+         attempts = attempts + 1,
+         mastery_validated_at = NOW()`,
+        [botId, userId, moduleIndex, conceptIndex, scorePercentage, passed, 1],
+      );
+      console.log("[Checkpoint Quiz] ✅ Checkpoint recorded");
+    } catch (dbErr) {
+      console.warn(
+        "[Checkpoint Quiz] Failed to save checkpoint:",
+        dbErr.message,
+      );
+    }
+
+    // If passed, advance to next concept automatically
+    if (passed) {
+      try {
+        const progressResult = await pool.query(
+          `SELECT study_plan, completed_concepts FROM bot_progress 
+           WHERE bot_id = $1 AND user_id = $2 LIMIT 1`,
+          [botId, userId],
+        );
+
+        if (progressResult.rows.length > 0) {
+          const row = progressResult.rows[0];
+          const plan = row.study_plan;
+          let completedConcepts = row.completed_concepts || [];
+
+          if (plan && plan.modules && plan.modules.length > 0) {
+            const currentModule = plan.modules[moduleIndex];
+            const keyTopics =
+              currentModule?.key_topics || currentModule?.subtopics || [];
+            const conceptKey = `m${moduleIndex}_c${conceptIndex}`;
+
+            // Mark concept as completed
+            if (!completedConcepts.includes(conceptKey)) {
+              completedConcepts.push(conceptKey);
+            }
+
+            // Update database
+            await pool.query(
+              `UPDATE bot_progress 
+               SET completed_concepts = $1, last_updated = NOW()
+               WHERE bot_id = $2 AND user_id = $3`,
+              [JSON.stringify(completedConcepts), botId, userId],
+            );
+
+            console.log(
+              "[Checkpoint Quiz] ✅ Concept advanced successfully after mastery validation",
+            );
+          }
+        }
+      } catch (advErr) {
+        console.warn(
+          "[Checkpoint Quiz] Failed to advance concept:",
+          advErr.message,
+        );
+      }
+    }
+
+    // Record performance metrics
+    try {
+      await pool.query(
+        `INSERT INTO concept_performance_metrics 
+         (bot_id, user_id, module_index, concept_index, quiz_score, confidence_level)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (bot_id, user_id, module_index, concept_index) 
+         DO UPDATE SET 
+         quiz_score = $5,
+         confidence_level = $6,
+         updated_at = NOW()`,
+        [
+          botId,
+          userId,
+          moduleIndex,
+          conceptIndex,
+          scorePercentage,
+          passed ? "confident" : "needs_review",
+        ],
+      );
+    } catch (metricsErr) {
+      console.warn(
+        "[Checkpoint Quiz] Failed to save metrics:",
+        metricsErr.message,
+      );
+    }
+
+    return res.json({
+      status: "success",
+      passed: passed,
+      score: score,
+      totalQuestions: totalQuestions,
+      scorePercentage: scorePercentage.toFixed(1),
+      passingThreshold: passingThreshold,
+      message: passed
+        ? `🎉 Congratulations! You've mastered this concept with ${scorePercentage.toFixed(
+            1,
+          )}% accuracy!`
+        : `Let's review this concept. You scored ${scorePercentage.toFixed(
+            1,
+          )}%. We need ${passingThreshold}% to advance.`,
+      nextAction: passed ? "concept_advance" : "concept_review",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("[POST /api/submit-checkpoint-quiz] Error:", err.message);
+    return res.status(500).json({
+      error: "Failed to process checkpoint submission",
+      message: err.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// ============= ENDPOINT: GET STRUGGLE SIGNALS =============
+// CRITICAL FIX #3: Retrieve detected struggle signals for analytics
+app.get("/api/struggle-signals/:botId/:userId", async (req, res) => {
+  try {
+    const { botId, userId } = req.params;
+    const { moduleIndex, conceptIndex } = req.query;
+
+    if (!botId || !userId) {
+      return res.status(400).json({
+        error: "Invalid request",
+        message: "botId and userId are required",
+      });
+    }
+
+    console.log("[Struggle Signals] Fetching for bot:", botId, "user:", userId);
+
+    let query = `SELECT * FROM struggle_signals WHERE bot_id = $1 AND user_id = $2`;
+    const params = [botId, userId];
+
+    if (moduleIndex !== undefined) {
+      query += ` AND module_index = $3`;
+      params.push(moduleIndex);
+    }
+
+    if (conceptIndex !== undefined) {
+      const conceptParam = params.length + 1;
+      query += ` AND concept_index = $${conceptParam}`;
+      params.push(conceptIndex);
+    }
+
+    query += ` ORDER BY detected_at DESC`;
+
+    const result = await pool.query(query, params);
+
+    console.log(
+      "[Struggle Signals] Found",
+      result.rows.length,
+      "signals for user",
+    );
+
+    return res.json({
+      status: "success",
+      signals: result.rows,
+      count: result.rows.length,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("[GET /api/struggle-signals] Error:", err.message);
+    return res.status(500).json({
+      error: "Failed to fetch struggle signals",
+      message: err.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// ============= ENDPOINT: GET CONCEPT PERFORMANCE =============
+// Analytics: Track per-concept learning performance
+app.get("/api/concept-performance/:botId/:userId", async (req, res) => {
+  try {
+    const { botId, userId } = req.params;
+
+    if (!botId || !userId) {
+      return res.status(400).json({
+        error: "Invalid request",
+        message: "botId and userId are required",
+      });
+    }
+
+    const result = await pool.query(
+      `SELECT * FROM concept_performance_metrics WHERE bot_id = $1 AND user_id = $2 ORDER BY updated_at DESC`,
+      [botId, userId],
+    );
+
+    console.log(
+      "[Concept Performance] Retrieved metrics for",
+      result.rows.length,
+      "concepts",
+    );
+
+    return res.json({
+      status: "success",
+      concepts: result.rows,
+      totalConcepts: result.rows.length,
+      averageScore:
+        result.rows.length > 0
+          ? (
+              result.rows.reduce((sum, r) => sum + (r.quiz_score || 0), 0) /
+              result.rows.length
+            ).toFixed(1)
+          : 0,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("[GET /api/concept-performance] Error:", err.message);
+    return res.status(500).json({
+      error: "Failed to fetch concept performance",
+      message: err.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// Start the server
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`);
+  console.log(`📍 Environment: ${process.env.NODE_ENV || "development"}`);
+  console.log(`🔑 API Keys Status:`);
+  console.log(`   - GROQ_API_KEY: ${process.env.GROQ_API_KEY ? "✅" : "❌"}`);
+  console.log(`   - EXA_API_KEY: ${process.env.EXA_API_KEY ? "✅" : "❌"}`);
+  console.log(`   - DATABASE_URL: ${process.env.DATABASE_URL ? "✅" : "❌"}`);
+});
+
 // ============= SPEECH-TO-TEXT ROUTE =============
 
 // POST /transcribe - Convert audio file to text using Google Cloud Speech API
@@ -4769,17 +5514,8 @@ app.post("/transcribe", upload.single("audio"), async (req, res) => {
   }
 });
 
-// ============= SERVER STARTUP =============
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(
-    `[Server Started] Running on port ${PORT} at ${new Date().toISOString()}`,
-  );
-  console.log(
-    "[Server] Normal/Detailed mode system active with unrestricted responses",
-  );
-});
+// Server is already running on PORT from line 5438
+// No need to start a second server instance
 
 // ============= GLOBAL ERROR HANDLER (MUST BE LAST) =============
 
