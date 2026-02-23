@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import '../services/checkpoint_quiz_service.dart';
 
 class CheckpointQuizWidget extends StatefulWidget {
@@ -30,6 +31,7 @@ class _CheckpointQuizWidgetState extends State<CheckpointQuizWidget> {
   int currentQuestionIndex = 0;
   bool isSubmitting = false;
   int timeRemaining = 0;
+  Timer? _timer;
 
   @override
   void initState() {
@@ -40,12 +42,19 @@ class _CheckpointQuizWidgetState extends State<CheckpointQuizWidget> {
   }
 
   void _startTimer() {
-    Future.delayed(Duration(seconds: 1), () {
-      if (mounted && timeRemaining > 0) {
+    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+      if (timeRemaining > 0) {
         setState(() => timeRemaining--);
-        _startTimer();
+      } else {
+        timer.cancel();
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
   void _submitAnswers() async {
