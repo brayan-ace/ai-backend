@@ -136,7 +136,16 @@
     "twoWeeks": "Two weeks of consistency! Keep crushing it!",
     "oneWeek": "One week down! You're unstoppable!",
     "buildingMomentum": "You're building momentum!",
-    "everyDayCount": "Every day counts. Start your streak today!"
+    "everyDayCount": "Every day counts. Start your streak today!",
+    "calendar": {
+      "title": "Daily Streak",
+      "thisMonth": "This Month",
+      "daysStudied": "Days studied",
+      "bestStreak": "Best streak",
+      "consistency": "Consistency",
+      "lastActivity": "Last activity",
+      "never": "Never"
+    }
   },
   "study": {
     "studyPlans": "Study Plans",

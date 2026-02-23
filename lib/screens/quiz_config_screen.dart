@@ -17,7 +17,7 @@ class QuizConfigScreen extends StatefulWidget {
 
 class _QuizConfigScreenState extends State<QuizConfigScreen> {
   // Question type selection
-  String _questionType = 'both'; // 'mcq', 'text', 'both'
+  String _questionType = 'mcq'; // MCQ only
 
   // Number of questions
   int _mcqCount = 5;
@@ -60,89 +60,68 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
 
             // Question Type Selection
             Text(
-              'Question Types',
+              'Quiz Type',
               style: AppTheme.labelMedium.copyWith(
                 color: isDarkMode ? AppTheme.textPrimary : Color(0xFF1F2937),
                 fontWeight: FontWeight.w600,
               ),
             ),
             SizedBox(height: AppTheme.spaceSm),
-
-            // Radio buttons for question type
-            _buildRadioTile(
-              title: 'Multiple Choice Questions (MCQ)',
-              value: 'mcq',
-              groupValue: _questionType,
-              onChanged: (value) {
-                setState(() => _questionType = value!);
-              },
-              isDarkMode: isDarkMode,
-            ),
-            SizedBox(height: AppTheme.spaceSm),
-            _buildRadioTile(
-              title: 'Full Text Questions',
-              value: 'text',
-              groupValue: _questionType,
-              onChanged: (value) {
-                setState(() => _questionType = value!);
-              },
-              isDarkMode: isDarkMode,
-            ),
-            SizedBox(height: AppTheme.spaceSm),
-            _buildRadioTile(
-              title: 'Both MCQ and Text',
-              value: 'both',
-              groupValue: _questionType,
-              onChanged: (value) {
-                setState(() => _questionType = value!);
-              },
-              isDarkMode: isDarkMode,
+            Container(
+              padding: EdgeInsets.all(AppTheme.spaceSm),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryBlue.withOpacity(
+                  isDarkMode ? 0.15 : 0.1,
+                ),
+                borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                border: Border.all(color: AppTheme.primaryBlue, width: 2),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.check_circle,
+                    color: AppTheme.primaryBlue,
+                    size: 24,
+                  ),
+                  SizedBox(width: AppTheme.spaceSm),
+                  Expanded(
+                    child: Text(
+                      'Multiple Choice Questions (MCQ)',
+                      style: AppTheme.bodyMedium.copyWith(
+                        color: isDarkMode
+                            ? AppTheme.textPrimary
+                            : Color(0xFF1F2937),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
 
             SizedBox(height: AppTheme.spaceMd),
 
             // Number of questions
-            if (_questionType == 'mcq' || _questionType == 'both') ...[
-              Text(
-                'MCQ Questions',
-                style: AppTheme.labelMedium.copyWith(
-                  color: isDarkMode ? AppTheme.textPrimary : Color(0xFF1F2937),
-                  fontWeight: FontWeight.w600,
-                ),
+            Text(
+              'Number of Questions',
+              style: AppTheme.labelMedium.copyWith(
+                color: isDarkMode ? AppTheme.textPrimary : Color(0xFF1F2937),
+                fontWeight: FontWeight.w600,
               ),
-              SizedBox(height: AppTheme.spaceSm),
-              _buildNumberSlider(
-                label: 'Number of MCQs: $_mcqCount',
-                value: _mcqCount.toDouble(),
-                min: 1,
-                max: 10,
-                onChanged: (value) {
-                  setState(() => _mcqCount = value.toInt());
-                },
-              ),
-              SizedBox(height: AppTheme.spaceMd),
-            ],
+            ),
+            SizedBox(height: AppTheme.spaceSm),
+            _buildNumberSlider(
+              label: 'MCQ Count: $_mcqCount',
+              value: _mcqCount.toDouble(),
+              min: 1,
+              max: 10,
+              onChanged: (value) {
+                setState(() => _mcqCount = value.toInt());
+              },
+            ),
+            SizedBox(height: AppTheme.spaceMd),
 
-            if (_questionType == 'text' || _questionType == 'both') ...[
-              Text(
-                'Text Questions',
-                style: AppTheme.labelMedium.copyWith(
-                  color: isDarkMode ? AppTheme.textPrimary : Color(0xFF1F2937),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              SizedBox(height: AppTheme.spaceSm),
-              _buildNumberSlider(
-                label: 'Number of Text Questions: $_textCount',
-                value: _textCount.toDouble(),
-                min: 1,
-                max: 10,
-                onChanged: (value) {
-                  setState(() => _textCount = value.toInt());
-                },
-              ),
-              SizedBox(height: AppTheme.spaceMd),
-            ],
+            // Removed text questions section as only MCQ is supported
 
             // Web Search Toggle
             Container(
@@ -218,34 +197,16 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
                     ),
                   ),
                   SizedBox(height: AppTheme.spaceSm),
-                  if (_questionType == 'mcq') ...[
-                    Text(
-                      '• $_mcqCount multiple choice questions',
-                      style: AppTheme.bodySmall.copyWith(
-                        color: isDarkMode
-                            ? AppTheme.textSecondary
-                            : Color(0xFF6B7280),
-                      ),
+
+                  Text(
+                    '• $_mcqCount multiple choice questions',
+                    style: AppTheme.bodySmall.copyWith(
+                      color: isDarkMode
+                          ? AppTheme.textSecondary
+                          : Color(0xFF6B7280),
                     ),
-                  ] else if (_questionType == 'text') ...[
-                    Text(
-                      '• $_textCount text questions',
-                      style: AppTheme.bodySmall.copyWith(
-                        color: isDarkMode
-                            ? AppTheme.textSecondary
-                            : Color(0xFF6B7280),
-                      ),
-                    ),
-                  ] else ...[
-                    Text(
-                      '• $_mcqCount MCQ + $_textCount text questions',
-                      style: AppTheme.bodySmall.copyWith(
-                        color: isDarkMode
-                            ? AppTheme.textSecondary
-                            : Color(0xFF6B7280),
-                      ),
-                    ),
-                  ],
+                  ),
+
                   SizedBox(height: 4),
                   Text(
                     _useWebSearch
@@ -316,54 +277,6 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
     );
   }
 
-  Widget _buildRadioTile({
-    required String title,
-    required String value,
-    required String groupValue,
-    required ValueChanged<String?> onChanged,
-    required bool isDarkMode,
-  }) {
-    return InkWell(
-      onTap: () => onChanged(value),
-      child: Container(
-        padding: EdgeInsets.all(AppTheme.spaceSm),
-        decoration: BoxDecoration(
-          color: groupValue == value
-              ? AppTheme.primaryBlue.withOpacity(isDarkMode ? 0.15 : 0.1)
-              : (isDarkMode ? AppTheme.surfaceCard : Color(0xFFF3F4F6)),
-          borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-          border: Border.all(
-            color: groupValue == value
-                ? AppTheme.primaryBlue
-                : AppTheme.primaryBlue.withOpacity(0.2),
-            width: groupValue == value ? 2 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Radio<String>(
-              value: value,
-              groupValue: groupValue,
-              onChanged: onChanged,
-              activeColor: AppTheme.primaryBlue,
-            ),
-            Expanded(
-              child: Text(
-                title,
-                style: AppTheme.bodyMedium.copyWith(
-                  color: isDarkMode ? AppTheme.textPrimary : Color(0xFF1F2937),
-                  fontWeight: groupValue == value
-                      ? FontWeight.w600
-                      : FontWeight.normal,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildNumberSlider({
     required String label,
     required double value,
@@ -394,13 +307,9 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
 
   void _handleStartQuiz() {
     final config = {
-      'questionType': _questionType,
-      'mcqCount': _questionType == 'mcq' || _questionType == 'both'
-          ? _mcqCount
-          : 0,
-      'textCount': _questionType == 'text' || _questionType == 'both'
-          ? _textCount
-          : 0,
+      'questionType': 'mcq',
+      'mcqCount': _mcqCount,
+      'textCount': 0,
       'useWebSearch': _useWebSearch,
     };
 

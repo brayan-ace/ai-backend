@@ -20,10 +20,8 @@ class StudyActivityService {
 
   // Preference keys
   static const String _lastStudyTimestampKey = 'study_last_timestamp';
-  static const String _lastStudyDateKey =
-      'study_last_date'; // Calendar date for day-based tracking
-  static const String _lastAppOpenDateKey =
-      'study_last_app_open_date'; // Calendar date for day-based tracking
+  static const String _lastActivityDateKey =
+      'study_last_activity_date'; // UNIFIED: Both app open AND study activity use this
   static const String _currentStreakKey = 'study_current_streak';
   static const String _lastStreakMilestoneKey = 'study_last_milestone';
   static const String _longestStreakKey = 'study_longest_streak';
@@ -46,6 +44,7 @@ class StudyActivityService {
   /// Record a study activity (message in chat, quiz, module, etc.)
   /// Returns the updated streak information
   /// Uses CALENDAR DAY tracking (not 24-hour windows)
+  /// UNIFIED: Now shares date tracking with app open
   Future<StudyStreakData> recordStudyActivity({
     required String activityType, // 'message', 'quiz', 'module', etc.
     String? botId,
@@ -56,21 +55,21 @@ class StudyActivityService {
     try {
       final now = DateTime.now();
       final today = _dateOnly(now);
-      final lastStudyDate = _getLastStudyDate();
+      final lastActivityDate = _getLastActivityDate();
 
-      // First study session ever
-      if (lastStudyDate == null) {
-        await _setLastStudyDate(today);
+      // First activity ever
+      if (lastActivityDate == null) {
+        await _setLastActivityDate(today);
         await _setCurrentStreak(1);
-        print('[StudyActivity] 🎯 First study session recorded. Streak: 1');
+        print('[StudyActivity] 🎯 First activity recorded. Streak: 1');
         return _buildStreakData(1, false);
       }
 
       // Same day - don't increment streak
-      if (lastStudyDate.isAtSameMomentAs(today)) {
+      if (lastActivityDate.isAtSameMomentAs(today)) {
         final currentStreak = _getCurrentStreak();
         print(
-          '[StudyActivity] ⏱️  Already studied today. Streak remains: $currentStreak',
+          '[StudyActivity] ⏱️  Already active today. Streak remains: $currentStreak',
         );
         return _buildStreakData(currentStreak, false);
       }
@@ -79,9 +78,9 @@ class StudyActivityService {
       final hoursDiff = now
           .difference(
             DateTime(
-              lastStudyDate.year,
-              lastStudyDate.month,
-              lastStudyDate.day,
+              lastActivityDate.year,
+              lastActivityDate.month,
+              lastActivityDate.day,
             ),
           )
           .inHours;
@@ -90,7 +89,7 @@ class StudyActivityService {
         // Within 48 hours, different day - INCREMENT STREAK
         final newStreak = _getCurrentStreak() + 1;
         await _setCurrentStreak(newStreak);
-        await _setLastStudyDate(today);
+        await _setLastActivityDate(today);
 
         // Update longest streak if applicable
         final longestStreak = _getLongestStreak();
@@ -104,10 +103,10 @@ class StudyActivityService {
         return _buildStreakData(newStreak, true);
       }
 
-      // More than 48 hours since last study - RESET STREAK
+      // More than 48 hours since last activity - RESET STREAK
       if (hoursDiff >= 48) {
         await _setCurrentStreak(1);
-        await _setLastStudyDate(today);
+        await _setLastActivityDate(today);
         // Reset milestone when streak resets
         await _prefs.remove(_lastStreakMilestoneKey);
         print(
@@ -128,24 +127,25 @@ class StudyActivityService {
   /// This increments the streak whenever user opens the app on a new calendar day
   /// Returns the updated streak information
   /// Uses CALENDAR DAY tracking (not 24-hour windows)
+  /// UNIFIED: Now shares date tracking with study activity
   Future<StudyStreakData> recordAppOpen() async {
     _ensureInitialized();
 
     try {
       final now = DateTime.now();
       final today = _dateOnly(now);
-      final lastAppOpenDate = _getLastAppOpenDate();
+      final lastActivityDate = _getLastActivityDate();
 
-      // First app open ever
-      if (lastAppOpenDate == null) {
-        await _setLastAppOpenDate(today);
+      // First activity ever
+      if (lastActivityDate == null) {
+        await _setLastActivityDate(today);
         await _setCurrentStreak(1);
         print('[StudyActivity] 🎯 First app open. Streak: 1');
         return _buildStreakData(1, false);
       }
 
       // Same day - don't increment streak
-      if (lastAppOpenDate.isAtSameMomentAs(today)) {
+      if (lastActivityDate.isAtSameMomentAs(today)) {
         final currentStreak = _getCurrentStreak();
         print(
           '[StudyActivity] ⏱️  Already opened app today. Streak remains: $currentStreak',
@@ -157,9 +157,9 @@ class StudyActivityService {
       final hoursDiff = now
           .difference(
             DateTime(
-              lastAppOpenDate.year,
-              lastAppOpenDate.month,
-              lastAppOpenDate.day,
+              lastActivityDate.year,
+              lastActivityDate.month,
+              lastActivityDate.day,
             ),
           )
           .inHours;
@@ -168,7 +168,7 @@ class StudyActivityService {
         // Within 48 hours, different day - INCREMENT STREAK
         final newStreak = _getCurrentStreak() + 1;
         await _setCurrentStreak(newStreak);
-        await _setLastAppOpenDate(today);
+        await _setLastActivityDate(today);
 
         // Update longest streak if applicable
         final longestStreak = _getLongestStreak();
@@ -182,10 +182,10 @@ class StudyActivityService {
         return _buildStreakData(newStreak, true);
       }
 
-      // More than 48 hours since last app open - RESET STREAK
+      // More than 48 hours since last activity - RESET STREAK
       if (hoursDiff >= 48) {
         await _setCurrentStreak(1);
-        await _setLastAppOpenDate(today);
+        await _setLastActivityDate(today);
         // Reset milestone when streak resets
         await _prefs.remove(_lastStreakMilestoneKey);
         print(
@@ -327,30 +327,17 @@ class StudyActivityService {
     return DateTime.parse(timestamp);
   }
 
-  // Get last study date (calendar day only)
-  DateTime? _getLastStudyDate() {
-    final dateStr = _prefs.getString(_lastStudyDateKey);
+  // Get last activity date (calendar day only) - UNIFIED for both app open and study activity
+  DateTime? _getLastActivityDate() {
+    final dateStr = _prefs.getString(_lastActivityDateKey);
     if (dateStr == null) return null;
     return DateTime.parse(dateStr);
   }
 
-  // Set last study date (calendar day only)
-  Future<void> _setLastStudyDate(DateTime dateTime) async {
+  // Set last activity date (calendar day only) - UNIFIED for both app open and study activity
+  Future<void> _setLastActivityDate(DateTime dateTime) async {
     final dateOnly = _dateOnly(dateTime);
-    await _prefs.setString(_lastStudyDateKey, dateOnly.toIso8601String());
-  }
-
-  // Get last app open date (calendar day only)
-  DateTime? _getLastAppOpenDate() {
-    final dateStr = _prefs.getString(_lastAppOpenDateKey);
-    if (dateStr == null) return null;
-    return DateTime.parse(dateStr);
-  }
-
-  // Set last app open date (calendar day only)
-  Future<void> _setLastAppOpenDate(DateTime dateTime) async {
-    final dateOnly = _dateOnly(dateTime);
-    await _prefs.setString(_lastAppOpenDateKey, dateOnly.toIso8601String());
+    await _prefs.setString(_lastActivityDateKey, dateOnly.toIso8601String());
   }
 
   int _getCurrentStreak() {
@@ -386,8 +373,7 @@ class StudyActivityService {
     print('[StudyActivity] Current state:');
     print('  - Current Streak: ${_getCurrentStreak()}');
     print('  - Longest Streak: ${_getLongestStreak()}');
-    print('  - Last Study Date: ${_getLastStudyDate()}');
-    print('  - Last App Open Date: ${_getLastAppOpenDate()}');
+    print('  - Last Activity Date: ${_getLastActivityDate()}');
     print('  - Last Notified Milestone: ${_getLastStreakMilestone()}');
   }
 }

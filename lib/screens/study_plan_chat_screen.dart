@@ -27,6 +27,7 @@ import '../services/study_activity_service.dart';
 import '../services/study_notification_service.dart';
 import '../services/push_notification_service.dart';
 import '../services/text_to_speech_service.dart';
+import '../widgets/voice_input_dialog.dart';
 import 'main_tabs.dart';
 import '../services/checkpoint_quiz_service.dart';
 import '../widgets/checkpoint_quiz_widget.dart';
@@ -1004,14 +1005,7 @@ Remember: The user is learning ${modules.length} interconnected modules. Each su
   }
 
   Future<void> _addUserMessage(String text) async {
-    // Stop any active speech when user sends a new message
-    try {
-      await TextToSpeechService().stop();
-      print('[ChatScreen] 🔇 Stopped active speech on new user message');
-    } catch (e) {
-      print('[ChatScreen] ⚠️ Error stopping speech: $e');
-    }
-
+    // Create message object
     final message = StudyBotMessage(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       senderType: 'user',
@@ -1019,6 +1013,7 @@ Remember: The user is learning ${modules.length} interconnected modules. Each su
       timestamp: DateTime.now(),
     );
 
+    // ⚡ IMMEDIATELY update UI - message appears instantly
     if (mounted) {
       setState(() {
         _messages.add(message);
@@ -1026,43 +1021,88 @@ Remember: The user is learning ${modules.length} interconnected modules. Each su
         _userMessageCount = _messages
             .where((m) => m.senderType == 'user')
             .length;
-        print(
-          '[ChatScreen] 📊 Added user message - User: $_userMessageCount, Total: $_totalMessageCount',
-        );
+        _inputController.clear();
+        _isLoading = true;
       });
+
+      // Scroll to bottom immediately to show the new message
+      Future.microtask(() {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+
+      print(
+        '[ChatScreen] 📊 Added user message - User: $_userMessageCount, Total: $_totalMessageCount',
+      );
     }
 
-    // Save user message to Firebase
+    // 🔄 Background operations - DON'T BLOCK UI
+    // These happen in parallel without waiting
+
+    // Stop TTS in background
+    _stopTTSInBackground();
+
+    // Save to Firebase in background
+    _saveToFirebaseInBackground(text);
+
+    // Detect mood and build learner profile in background
+    _processUserAnalyticsInBackground(text);
+
+    // ⏳ Then send to backend (this is the only awaited operation)
+    await _sendMessageToBackend(text);
+  }
+
+  /// Stop TTS without blocking the UI
+  void _stopTTSInBackground() {
+    // Fire and forget
+    TextToSpeechService()
+        .stop()
+        .then((_) {
+          print('[ChatScreen] 🔇 TTS stopped in background');
+        })
+        .catchError((e) {
+          print('[ChatScreen] ⚠️ TTS stop error (background): $e');
+        });
+  }
+
+  /// Save to Firebase without blocking the UI
+  void _saveToFirebaseInBackground(String text) {
     if (widget.botId != null) {
-      try {
-        await _firebaseService.saveMessage(
-          botId: widget.botId!,
-          text: text,
-          fromUser: true,
-        );
-        print('[ChatScreen] 🔥 User message saved to Firebase');
-
-        // Update bot metadata in Firestore
-        await _firebaseService.saveBot(
-          botId: widget.botId!,
-          name: widget.botName ?? 'Study Bot',
-          topic: widget.planName ?? '',
-          description: widget.planDescription ?? '',
-          gradeLevel: widget.educationLevel ?? '',
-          systemInstructions: widget.systemInstructions,
-          progressPercentage: _progressPercentage,
-          currentModule: 0,
-          botState: _botCurrentState,
-          messageCount: _totalMessageCount,
-        );
-        print(
-          '[ChatScreen] 🔥 Bot metadata updated in Firestore with $_totalMessageCount messages',
-        );
-      } catch (e) {
-        print('[ChatScreen] ⚠️ Firebase save error (non-blocking): $e');
-      }
+      // Fire and forget
+      _firebaseService
+          .saveMessage(botId: widget.botId!, text: text, fromUser: true)
+          .then((_) {
+            print('[ChatScreen] 🔥 User message saved to Firebase');
+            // Update bot metadata
+            return _firebaseService.saveBot(
+              botId: widget.botId!,
+              name: widget.botName ?? 'Study Bot',
+              topic: widget.planName ?? '',
+              description: widget.planDescription ?? '',
+              gradeLevel: widget.educationLevel ?? '',
+              systemInstructions: widget.systemInstructions,
+              progressPercentage: _progressPercentage,
+              currentModule: 0,
+              botState: _botCurrentState,
+              messageCount: _totalMessageCount,
+            );
+          })
+          .then((_) {
+            print('[ChatScreen] 🔥 Bot metadata updated in Firestore');
+          })
+          .catchError((e) {
+            print('[ChatScreen] ⚠️ Firebase error (background): $e');
+          });
     }
+  }
 
+  /// Process mood detection and learner profile in background
+  void _processUserAnalyticsInBackground(String text) {
     // Detect user mood from this message
     _currentMood = _tutorService.detectMood(text);
     print('[ChatScreen] Detected mood: ${_currentMood?.sentiment}');
@@ -1070,42 +1110,36 @@ Remember: The user is learning ${modules.length} interconnected modules. Each su
     // Check if user is indicating understanding or confusion
     if (_indicatesUnderstanding(text)) {
       print('[ChatScreen] User indicated understanding');
-      // Record milestone for understanding
-      await _recordMilestone(
+      // Record milestone in background (don't await)
+      _recordMilestone(
         'User demonstrated understanding',
         'concept_mastery',
         progressIncrement: 0.02,
-      );
+      ).catchError((e) {
+        print('[ChatScreen] ⚠️ Milestone record error: $e');
+      });
     } else if (_indicatesConfusion(text)) {
       print('[ChatScreen] User indicated confusion');
-      // Backend will know to provide clarification
     }
 
-    // Build learner profile from initial exchanges if not yet built
+    // Build learner profile from initial exchanges if needed
     if (_learnerProfile == null && _messages.length < 6) {
-      // Build profile from first few exchanges
-      final exchange = _messages
-          .map((m) => {'text': m.text, 'sender': m.senderType})
-          .toList();
-      exchange.add({'text': text, 'sender': 'user'});
-      _learnerProfile = _tutorService.buildLearnerProfile(
-        _botState?.sessionId ?? 'unknown',
-        exchange.cast<Map<String, String>>(),
-      );
-      print(
-        '[ChatScreen] Learner profile built: ${_learnerProfile?.learningStyle}',
-      );
+      try {
+        final exchange = _messages
+            .map((m) => {'text': m.text, 'sender': m.senderType})
+            .toList();
+        exchange.add({'text': text, 'sender': 'user'});
+        _learnerProfile = _tutorService.buildLearnerProfile(
+          _botState?.sessionId ?? 'unknown',
+          exchange.cast<Map<String, String>>(),
+        );
+        print(
+          '[ChatScreen] Learner profile built: ${_learnerProfile?.learningStyle}',
+        );
+      } catch (e) {
+        print('[ChatScreen] ⚠️ Learner profile build error: $e');
+      }
     }
-
-    if (mounted) {
-      setState(() {
-        _inputController.clear();
-        _isLoading = true;
-      });
-    }
-
-    // Send message to backend AI
-    await _sendMessageToBackend(text);
   }
 
   Future<void> _sendMessageToBackend(String userMessage) async {
@@ -2696,6 +2730,7 @@ Remember: The user is learning ${modules.length} interconnected modules. Each su
                     label: 'Voice',
                     onTap: () {
                       Navigator.pop(context);
+                      _toggleListening();
                     },
                   ),
                 ],
@@ -3926,6 +3961,24 @@ Remember: The user is learning ${modules.length} interconnected modules. Each su
     );
   }
 
+  /// Toggle voice input - opens voice recording dialog
+  void _toggleListening() async {
+    final transcribedText = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black54,
+      builder: (context) => const VoiceInputDialog(),
+    );
+
+    if (transcribedText != null && transcribedText.isNotEmpty) {
+      setState(() {
+        _inputController.text = transcribedText;
+      });
+      // Text is now in the input field as a preview before sending
+      // User can edit or press send to add as a message
+    }
+  }
+
   /// Show quiz configuration screen
   void _showQuizConfiguration() {
     showDialog(
@@ -3966,9 +4019,8 @@ Remember: The user is learning ${modules.length} interconnected modules. Each su
         'moduleName':
             'Module ${((_botState?.chatHistory?.length) ?? 0) ~/ 5 + 1}',
         'moduleContent': moduleContext,
-        'questionType': config['questionType'] ?? 'both',
+        'questionType': 'mcq',
         'mcqCount': config['mcqCount'] ?? 5,
-        'textCount': config['textCount'] ?? 3,
         'useWebSearch': config['useWebSearch'] ?? true,
         'gradeLevel': widget.educationLevel ?? 'General',
         'topic': widget.planName ?? 'General',

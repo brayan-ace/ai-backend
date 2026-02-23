@@ -82,6 +82,44 @@ async function ensureDatabaseTables() {
 ensureDatabaseTables();
 // ============= UTILITY FUNCTIONS =============
 
+/**
+ * Calculate granular progress percentage based on modules and concepts
+ * Progress is independent of user input - driven by bot teaching
+ *
+ * - Each completed module = full module percentage
+ * - Current module = partial progress based on concepts covered
+ * - Returns smooth, continuous progress values
+ */
+function calculateGranularProgress(
+  completedModules = [],
+  totalModules = 0,
+  currentModuleIndex = 0,
+  conceptsCoveredInCurrentModule = 0,
+  totalConceptsInCurrentModule = 0,
+) {
+  if (totalModules === 0) return 0;
+
+  // Each module is worth this much percentage
+  const modulePercentage = 100 / totalModules;
+
+  // Start with completed modules
+  let progressPercentage = completedModules.length * modulePercentage;
+
+  // Add partial progress for current module (if not already completed)
+  if (
+    !completedModules.includes(currentModuleIndex) &&
+    totalConceptsInCurrentModule > 0
+  ) {
+    const conceptProgress =
+      (conceptsCoveredInCurrentModule / totalConceptsInCurrentModule) *
+      modulePercentage;
+    progressPercentage += conceptProgress;
+  }
+
+  // Cap at 99% until modules are actually marked complete
+  return Math.min(Math.round(progressPercentage), 99);
+}
+
 function shouldAutoTriggerWebSearch(message) {
   if (!message) return false;
   const msg = message.toLowerCase();
@@ -2778,21 +2816,78 @@ Always prioritize intellectual clarity, aesthetic presentation, and cognitive en
       );
     }
 
+    // STEP 9: Calculate granular progress before responding
+    // Fetch latest progress data to calculate smooth, continuous progress
+    let finalProgressPercentage = newProgressPercentage;
+    let finalCompletedModules = 0;
+    let finalTotalModules = 0;
+    try {
+      const progressData = await pool.query(
+        `SELECT study_plan, completed_modules, current_module, completed_concepts 
+         FROM bot_progress WHERE bot_id = $1 AND user_id = $2 LIMIT 1`,
+        [botId, userId],
+      );
+
+      if (progressData.rows.length > 0) {
+        const row = progressData.rows[0];
+        const plan = row.study_plan || { modules: [] };
+        const completedMods = row.completed_modules || [];
+        const currentMod = row.current_module || 0;
+        const completedConcepts = row.completed_concepts || [];
+
+        finalTotalModules = plan.modules?.length || 0;
+        finalCompletedModules = completedMods.length;
+
+        // Get total concepts in current module
+        let totalConceptsInCurrentModule = 0;
+        if (plan.modules && plan.modules[currentMod]) {
+          const currentModuleData = plan.modules[currentMod];
+          totalConceptsInCurrentModule =
+            currentModuleData.key_topics?.length ||
+            currentModuleData.subtopics?.length ||
+            0;
+        }
+
+        // Calculate granular progress using the new helper function
+        finalProgressPercentage = calculateGranularProgress(
+          completedMods,
+          finalTotalModules,
+          currentMod,
+          completedConcepts.length,
+          totalConceptsInCurrentModule,
+        );
+
+        console.log(
+          `[Chat-Enhanced] 📊 Granular progress calculated: ${finalProgressPercentage}% (${completedMods.length}/${finalTotalModules} modules, ${completedConcepts.length}/${totalConceptsInCurrentModule} concepts in module ${currentMod})`,
+        );
+      }
+    } catch (progErr) {
+      console.warn(
+        "[Chat-Enhanced] Failed to calculate granular progress:",
+        progErr.message,
+      );
+      // Use the module-completion-based calculation as fallback
+      if (
+        !moduleCompleted &&
+        completedModulesCount > 0 &&
+        finalTotalModules > 0
+      ) {
+        finalProgressPercentage = Math.round(
+          (completedModulesCount / finalTotalModules) * 100,
+        );
+      }
+    }
+
     return res.json({
       status: "success",
       response: aiResponse,
       state: botProgressState || "intro",
       progress: {
-        percentage: moduleCompleted
-          ? newProgressPercentage
-          : completedModulesCount > 0
-            ? Math.round(
-                (completedModulesCount / (completedModulesCount + 1)) * 100,
-              )
-            : 0,
+        percentage: finalProgressPercentage,
         currentModule: updatedCurrentModule,
         currentConcept: updatedCurrentConcept,
-        completedModules: completedModulesCount + (moduleCompleted ? 1 : 0),
+        completedModules: finalCompletedModules,
+        totalModules: finalTotalModules,
       },
       conceptCompleted: conceptCompleted,
       moduleCompleted: moduleCompleted,
@@ -2859,18 +2954,30 @@ app.get("/api/bot-progress/:botId/:userId", async (req, res) => {
     const row = result.rows[0];
     const plan = row.study_plan || { modules: [] };
     const completedModules = row.completed_modules || [];
+    const currentModuleIndex = row.current_module || 0;
+    const completedConcepts = row.completed_concepts || [];
     const totalModules = plan.modules?.length || 0;
 
-    // Calculate progress percentage based on completed modules
-    let progressPercentage = row.progress_percentage || 0;
-    if (totalModules > 0 && completedModules.length > 0) {
-      progressPercentage = Math.round(
-        (completedModules.length / totalModules) * 100,
-      );
+    // Calculate granular progress percentage (smooth, continuous progress based on teaching)
+    let totalConceptsInCurrentModule = 0;
+    if (plan.modules && plan.modules[currentModuleIndex]) {
+      const currentModule = plan.modules[currentModuleIndex];
+      totalConceptsInCurrentModule =
+        currentModule.key_topics?.length ||
+        currentModule.subtopics?.length ||
+        0;
     }
 
+    const progressPercentage = calculateGranularProgress(
+      completedModules,
+      totalModules,
+      currentModuleIndex,
+      completedConcepts.length,
+      totalConceptsInCurrentModule,
+    );
+
     console.log(
-      `[bot-progress] Progress: ${progressPercentage}% (${completedModules.length}/${totalModules} modules)`,
+      `[bot-progress] Granular Progress: ${progressPercentage}% (${completedModules.length}/${totalModules} modules, ${completedConcepts.length}/${totalConceptsInCurrentModule} concepts in module ${currentModuleIndex})`,
     );
 
     return res.json({
@@ -2883,10 +2990,10 @@ app.get("/api/bot-progress/:botId/:userId", async (req, res) => {
       },
       study_plan: plan,
       plan_version: row.plan_version || 1,
-      current_module: row.current_module || 0,
+      current_module: currentModuleIndex,
       current_concept: row.current_concept_index || 0,
       completed_modules: completedModules,
-      completed_concepts: row.completed_concepts || [],
+      completed_concepts: completedConcepts,
       timestamp: new Date().toISOString(),
     });
   } catch (err) {

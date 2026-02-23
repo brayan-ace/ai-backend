@@ -17,6 +17,7 @@ import '../widgets/typing_indicator.dart';
 import '../widgets/voice_input_dialog.dart';
 import '../widgets/streak_indicator.dart';
 import '../widgets/streak_details_modal.dart';
+import 'streak_calendar_full_screen.dart';
 import '../services/gemini_services.dart';
 import '../services/api_service.dart';
 import '../services/web_search_service.dart';
@@ -3124,7 +3125,28 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                       StreakIndicator(
                         onTap: () {
                           Navigator.pop(context);
-                          StreakDetailsModal.show(context);
+                          // Navigate to full-screen premium streak calendar
+                          Navigator.push(
+                            context,
+                            PageRouteBuilder(
+                              pageBuilder:
+                                  (context, animation, secondaryAnimation) =>
+                                      StreakCalendarFullScreen(),
+                              transitionsBuilder:
+                                  (
+                                    context,
+                                    animation,
+                                    secondaryAnimation,
+                                    child,
+                                  ) {
+                                    return FadeTransition(
+                                      opacity: animation,
+                                      child: child,
+                                    );
+                                  },
+                              transitionDuration: Duration(milliseconds: 400),
+                            ),
+                          );
                         },
                       ),
                     ],

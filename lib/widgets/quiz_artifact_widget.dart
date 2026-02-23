@@ -215,6 +215,8 @@ class _QuizArtifactWidgetState extends State<QuizArtifactWidget> {
 
     int correctCount = 0;
     List<int> wrongAnswers = [];
+    Map<int, String> correctAnswersMap =
+        {}; // Track correct answers for display
 
     print('[QuizScore] Starting score calculation...');
     print(
@@ -222,7 +224,7 @@ class _QuizArtifactWidgetState extends State<QuizArtifactWidget> {
     );
 
     for (int i = 0; i < questions.length; i++) {
-      // final question = questions[i] as Map<String, dynamic>?;
+      final question = questions[i] as Map<String, dynamic>?;
       final answer = answers[i] as Map<String, dynamic>?;
 
       if (answer == null) {
@@ -230,8 +232,8 @@ class _QuizArtifactWidgetState extends State<QuizArtifactWidget> {
         continue;
       }
 
-      // Get the correct answer from the answers array
-      final correctAnswer =
+      // Extract correct answer - try multiple field names
+      var correctAnswer =
           (answer['correct_answer'] as String?) ??
           (answer['answer'] as String?) ??
           '';
@@ -239,11 +241,35 @@ class _QuizArtifactWidgetState extends State<QuizArtifactWidget> {
       // Get user's selected answer
       final userAnswer = (_selectedAnswers[i] ?? '').trim();
 
+      // For MCQ: Extract the option text if the backend returned "Option A/B/C/D"
+      final options =
+          (question?['options'] as List<dynamic>?)?.cast<String>() ?? [];
+      if (options.isNotEmpty && correctAnswer.isNotEmpty) {
+        // If correct answer is just "Option A", "Option B", etc, map it to actual option
+        final optionMatch = RegExp(
+          r'^Option\s+([A-D])$',
+          caseSensitive: false,
+        ).firstMatch(correctAnswer);
+        if (optionMatch != null) {
+          final optionLetter = optionMatch.group(1)?.toUpperCase() ?? '';
+          final optionIndex = optionLetter.codeUnitAt(0) - 65; // A=0, B=1, etc
+          if (optionIndex >= 0 && optionIndex < options.length) {
+            correctAnswer = options[optionIndex];
+            print(
+              '[QuizScore] Q$i: Mapped "Option $optionLetter" to "${options[optionIndex]}"',
+            );
+          }
+        }
+      }
+
+      // Store correct answer for display in answers tab
+      correctAnswersMap[i] = correctAnswer;
+
       print('[QuizScore] Q$i:');
       print('[QuizScore]   Correct: "$correctAnswer"');
       print('[QuizScore]   User selected: "$userAnswer"');
 
-      // Normalize and compare
+      // Normalize and compare (case-insensitive, trim whitespace)
       final correctNorm = correctAnswer.trim().toLowerCase();
       final userNorm = userAnswer.toLowerCase();
 
@@ -253,7 +279,9 @@ class _QuizArtifactWidgetState extends State<QuizArtifactWidget> {
           print('[QuizScore]   ✓ CORRECT');
         } else {
           wrongAnswers.add(i);
-          print('[QuizScore]   ✗ WRONG - no match');
+          print(
+            '[QuizScore]   ✗ WRONG - Expected "$correctNorm", got "$userNorm"',
+          );
         }
       } else {
         print('[QuizScore]   ✗ SKIPPED - empty answer or user didn\'t select');
@@ -272,6 +300,8 @@ class _QuizArtifactWidgetState extends State<QuizArtifactWidget> {
       _totalQuestions = total;
       _scorePercentage = percentage.toDouble();
       _wrongAnswerIndices = wrongAnswers;
+      // Store correct answers for comparison in answers tab
+      widget.quizData['_correctAnswerMap'] = correctAnswersMap;
     });
 
     // Call the score update callback with detailed info
