@@ -2510,7 +2510,9 @@ Always prioritize intellectual clarity, aesthetic presentation, and cognitive en
               role: "user",
               parts: [
                 {
-                  text: messages.map((m) => `${m.role.toUpperCase()}: ${m.content}`).join("\n\n"),
+                  text: messages
+                    .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
+                    .join("\n\n"),
                 },
               ],
             },
@@ -2549,7 +2551,8 @@ Always prioritize intellectual clarity, aesthetic presentation, and cognitive en
     }
 
     const aiResponseRaw =
-      response.data.candidates?.[0]?.content?.parts?.[0]?.text || "No response from AI";
+      response.data.candidates?.[0]?.content?.parts?.[0]?.text ||
+      "No response from AI";
 
     console.log(
       "[Chat-Enhanced] ✅ AI response received, raw length:",
@@ -4437,7 +4440,8 @@ Make them understand AND be able to apply this.`;
                   },
                   body: JSON.stringify({
                     messages: summarizeMessages,
-                  model: "openai/gpt-oss-120b",
+                    model: "openai/gpt-oss-120b",
+                  }),
                 },
               );
 
@@ -4544,7 +4548,8 @@ Make them understand AND be able to apply this.`;
                 },
                 body: JSON.stringify({
                   messages: messages,
-                    model: "openai/gpt-oss-120b",
+                  model: "openai/gpt-oss-120b",
+                }),
               },
             );
 
