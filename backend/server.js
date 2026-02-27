@@ -567,11 +567,18 @@ function stripUrlsFromText(text) {
   cleaned = cleaned.replace(/^\s*\[\d+\]:\s*https?:\/\/\S+$/gm, "");
   cleaned = cleaned.replace(/^\s*\[.*?\]:\s*https?:\/\/\S+$/gm, "");
 
-  // Clean up multiple spaces and extra newlines left by removals
-  cleaned = cleaned.replace(/\s+/g, " ").trim();
+  // Clean up multiple spaces WITHIN LINES (preserve newlines and paragraph structure)
+  cleaned = cleaned.replace(/ +/g, " ");
 
-  // Remove excessive blank lines (more than 2 consecutive newlines)
+  // Preserve newlines but remove excessive blank lines (more than 2 consecutive newlines)
   cleaned = cleaned.replace(/\n\n\n+/g, "\n\n");
+
+  // Clean up trailing/leading spaces on each line but preserve structure
+  cleaned = cleaned
+    .split("\n")
+    .map((line) => line.trim())
+    .join("\n")
+    .trim();
 
   return cleaned;
 }
@@ -2483,12 +2490,12 @@ Always prioritize intellectual clarity, aesthetic presentation, and cognitive en
     );
 
     // STEP 6: Call AI model with proper instructions
-    const groqApiKey = process.env.GROQ_API_KEY;
-    if (!groqApiKey) {
-      console.error("[POST /api/chat-enhanced] GROQ_API_KEY not configured");
+    const geminiApiKey = process.env.newgemini_key;
+    if (!geminiApiKey) {
+      console.error("[POST /api/chat-enhanced] newgemini_key not configured");
       return res.status(500).json({
         error: "API configuration error",
-        message: "GROQ_API_KEY not configured",
+        message: "newgemini_key not configured",
         timestamp: new Date().toISOString(),
       });
     }
@@ -2496,44 +2503,53 @@ Always prioritize intellectual clarity, aesthetic presentation, and cognitive en
     let response;
     try {
       response = await axios.post(
-        "https://api.groq.com/openai/v1/chat/completions",
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
         {
-          model: "openai/gpt-oss-20b",
-          messages: messages,
-          max_tokens: 1500,
-          temperature: 0.7,
+          contents: [
+            {
+              role: "user",
+              parts: [
+                {
+                  text: messages.map((m) => `${m.role.toUpperCase()}: ${m.content}`).join("\n\n"),
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            maxOutputTokens: 1500,
+            temperature: 0.7,
+          },
         },
         {
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${groqApiKey}`,
           },
           timeout: 30000,
         },
       );
-    } catch (groqErr) {
-      console.error("[Chat-Enhanced] Groq API Error:", groqErr.message);
-      if (groqErr.response) {
+    } catch (geminiErr) {
+      console.error("[Chat-Enhanced] Gemini API Error:", geminiErr.message);
+      if (geminiErr.response) {
         console.error(
-          "[Chat-Enhanced] Groq response status:",
-          groqErr.response.status,
+          "[Chat-Enhanced] Gemini response status:",
+          geminiErr.response.status,
         );
         console.error(
-          "[Chat-Enhanced] Groq response data:",
-          groqErr.response.data,
+          "[Chat-Enhanced] Gemini response data:",
+          geminiErr.response.data,
         );
         return res.status(503).json({
           error: "AI service temporarily unavailable",
-          message: groqErr.response.data?.error?.message || groqErr.message,
-          provider: "groq",
+          message: geminiErr.response.data?.error?.message || geminiErr.message,
+          provider: "gemini",
           timestamp: new Date().toISOString(),
         });
       }
-      throw groqErr;
+      throw geminiErr;
     }
 
     const aiResponseRaw =
-      response.data.choices?.[0]?.message?.content || "No response from AI";
+      response.data.candidates?.[0]?.content?.parts?.[0]?.text || "No response from AI";
 
     console.log(
       "[Chat-Enhanced] ✅ AI response received, raw length:",
@@ -3495,7 +3511,7 @@ ${quizPrompt}`;
       groqRes = await axios.post(
         "https://api.groq.com/openai/v1/chat/completions",
         {
-          model: "openai/gpt-oss-20b",
+          model: "openai/gpt-oss-120b",
           messages: [
             {
               role: "system",
@@ -3529,7 +3545,7 @@ ${quizPrompt}`;
       groqRes = await axios.post(
         "https://api.groq.com/openai/v1/chat/completions",
         {
-          model: "openai/gpt-oss-20b",
+          model: "openai/gpt-oss-120b",
           messages: [
             {
               role: "system",
@@ -4421,9 +4437,7 @@ Make them understand AND be able to apply this.`;
                   },
                   body: JSON.stringify({
                     messages: summarizeMessages,
-                    model: "openai/gpt-oss-20b",
-                  }),
-                  timeout: 30000,
+                  model: "openai/gpt-oss-120b",
                 },
               );
 
@@ -4530,9 +4544,7 @@ Make them understand AND be able to apply this.`;
                 },
                 body: JSON.stringify({
                   messages: messages,
-                  model: "openai/gpt-oss-20b",
-                }),
-                timeout: 30000,
+                    model: "openai/gpt-oss-120b",
               },
             );
 
@@ -4750,7 +4762,7 @@ Make them understand AND be able to apply this.`;
                     },
                     body: JSON.stringify({
                       messages: regenMessages,
-                      model: "openai/gpt-oss-20b",
+                      model: "openai/gpt-oss-120b",
                     }),
                     timeout: 30000,
                   },

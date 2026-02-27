@@ -71,7 +71,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
   late ChatStorageService _chatStorage;
   late SettingsService _settingsService;
 
-  String _selectedModel = 'Groq Pro';
+  String _selectedModel = 'GPT-OSS 120B';
   String _searchQuery = '';
 
   late ScrollController _messageScrollController;
@@ -200,11 +200,11 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
 
   /// Convert display model name to backend API name
   String _getBackendModelName(String displayName) {
-    if (displayName == 'Sonnet 3.5') {
+    if (displayName == 'Sonnet') {
       return 'claude-sonnet';
-    } else if (displayName == 'Gemini 2.0') {
+    } else if (displayName == 'Gemini 3') {
       return 'gemini';
-    } else if (displayName == 'Groq Pro') {
+    } else if (displayName == 'GPT-OSS 120B') {
       return 'groq';
     }
     return displayName.toLowerCase();
@@ -881,10 +881,10 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                       description: AppLocalizations.of(
                         context,
                       ).t('models.sonnetDesc'),
-                      isSelected: _selectedModel == 'Sonnet 3.5',
+                      isSelected: _selectedModel == 'Sonnet',
                       gradient: AppTheme.primaryGradient,
                       onTap: () {
-                        setState(() => _selectedModel = 'Sonnet 3.5');
+                        setState(() => _selectedModel = 'Sonnet');
                         Navigator.pop(context);
                       },
                     ),
@@ -894,10 +894,10 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                       description: AppLocalizations.of(
                         context,
                       ).t('models.geminiDesc'),
-                      isSelected: _selectedModel == 'Gemini 2.0',
+                      isSelected: _selectedModel == 'Gemini 3',
                       gradient: AppTheme.accentGradient,
                       onTap: () {
-                        setState(() => _selectedModel = 'Gemini 2.0');
+                        setState(() => _selectedModel = 'Gemini 3');
                         Navigator.pop(context);
                       },
                     ),
@@ -907,10 +907,10 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                       description: AppLocalizations.of(
                         context,
                       ).t('models.groqDesc'),
-                      isSelected: _selectedModel == 'Groq Pro',
+                      isSelected: _selectedModel == 'GPT-OSS 120B',
                       gradient: [AppTheme.primaryBlue, AppTheme.accentBlue],
                       onTap: () {
-                        setState(() => _selectedModel = 'Groq Pro');
+                        setState(() => _selectedModel = 'GPT-OSS 120B');
                         Navigator.pop(context);
                       },
                     ),
@@ -988,6 +988,8 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                 children: [
                   Text(
                     name,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                     style: AppTheme.bodyLarge.copyWith(
                       color: Theme.of(context).brightness == Brightness.dark
                           ? AppTheme.textPrimary
@@ -998,6 +1000,8 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                   SizedBox(height: 2),
                   Text(
                     description,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
                     style: AppTheme.bodySmall.copyWith(
                       color: Theme.of(context).brightness == Brightness.dark
                           ? AppTheme.textSecondary
@@ -4067,16 +4071,20 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          ShaderMask(
-                            shaderCallback: (bounds) => LinearGradient(
-                              colors: AppTheme.primaryGradient,
-                            ).createShader(bounds),
-                            child: Text(
-                              _selectedModel,
-                              style: AppTheme.headlineSmall.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                                fontSize: 16,
+                          Flexible(
+                            child: ShaderMask(
+                              shaderCallback: (bounds) => LinearGradient(
+                                colors: AppTheme.primaryGradient,
+                              ).createShader(bounds),
+                              child: Text(
+                                _selectedModel,
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                                style: AppTheme.headlineSmall.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                ),
                               ),
                             ),
                           ),
