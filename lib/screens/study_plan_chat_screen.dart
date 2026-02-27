@@ -251,6 +251,10 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
   int _userMessageCount = 0; // Track user messages
   int _totalMessageCount = 0; // Track total messages (user + bot)
   String _botCurrentState = 'intro';
+
+  // Greeting and plan creation flow
+  bool _greetingReceived = false;
+  bool _createPlanPromptShown = false;
   LearnerProfile? _learnerProfile;
   UserMoodState? _currentMood;
 
@@ -678,6 +682,19 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
         print('[ChatScreen] 💬 Greeting text: "$botResponse"');
         print('[ChatScreen] 💬 Greeting length: ${botResponse.length} chars');
         await _addBotMessage(botResponse);
+
+        // ✅ Mark greeting as received and show create plan prompt
+        if (mounted) {
+          setState(() {
+            _greetingReceived = true;
+          });
+        }
+
+        // Show create plan prompt after greeting
+        Future.delayed(Duration(milliseconds: 800), () {
+          _showCreateStudyPlanPrompt();
+        });
+
         print(
           '[ChatScreen] ✅ Initial greeting fetched from backend and displayed',
         );
@@ -690,6 +707,54 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
       print('[ChatScreen] ❌ Error fetching initial greeting: $e');
       // Non-blocking - user can still send messages and backend will respond
     }
+  }
+
+  /// Show prompt to create a study plan after greeting
+  /// Auto-populates text input and shows suggestion
+  void _showCreateStudyPlanPrompt() {
+    if (_createPlanPromptShown || !_greetingReceived || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _createPlanPromptShown = true;
+      // Auto-populate text box with "Create study plan"
+      _inputController.text = 'Create study plan';
+    });
+
+    print('[ChatScreen] 📝 Create study plan prompt shown');
+
+    // Show a toast/snackbar suggestion
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.lightbulb_outline, color: Colors.yellow[600], size: 20),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Tap the send button to create your personalized study plan!',
+                style: TextStyle(color: Colors.white, fontSize: 14),
+              ),
+            ),
+          ],
+        ),
+        duration: Duration(seconds: 4),
+        backgroundColor: Color(0xFF4f46e5).withOpacity(0.9),
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.fromLTRB(16, 0, 16, 80),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        action: SnackBarAction(
+          label: 'Create',
+          textColor: Colors.white,
+          onPressed: () {
+            // Trigger the send action
+            _addUserMessage('Create study plan');
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
+        ),
+      ),
+    );
   }
 
   /// Add study plan card to chat when plan is generated
