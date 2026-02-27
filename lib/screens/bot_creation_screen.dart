@@ -162,27 +162,39 @@ class _BotCreationScreenState extends State<BotCreationScreen>
                 shaderCallback: (bounds) => LinearGradient(
                   colors: [AppTheme.primaryBlue, AppTheme.accentBlue],
                 ).createShader(bounds),
-                child: Text(
-                  AppLocalizations.of(
-                    context,
-                  ).t('botCreation.craftingBotTitle'),
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                    letterSpacing: 0.5,
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 300),
+                  child: Text(
+                    AppLocalizations.of(
+                      context,
+                    ).t('botCreation.craftingBotTitle'),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: 0.5,
+                    ),
                   ),
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
-                AppLocalizations.of(
-                  context,
-                ).t('botCreation.analyzeGoalsMessage'),
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.white.withOpacity(0.6),
-                  letterSpacing: 0.3,
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 280),
+                child: Text(
+                  AppLocalizations.of(
+                    context,
+                  ).t('botCreation.analyzeGoalsMessage'),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.white.withOpacity(0.6),
+                    letterSpacing: 0.3,
+                  ),
                 ),
               ),
             ],

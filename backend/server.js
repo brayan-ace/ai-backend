@@ -961,9 +961,9 @@ async function generateStructuredStudyPlan(
   learnerProfile,
 ) {
   try {
-    const geminiApiKey = process.env.newgemini_key;
-    if (!geminiApiKey) {
-      console.warn("[StudyPlan] newgemini_key not configured");
+    const groqApiKey = process.env.GROQ_API_KEY;
+    if (!groqApiKey) {
+      console.warn("[StudyPlan] GROQ_API_KEY not configured");
       return null;
     }
 
@@ -1018,34 +1018,34 @@ INSTRUCTIONS:
 
 Return ONLY the JSON object, no explanations or markdown.`;
 
-    const geminiRes = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
+    const groqRes = await axios.post(
+      "https://api.groq.com/openai/v1/chat/completions",
       {
-        contents: [
+        model: "openai/gpt-oss-120b",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are an expert curriculum designer. Output ONLY valid JSON, no explanations.",
+          },
           {
             role: "user",
-            parts: [
-              {
-                text: prompt,
-              },
-            ],
+            content: prompt,
           },
         ],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 2000,
-        },
+        max_tokens: 2000,
+        temperature: 0.7,
       },
       {
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${groqApiKey}`,
         },
         timeout: 45000,
       },
     );
 
-    let responseText =
-      geminiRes?.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    let responseText = groqRes?.data?.choices?.[0]?.message?.content || "";
     // Clean code fences if present
     responseText = responseText.replace(/```json\n?|```/g, "").trim();
 
@@ -2490,12 +2490,12 @@ Always prioritize intellectual clarity, aesthetic presentation, and cognitive en
     );
 
     // STEP 6: Call AI model with proper instructions
-    const geminiApiKey = process.env.newgemini_key;
-    if (!geminiApiKey) {
-      console.error("[POST /api/chat-enhanced] newgemini_key not configured");
+    const groqApiKey = process.env.GROQ_API_KEY;
+    if (!groqApiKey) {
+      console.error("[POST /api/chat-enhanced] GROQ_API_KEY not configured");
       return res.status(500).json({
         error: "API configuration error",
-        message: "newgemini_key not configured",
+        message: "GROQ_API_KEY not configured",
         timestamp: new Date().toISOString(),
       });
     }
@@ -2503,56 +2503,44 @@ Always prioritize intellectual clarity, aesthetic presentation, and cognitive en
     let response;
     try {
       response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
+        "https://api.groq.com/openai/v1/chat/completions",
         {
-          contents: [
-            {
-              role: "user",
-              parts: [
-                {
-                  text: messages
-                    .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
-                    .join("\n\n"),
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            maxOutputTokens: 1500,
-            temperature: 0.7,
-          },
+          model: "openai/gpt-oss-120b",
+          messages: messages,
+          max_tokens: 1500,
+          temperature: 0.7,
         },
         {
           headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${groqApiKey}`,
           },
           timeout: 30000,
         },
       );
-    } catch (geminiErr) {
-      console.error("[Chat-Enhanced] Gemini API Error:", geminiErr.message);
-      if (geminiErr.response) {
+    } catch (groqErr) {
+      console.error("[Chat-Enhanced] Groq API Error:", groqErr.message);
+      if (groqErr.response) {
         console.error(
-          "[Chat-Enhanced] Gemini response status:",
-          geminiErr.response.status,
+          "[Chat-Enhanced] Groq response status:",
+          groqErr.response.status,
         );
         console.error(
-          "[Chat-Enhanced] Gemini response data:",
-          geminiErr.response.data,
+          "[Chat-Enhanced] Groq response data:",
+          groqErr.response.data,
         );
         return res.status(503).json({
           error: "AI service temporarily unavailable",
-          message: geminiErr.response.data?.error?.message || geminiErr.message,
-          provider: "gemini",
+          message: groqErr.response.data?.error?.message || groqErr.message,
+          provider: "groq",
           timestamp: new Date().toISOString(),
         });
       }
-      throw geminiErr;
+      throw groqErr;
     }
 
     const aiResponseRaw =
-      response.data.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "No response from AI";
+      response.data.choices?.[0]?.message?.content || "No response from AI";
 
     console.log(
       "[Chat-Enhanced] ✅ AI response received, raw length:",
