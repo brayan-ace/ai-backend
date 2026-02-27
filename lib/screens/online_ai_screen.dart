@@ -7,6 +7,7 @@ import 'package:image/image.dart' as img;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/theme.dart';
@@ -1712,7 +1713,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(context);
-                // TODO: Navigate to premium screen
+                _launchUrl('https://nexasmartai.org/premium');
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.warning,
@@ -3070,680 +3071,487 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
           ),
         ),
         child: SafeArea(
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: EdgeInsets.all(AppTheme.spaceMd),
+          child: Column(
+            children: [
+              // Scrollable content area
+              Expanded(
+                child: SingleChildScrollView(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ShaderMask(
-                              shaderCallback: (bounds) => LinearGradient(
-                                colors: AppTheme.primaryGradient,
-                              ).createShader(bounds),
-                              child: Text(
-                                AppLocalizations.of(context).t('drawer.chats'),
-                                style: AppTheme.displayMedium.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
+                      Padding(
+                        padding: EdgeInsets.all(AppTheme.spaceMd),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ShaderMask(
+                                    shaderCallback: (bounds) => LinearGradient(
+                                      colors: AppTheme.primaryGradient,
+                                    ).createShader(bounds),
+                                    child: Text(
+                                      AppLocalizations.of(
+                                        context,
+                                      ).t('drawer.chats'),
+                                      style: AppTheme.displayMedium.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
                                 ),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: AppTheme.accentGradient,
+                                    ),
+                                    shape: BoxShape.circle,
+                                    boxShadow: AppTheme.accentGlow,
+                                  ),
+                                  child: IconButton(
+                                    icon: Icon(Icons.add, color: Colors.white),
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                      setState(() {
+                                        _messages.clear();
+                                        _currentChatId = null;
+                                        _showGreeting = true;
+                                        _greetingAnimationController.forward();
+                                      });
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: AppTheme.spaceMd),
+                            // ✨ STREAK INDICATOR - Premium UI reusing existing StudyActivityService
+                            StreakIndicator(
+                              onTap: () {
+                                Navigator.pop(context);
+                                // Navigate to full-screen premium streak calendar
+                                Navigator.push(
+                                  context,
+                                  PageRouteBuilder(
+                                    pageBuilder:
+                                        (
+                                          context,
+                                          animation,
+                                          secondaryAnimation,
+                                        ) => StreakCalendarFullScreen(),
+                                    transitionsBuilder:
+                                        (
+                                          context,
+                                          animation,
+                                          secondaryAnimation,
+                                          child,
+                                        ) {
+                                          return FadeTransition(
+                                            opacity: animation,
+                                            child: child,
+                                          );
+                                        },
+                                    transitionDuration: Duration(
+                                      milliseconds: 400,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: AppTheme.spaceMd,
+                        ),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: AppTheme.surfaceGradient,
+                            ),
+                            borderRadius: BorderRadius.circular(
+                              AppTheme.radiusLg,
+                            ),
+                            border: Border.all(
+                              color: AppTheme.surfaceElevated,
+                              width: 1,
+                            ),
+                          ),
+                          child: TextField(
+                            controller: _searchController,
+                            style: AppTheme.bodyMedium.copyWith(
+                              color: AppTheme.textPrimary,
+                            ),
+                            onChanged: (value) {
+                              setState(() {
+                                _searchQuery = value;
+                              });
+                            },
+                            decoration: InputDecoration(
+                              hintText: AppLocalizations.of(
+                                context,
+                              ).t('drawer.searchChats'),
+                              hintStyle: AppTheme.bodyMedium.copyWith(
+                                color: AppTheme.textTertiary,
+                              ),
+                              prefixIcon: Icon(
+                                Icons.search,
+                                color: AppTheme.primaryBlue,
+                              ),
+                              suffixIcon: _searchQuery.isNotEmpty
+                                  ? IconButton(
+                                      icon: Icon(
+                                        Icons.clear,
+                                        color: AppTheme.textTertiary,
+                                      ),
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        setState(() {
+                                          _searchQuery = '';
+                                        });
+                                      },
+                                    )
+                                  : null,
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: AppTheme.spaceMd,
+                                vertical: AppTheme.spaceSm,
                               ),
                             ),
                           ),
-                          Container(
+                        ),
+                      ),
+
+                      SizedBox(height: AppTheme.spaceMd),
+
+                      Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: AppTheme.spaceMd,
+                        ),
+                        child: InkWell(
+                          key: OnboardingConfig.studyPlanKey,
+                          onTap: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const BotCreationScreen(),
+                              ),
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(
+                            AppTheme.radiusMd,
+                          ),
+                          child: Container(
+                            padding: EdgeInsets.all(AppTheme.spaceMd),
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                                 colors: AppTheme.accentGradient,
                               ),
-                              shape: BoxShape.circle,
+                              borderRadius: BorderRadius.circular(
+                                AppTheme.radiusMd,
+                              ),
                               boxShadow: AppTheme.accentGlow,
                             ),
-                            child: IconButton(
-                              icon: Icon(Icons.add, color: Colors.white),
-                              onPressed: () {
-                                Navigator.pop(context);
-                                setState(() {
-                                  _messages.clear();
-                                  _currentChatId = null;
-                                  _showGreeting = true;
-                                  _greetingAnimationController.forward();
-                                });
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: AppTheme.spaceMd),
-                      // ✨ STREAK INDICATOR - Premium UI reusing existing StudyActivityService
-                      StreakIndicator(
-                        onTap: () {
-                          Navigator.pop(context);
-                          // Navigate to full-screen premium streak calendar
-                          Navigator.push(
-                            context,
-                            PageRouteBuilder(
-                              pageBuilder:
-                                  (context, animation, secondaryAnimation) =>
-                                      StreakCalendarFullScreen(),
-                              transitionsBuilder:
-                                  (
-                                    context,
-                                    animation,
-                                    secondaryAnimation,
-                                    child,
-                                  ) {
-                                    return FadeTransition(
-                                      opacity: animation,
-                                      child: child,
-                                    );
-                                  },
-                              transitionDuration: Duration(milliseconds: 400),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: AppTheme.spaceMd),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: AppTheme.surfaceGradient,
-                      ),
-                      borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-                      border: Border.all(
-                        color: AppTheme.surfaceElevated,
-                        width: 1,
-                      ),
-                    ),
-                    child: TextField(
-                      controller: _searchController,
-                      style: AppTheme.bodyMedium.copyWith(
-                        color: AppTheme.textPrimary,
-                      ),
-                      onChanged: (value) {
-                        setState(() {
-                          _searchQuery = value;
-                        });
-                      },
-                      decoration: InputDecoration(
-                        hintText: AppLocalizations.of(
-                          context,
-                        ).t('drawer.searchChats'),
-                        hintStyle: AppTheme.bodyMedium.copyWith(
-                          color: AppTheme.textTertiary,
-                        ),
-                        prefixIcon: Icon(
-                          Icons.search,
-                          color: AppTheme.primaryBlue,
-                        ),
-                        suffixIcon: _searchQuery.isNotEmpty
-                            ? IconButton(
-                                icon: Icon(
-                                  Icons.clear,
-                                  color: AppTheme.textTertiary,
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.school,
+                                  color: Colors.white,
+                                  size: 24,
                                 ),
-                                onPressed: () {
-                                  _searchController.clear();
-                                  setState(() {
-                                    _searchQuery = '';
-                                  });
-                                },
-                              )
-                            : null,
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: AppTheme.spaceMd,
-                          vertical: AppTheme.spaceSm,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                SizedBox(height: AppTheme.spaceMd),
-
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: AppTheme.spaceMd),
-                  child: InkWell(
-                    key: OnboardingConfig.studyPlanKey,
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const BotCreationScreen(),
-                        ),
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                    child: Container(
-                      padding: EdgeInsets.all(AppTheme.spaceMd),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: AppTheme.accentGradient,
-                        ),
-                        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                        boxShadow: AppTheme.accentGlow,
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.school, color: Colors.white, size: 24),
-                          SizedBox(width: AppTheme.spaceSm),
-                          Text(
-                            AppLocalizations.of(
-                              context,
-                            ).t('drawer.createStudyPlan'),
-                            style: AppTheme.labelLarge.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
+                                SizedBox(width: AppTheme.spaceSm),
+                                Text(
+                                  AppLocalizations.of(
+                                    context,
+                                  ).t('drawer.createStudyPlan'),
+                                  style: AppTheme.labelLarge.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Spacer(),
+                                Icon(
+                                  Icons.arrow_forward,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ],
                             ),
                           ),
-                          Spacer(),
-                          Icon(
-                            Icons.arrow_forward,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
-                ),
 
-                SizedBox(height: AppTheme.spaceMd),
+                      SizedBox(height: AppTheme.spaceMd),
 
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: AppTheme.spaceMd),
-                  child: Text(
-                    AppLocalizations.of(context).t('drawer.recentChats'),
-                    style: AppTheme.labelMedium.copyWith(
-                      color: AppTheme.textTertiary,
-                      letterSpacing: 1.5,
-                    ),
-                  ),
-                ),
-
-                SizedBox(height: AppTheme.spaceSm),
-
-                if (!_isSavingEnabled)
-                  Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.login,
-                          size: 48,
-                          color: AppTheme.textTertiary,
+                      Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: AppTheme.spaceMd,
                         ),
-                        SizedBox(height: AppTheme.spaceSm),
-                        Text(
-                          AppLocalizations.of(
-                            context,
-                          ).t('drawer.signInToSaveChats'),
-                          style: AppTheme.bodyMedium.copyWith(
+                        child: Text(
+                          AppLocalizations.of(context).t('drawer.recentChats'),
+                          style: AppTheme.labelMedium.copyWith(
                             color: AppTheme.textTertiary,
+                            letterSpacing: 1.5,
                           ),
                         ),
-                        SizedBox(height: AppTheme.spaceMd),
-                        ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            Navigator.pushNamed(context, '/auth');
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primaryBlue,
-                            foregroundColor: Colors.white,
-                          ),
-                          child: Text(
-                            AppLocalizations.of(
-                              context,
-                            ).t('drawer.signInButton'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                else
-                  StreamBuilder<List<Map<String, dynamic>>>(
-                    stream: _chatStorage.getChats(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return Center(
-                          child: CircularProgressIndicator(
-                            color: AppTheme.primaryBlue,
-                          ),
-                        );
-                      }
+                      ),
 
-                      if (snapshot.hasError) {
-                        return Center(
+                      SizedBox(height: AppTheme.spaceSm),
+
+                      if (!_isSavingEnabled)
+                        Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(
-                                Icons.error_outline,
+                                Icons.login,
                                 size: 48,
-                                color: Colors.red,
+                                color: AppTheme.textTertiary,
                               ),
                               SizedBox(height: AppTheme.spaceSm),
                               Text(
                                 AppLocalizations.of(
                                   context,
-                                ).t('drawer.errorLoadingChats'),
+                                ).t('drawer.signInToSaveChats'),
                                 style: AppTheme.bodyMedium.copyWith(
                                   color: AppTheme.textTertiary,
                                 ),
                               ),
+                              SizedBox(height: AppTheme.spaceMd),
+                              ElevatedButton(
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                  Navigator.pushNamed(context, '/auth');
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.primaryBlue,
+                                  foregroundColor: Colors.white,
+                                ),
+                                child: Text(
+                                  AppLocalizations.of(
+                                    context,
+                                  ).t('drawer.signInButton'),
+                                ),
+                              ),
                             ],
                           ),
-                        );
-                      }
-
-                      final allChats = snapshot.data ?? [];
-
-                      if (_searchQuery.isEmpty) {
-                        final displayChats = allChats;
-                        if (displayChats.isEmpty) {
-                          return Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.chat_bubble_outline,
-                                  size: 48,
-                                  color: AppTheme.textTertiary,
+                        )
+                      else
+                        StreamBuilder<List<Map<String, dynamic>>>(
+                          stream: _chatStorage.getChats(),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return Center(
+                                child: CircularProgressIndicator(
+                                  color: AppTheme.primaryBlue,
                                 ),
-                                SizedBox(height: AppTheme.spaceSm),
-                                Text(
-                                  AppLocalizations.of(
-                                    context,
-                                  ).t('drawer.noChats'),
-                                  style: AppTheme.bodyMedium.copyWith(
-                                    color: AppTheme.textTertiary,
-                                  ),
-                                ),
-                                Padding(
-                                  padding: EdgeInsets.only(
-                                    top: AppTheme.spaceSm,
-                                  ),
-                                  child: Text(
-                                    AppLocalizations.of(
-                                      context,
-                                    ).t('drawer.startChatting'),
-                                    style: AppTheme.bodySmall.copyWith(
-                                      color: AppTheme.textTertiary,
+                              );
+                            }
+
+                            if (snapshot.hasError) {
+                              return Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.error_outline,
+                                      size: 48,
+                                      color: Colors.red,
                                     ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
-
-                        return ListView.builder(
-                          shrinkWrap: true,
-                          physics: NeverScrollableScrollPhysics(),
-                          itemCount: displayChats.length,
-                          itemBuilder: (context, index) {
-                            final chat = displayChats[index];
-                            final isStarred = chat['isStarred'] ?? false;
-                            final chatId = chat['id'];
-                            final chatTitle = chat['title'];
-                            final timeStr = _formatTimestamp(chat['timestamp']);
-
-                            return Padding(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: AppTheme.spaceSm,
-                                vertical: 2,
-                              ),
-                              child: Dismissible(
-                                key: Key(chatId),
-                                direction: DismissDirection.endToStart,
-                                confirmDismiss: (direction) async {
-                                  // If user has checked "Do not show again", delete without confirmation
-                                  if (_skipDeleteConfirmation) {
-                                    return true;
-                                  }
-                                  // Otherwise show the confirmation dialog with checkbox
-                                  final confirmed =
-                                      await _showDeleteConfirmationWithOption();
-                                  return confirmed ?? false;
-                                },
-                                onDismissed: (direction) {
-                                  _deleteChat(chatId, chatTitle);
-                                },
-                                background: Container(
-                                  margin: EdgeInsets.symmetric(
-                                    vertical: AppTheme.spaceSm,
-                                  ),
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: AppTheme.spaceMd,
-                                    vertical: AppTheme.spaceSm,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        AppTheme.primaryBlue.withOpacity(0.1),
-                                        AppTheme.primaryBlue.withOpacity(0.8),
-                                      ],
-                                    ),
-                                    borderRadius: BorderRadius.circular(
-                                      AppTheme.radiusSm,
-                                    ),
-                                  ),
-                                  alignment: Alignment.centerRight,
-                                  child: Icon(
-                                    Icons.delete_outline,
-                                    color: Colors.white,
-                                    size: 24,
-                                  ),
-                                ),
-                                child: InkWell(
-                                  onTap: () {
-                                    Navigator.pop(context);
-                                    _loadChat(chatId, chatTitle);
-                                  },
-                                  onLongPress: () {
-                                    _showChatOptions(
-                                      chatId,
-                                      chatTitle,
-                                      isStarred,
-                                    );
-                                  },
-                                  borderRadius: BorderRadius.circular(
-                                    AppTheme.radiusSm,
-                                  ),
-                                  child: Container(
-                                    padding: EdgeInsets.all(AppTheme.spaceSm),
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: AppTheme.glassGradient,
+                                    SizedBox(height: AppTheme.spaceSm),
+                                    Text(
+                                      AppLocalizations.of(
+                                        context,
+                                      ).t('drawer.errorLoadingChats'),
+                                      style: AppTheme.bodyMedium.copyWith(
+                                        color: AppTheme.textTertiary,
                                       ),
-                                      borderRadius: BorderRadius.circular(
-                                        AppTheme.radiusSm,
-                                      ),
-                                      border: isStarred
-                                          ? Border.all(
-                                              color: Colors.amber,
-                                              width: 1.5,
-                                            )
-                                          : Border.all(
-                                              color: AppTheme.surfaceElevated
-                                                  .withOpacity(0.5),
-                                              width: 1,
-                                            ),
                                     ),
-                                    child: Row(
-                                      children: [
-                                        if (isStarred)
-                                          Padding(
-                                            padding: EdgeInsets.only(
-                                              right: AppTheme.spaceSm,
-                                            ),
-                                            child: Icon(
-                                              Icons.star,
-                                              color: AppTheme.primaryBlue,
-                                              size: 18,
-                                            ),
+                                  ],
+                                ),
+                              );
+                            }
+
+                            final allChats = snapshot.data ?? [];
+
+                            if (_searchQuery.isEmpty) {
+                              final displayChats = allChats;
+                              if (displayChats.isEmpty) {
+                                return Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.chat_bubble_outline,
+                                        size: 48,
+                                        color: AppTheme.textTertiary,
+                                      ),
+                                      SizedBox(height: AppTheme.spaceSm),
+                                      Text(
+                                        AppLocalizations.of(
+                                          context,
+                                        ).t('drawer.noChats'),
+                                        style: AppTheme.bodyMedium.copyWith(
+                                          color: AppTheme.textTertiary,
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: EdgeInsets.only(
+                                          top: AppTheme.spaceSm,
+                                        ),
+                                        child: Text(
+                                          AppLocalizations.of(
+                                            context,
+                                          ).t('drawer.startChatting'),
+                                          style: AppTheme.bodySmall.copyWith(
+                                            color: AppTheme.textTertiary,
                                           ),
-                                        Expanded(
-                                          child: Builder(
-                                            builder: (context) {
-                                              final isDarkMode =
-                                                  Theme.of(
-                                                    context,
-                                                  ).brightness ==
-                                                  Brightness.dark;
-                                              return Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    chatTitle,
-                                                    style: AppTheme.bodyLarge
-                                                        .copyWith(
-                                                          color: isDarkMode
-                                                              ? AppTheme
-                                                                    .textPrimary
-                                                              : Color(
-                                                                  0xFF000000,
-                                                                ),
-                                                          fontWeight:
-                                                              FontWeight.w500,
-                                                        ),
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                  ),
-                                                  Text(
-                                                    '${chat['messageCount']} ${AppLocalizations.of(context).t('drawer.messages')}',
-                                                    style: AppTheme.bodySmall
-                                                        .copyWith(
-                                                          color: isDarkMode
-                                                              ? AppTheme
-                                                                    .textTertiary
-                                                              : Color(
-                                                                  0xFF6B7280,
-                                                                ),
-                                                        ),
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                  ),
-                                                ],
-                                              );
-                                            },
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }
+
+                              return ListView.builder(
+                                shrinkWrap: true,
+                                physics: NeverScrollableScrollPhysics(),
+                                itemCount: displayChats.length,
+                                itemBuilder: (context, index) {
+                                  final chat = displayChats[index];
+                                  final isStarred = chat['isStarred'] ?? false;
+                                  final chatId = chat['id'];
+                                  final chatTitle = chat['title'];
+                                  final timeStr = _formatTimestamp(
+                                    chat['timestamp'],
+                                  );
+
+                                  return Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: AppTheme.spaceSm,
+                                      vertical: 2,
+                                    ),
+                                    child: Dismissible(
+                                      key: Key(chatId),
+                                      direction: DismissDirection.endToStart,
+                                      confirmDismiss: (direction) async {
+                                        // If user has checked "Do not show again", delete without confirmation
+                                        if (_skipDeleteConfirmation) {
+                                          return true;
+                                        }
+                                        // Otherwise show the confirmation dialog with checkbox
+                                        final confirmed =
+                                            await _showDeleteConfirmationWithOption();
+                                        return confirmed ?? false;
+                                      },
+                                      onDismissed: (direction) {
+                                        _deleteChat(chatId, chatTitle);
+                                      },
+                                      background: Container(
+                                        margin: EdgeInsets.symmetric(
+                                          vertical: AppTheme.spaceSm,
+                                        ),
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: AppTheme.spaceMd,
+                                          vertical: AppTheme.spaceSm,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: [
+                                              AppTheme.primaryBlue.withOpacity(
+                                                0.1,
+                                              ),
+                                              AppTheme.primaryBlue.withOpacity(
+                                                0.8,
+                                              ),
+                                            ],
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            AppTheme.radiusSm,
                                           ),
                                         ),
-                                        Builder(
-                                          builder: (context) {
-                                            final isDarkMode =
-                                                Theme.of(context).brightness ==
-                                                Brightness.dark;
-                                            return Text(
-                                              timeStr,
-                                              style: AppTheme.bodySmall
-                                                  .copyWith(
-                                                    color: isDarkMode
-                                                        ? AppTheme.textTertiary
-                                                        : Color(0xFF9CA3AF),
-                                                  ),
-                                            );
-                                          },
+                                        alignment: Alignment.centerRight,
+                                        child: Icon(
+                                          Icons.delete_outline,
+                                          color: Colors.white,
+                                          size: 24,
                                         ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      } else {
-                        final filteredChats = allChats.where((chat) {
-                          return chat['title']
-                              .toString()
-                              .toLowerCase()
-                              .contains(_searchQuery.toLowerCase());
-                        }).toList();
-
-                        if (filteredChats.isEmpty) {
-                          return Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.search_off,
-                                  size: 48,
-                                  color: AppTheme.textTertiary,
-                                ),
-                                SizedBox(height: AppTheme.spaceSm),
-                                Text(
-                                  AppLocalizations.of(
-                                    context,
-                                  ).t('drawer.noChatFound'),
-                                  style: AppTheme.bodyMedium.copyWith(
-                                    color: AppTheme.textTertiary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
-
-                        return ListView.builder(
-                          shrinkWrap: true,
-                          physics: NeverScrollableScrollPhysics(),
-                          itemCount: filteredChats.length,
-                          itemBuilder: (context, index) {
-                            final chat = filteredChats[index];
-                            final timestamp = chat['updatedAt'];
-                            final timeStr = timestamp != null
-                                ? _formatTimestamp(timestamp)
-                                : AppLocalizations.of(
-                                    context,
-                                  ).t('drawer.justNow');
-                            final isStarred = chat['isStarred'] ?? false;
-                            final chatId = chat['id'];
-                            final chatTitle = chat['title'];
-
-                            return Padding(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: AppTheme.spaceSm,
-                                vertical: 2,
-                              ),
-                              child: Dismissible(
-                                key: Key(chatId),
-                                direction: DismissDirection.endToStart,
-                                confirmDismiss: (direction) async {
-                                  // If user has checked "Do not show again", delete without confirmation
-                                  if (_skipDeleteConfirmation) {
-                                    return true;
-                                  }
-                                  // Otherwise show the confirmation dialog with checkbox
-                                  final confirmed =
-                                      await _showDeleteConfirmationWithOption();
-                                  return confirmed ?? false;
-                                },
-                                onDismissed: (direction) {
-                                  _deleteChat(chatId, chatTitle);
-                                },
-                                background: Container(
-                                  alignment: Alignment.centerRight,
-                                  padding: EdgeInsets.only(
-                                    right: AppTheme.spaceMd,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        AppTheme.primaryBlue.withOpacity(0.1),
-                                        AppTheme.primaryBlue.withOpacity(0.8),
-                                      ],
-                                    ),
-                                    borderRadius: BorderRadius.circular(
-                                      AppTheme.radiusSm,
-                                    ),
-                                  ),
-                                  child: Icon(
-                                    Icons.delete_outline,
-                                    color: Colors.white,
-                                    size: 24,
-                                  ),
-                                ),
-                                child: InkWell(
-                                  onTap: () {
-                                    Navigator.pop(context);
-                                    _loadChat(chatId, chatTitle);
-                                  },
-                                  onLongPress: () {
-                                    _showChatOptions(
-                                      chatId,
-                                      chatTitle,
-                                      isStarred,
-                                    );
-                                  },
-                                  borderRadius: BorderRadius.circular(
-                                    AppTheme.radiusSm,
-                                  ),
-                                  child: Container(
-                                    padding: EdgeInsets.all(AppTheme.spaceSm),
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: AppTheme.glassGradient,
                                       ),
-                                      borderRadius: BorderRadius.circular(
-                                        AppTheme.radiusSm,
-                                      ),
-                                      border: isStarred
-                                          ? Border.all(
-                                              color: Colors.amber,
-                                              width: 1.5,
-                                            )
-                                          : null,
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Container(
+                                      child: InkWell(
+                                        onTap: () {
+                                          Navigator.pop(context);
+                                          _loadChat(chatId, chatTitle);
+                                        },
+                                        onLongPress: () {
+                                          _showChatOptions(
+                                            chatId,
+                                            chatTitle,
+                                            isStarred,
+                                          );
+                                        },
+                                        borderRadius: BorderRadius.circular(
+                                          AppTheme.radiusSm,
+                                        ),
+                                        child: Container(
                                           padding: EdgeInsets.all(
                                             AppTheme.spaceSm,
                                           ),
                                           decoration: BoxDecoration(
                                             gradient: LinearGradient(
-                                              colors: AppTheme.primaryGradient,
+                                              colors: AppTheme.glassGradient,
                                             ),
                                             borderRadius: BorderRadius.circular(
                                               AppTheme.radiusSm,
                                             ),
+                                            border: isStarred
+                                                ? Border.all(
+                                                    color: Colors.amber,
+                                                    width: 1.5,
+                                                  )
+                                                : Border.all(
+                                                    color: AppTheme
+                                                        .surfaceElevated
+                                                        .withOpacity(0.5),
+                                                    width: 1,
+                                                  ),
                                           ),
-                                          child: Icon(
-                                            Icons.chat_bubble_outline,
-                                            color: Colors.white,
-                                            size: 16,
-                                          ),
-                                        ),
-                                        SizedBox(width: AppTheme.spaceSm),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
+                                          child: Row(
                                             children: [
-                                              Row(
-                                                children: [
-                                                  if (isStarred)
-                                                    Padding(
-                                                      padding: EdgeInsets.only(
-                                                        right: 4,
-                                                      ),
-                                                      child: Icon(
-                                                        Icons.star,
-                                                        color: AppTheme
-                                                            .primaryBlue,
-                                                        size: 14,
-                                                      ),
-                                                    ),
-                                                  Expanded(
-                                                    child: Builder(
-                                                      builder: (context) {
-                                                        final isDarkMode =
-                                                            Theme.of(
-                                                              context,
-                                                            ).brightness ==
-                                                            Brightness.dark;
-                                                        return Text(
+                                              if (isStarred)
+                                                Padding(
+                                                  padding: EdgeInsets.only(
+                                                    right: AppTheme.spaceSm,
+                                                  ),
+                                                  child: Icon(
+                                                    Icons.star,
+                                                    color: AppTheme.primaryBlue,
+                                                    size: 18,
+                                                  ),
+                                                ),
+                                              Expanded(
+                                                child: Builder(
+                                                  builder: (context) {
+                                                    final isDarkMode =
+                                                        Theme.of(
+                                                          context,
+                                                        ).brightness ==
+                                                        Brightness.dark;
+                                                    return Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Text(
                                                           chatTitle,
                                                           style: AppTheme
                                                               .bodyLarge
@@ -3762,11 +3570,28 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                                           maxLines: 1,
                                                           overflow: TextOverflow
                                                               .ellipsis,
-                                                        );
-                                                      },
-                                                    ),
-                                                  ),
-                                                ],
+                                                        ),
+                                                        Text(
+                                                          '${chat['messageCount']} ${AppLocalizations.of(context).t('drawer.messages')}',
+                                                          style: AppTheme
+                                                              .bodySmall
+                                                              .copyWith(
+                                                                color:
+                                                                    isDarkMode
+                                                                    ? AppTheme
+                                                                          .textTertiary
+                                                                    : Color(
+                                                                        0xFF6B7280,
+                                                                      ),
+                                                              ),
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                        ),
+                                                      ],
+                                                    );
+                                                  },
+                                                ),
                                               ),
                                               Builder(
                                                 builder: (context) {
@@ -3776,94 +3601,340 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                                       ).brightness ==
                                                       Brightness.dark;
                                                   return Text(
-                                                    '${chat['messageCount']} ${AppLocalizations.of(context).t('drawer.messages')}',
+                                                    timeStr,
                                                     style: AppTheme.bodySmall
                                                         .copyWith(
                                                           color: isDarkMode
                                                               ? AppTheme
                                                                     .textTertiary
                                                               : Color(
-                                                                  0xFF6B7280,
+                                                                  0xFF9CA3AF,
                                                                 ),
                                                         ),
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
                                                   );
                                                 },
                                               ),
                                             ],
                                           ),
                                         ),
-                                        Builder(
-                                          builder: (context) {
-                                            final isDarkMode =
-                                                Theme.of(context).brightness ==
-                                                Brightness.dark;
-                                            return Text(
-                                              timeStr,
-                                              style: AppTheme.bodySmall
-                                                  .copyWith(
-                                                    color: isDarkMode
-                                                        ? AppTheme.textTertiary
-                                                        : Color(0xFF9CA3AF),
-                                                  ),
-                                            );
-                                          },
-                                        ),
-                                      ],
+                                      ),
                                     ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      }
-                    },
-                  ),
+                                  );
+                                },
+                              );
+                            } else {
+                              final filteredChats = allChats.where((chat) {
+                                return chat['title']
+                                    .toString()
+                                    .toLowerCase()
+                                    .contains(_searchQuery.toLowerCase());
+                              }).toList();
 
-                Padding(
-                  padding: EdgeInsets.all(AppTheme.spaceMd),
-                  child: InkWell(
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pushNamed(context, '/settings');
-                    },
-                    borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: AppTheme.spaceSm,
-                        vertical: AppTheme.spaceSm,
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.settings,
+                              if (filteredChats.isEmpty) {
+                                return Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.search_off,
+                                        size: 48,
+                                        color: AppTheme.textTertiary,
+                                      ),
+                                      SizedBox(height: AppTheme.spaceSm),
+                                      Text(
+                                        AppLocalizations.of(
+                                          context,
+                                        ).t('drawer.noChatFound'),
+                                        style: AppTheme.bodyMedium.copyWith(
+                                          color: AppTheme.textTertiary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }
+
+                              return ListView.builder(
+                                shrinkWrap: true,
+                                physics: NeverScrollableScrollPhysics(),
+                                itemCount: filteredChats.length,
+                                itemBuilder: (context, index) {
+                                  final chat = filteredChats[index];
+                                  final timestamp = chat['updatedAt'];
+                                  final timeStr = timestamp != null
+                                      ? _formatTimestamp(timestamp)
+                                      : AppLocalizations.of(
+                                          context,
+                                        ).t('drawer.justNow');
+                                  final isStarred = chat['isStarred'] ?? false;
+                                  final chatId = chat['id'];
+                                  final chatTitle = chat['title'];
+
+                                  return Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: AppTheme.spaceSm,
+                                      vertical: 2,
+                                    ),
+                                    child: Dismissible(
+                                      key: Key(chatId),
+                                      direction: DismissDirection.endToStart,
+                                      confirmDismiss: (direction) async {
+                                        // If user has checked "Do not show again", delete without confirmation
+                                        if (_skipDeleteConfirmation) {
+                                          return true;
+                                        }
+                                        // Otherwise show the confirmation dialog with checkbox
+                                        final confirmed =
+                                            await _showDeleteConfirmationWithOption();
+                                        return confirmed ?? false;
+                                      },
+                                      onDismissed: (direction) {
+                                        _deleteChat(chatId, chatTitle);
+                                      },
+                                      background: Container(
+                                        alignment: Alignment.centerRight,
+                                        padding: EdgeInsets.only(
+                                          right: AppTheme.spaceMd,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: [
+                                              AppTheme.primaryBlue.withOpacity(
+                                                0.1,
+                                              ),
+                                              AppTheme.primaryBlue.withOpacity(
+                                                0.8,
+                                              ),
+                                            ],
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            AppTheme.radiusSm,
+                                          ),
+                                        ),
+                                        child: Icon(
+                                          Icons.delete_outline,
+                                          color: Colors.white,
+                                          size: 24,
+                                        ),
+                                      ),
+                                      child: InkWell(
+                                        onTap: () {
+                                          Navigator.pop(context);
+                                          _loadChat(chatId, chatTitle);
+                                        },
+                                        onLongPress: () {
+                                          _showChatOptions(
+                                            chatId,
+                                            chatTitle,
+                                            isStarred,
+                                          );
+                                        },
+                                        borderRadius: BorderRadius.circular(
+                                          AppTheme.radiusSm,
+                                        ),
+                                        child: Container(
+                                          padding: EdgeInsets.all(
+                                            AppTheme.spaceSm,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              colors: AppTheme.glassGradient,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              AppTheme.radiusSm,
+                                            ),
+                                            border: isStarred
+                                                ? Border.all(
+                                                    color: Colors.amber,
+                                                    width: 1.5,
+                                                  )
+                                                : null,
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                padding: EdgeInsets.all(
+                                                  AppTheme.spaceSm,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  gradient: LinearGradient(
+                                                    colors: AppTheme
+                                                        .primaryGradient,
+                                                  ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                        AppTheme.radiusSm,
+                                                      ),
+                                                ),
+                                                child: Icon(
+                                                  Icons.chat_bubble_outline,
+                                                  color: Colors.white,
+                                                  size: 16,
+                                                ),
+                                              ),
+                                              SizedBox(width: AppTheme.spaceSm),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Row(
+                                                      children: [
+                                                        if (isStarred)
+                                                          Padding(
+                                                            padding:
+                                                                EdgeInsets.only(
+                                                                  right: 4,
+                                                                ),
+                                                            child: Icon(
+                                                              Icons.star,
+                                                              color: AppTheme
+                                                                  .primaryBlue,
+                                                              size: 14,
+                                                            ),
+                                                          ),
+                                                        Expanded(
+                                                          child: Builder(
+                                                            builder: (context) {
+                                                              final isDarkMode =
+                                                                  Theme.of(
+                                                                    context,
+                                                                  ).brightness ==
+                                                                  Brightness
+                                                                      .dark;
+                                                              return Text(
+                                                                chatTitle,
+                                                                style: AppTheme.bodyLarge.copyWith(
+                                                                  color:
+                                                                      isDarkMode
+                                                                      ? AppTheme
+                                                                            .textPrimary
+                                                                      : Color(
+                                                                          0xFF000000,
+                                                                        ),
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w500,
+                                                                ),
+                                                                maxLines: 1,
+                                                                overflow:
+                                                                    TextOverflow
+                                                                        .ellipsis,
+                                                              );
+                                                            },
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    Builder(
+                                                      builder: (context) {
+                                                        final isDarkMode =
+                                                            Theme.of(
+                                                              context,
+                                                            ).brightness ==
+                                                            Brightness.dark;
+                                                        return Text(
+                                                          '${chat['messageCount']} ${AppLocalizations.of(context).t('drawer.messages')}',
+                                                          style: AppTheme
+                                                              .bodySmall
+                                                              .copyWith(
+                                                                color:
+                                                                    isDarkMode
+                                                                    ? AppTheme
+                                                                          .textTertiary
+                                                                    : Color(
+                                                                        0xFF6B7280,
+                                                                      ),
+                                                              ),
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                        );
+                                                      },
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              Builder(
+                                                builder: (context) {
+                                                  final isDarkMode =
+                                                      Theme.of(
+                                                        context,
+                                                      ).brightness ==
+                                                      Brightness.dark;
+                                                  return Text(
+                                                    timeStr,
+                                                    style: AppTheme.bodySmall
+                                                        .copyWith(
+                                                          color: isDarkMode
+                                                              ? AppTheme
+                                                                    .textTertiary
+                                                              : Color(
+                                                                  0xFF9CA3AF,
+                                                                ),
+                                                        ),
+                                                  );
+                                                },
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+                            }
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              // Fixed Settings button at the bottom
+              Container(
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(color: AppTheme.surfaceElevated, width: 1),
+                  ),
+                ),
+                padding: EdgeInsets.all(AppTheme.spaceMd),
+                child: InkWell(
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.pushNamed(context, '/settings');
+                  },
+                  borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppTheme.spaceSm,
+                      vertical: AppTheme.spaceSm,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.settings,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? AppTheme.textSecondary
+                              : Color(0xFF000000),
+                          size: 20,
+                        ),
+                        SizedBox(width: AppTheme.spaceSm),
+                        Text(
+                          'Settings',
+                          style: AppTheme.bodyMedium.copyWith(
                             color:
                                 Theme.of(context).brightness == Brightness.dark
                                 ? AppTheme.textSecondary
                                 : Color(0xFF000000),
-                            size: 20,
                           ),
-                          SizedBox(width: AppTheme.spaceSm),
-                          Text(
-                            'Settings',
-                            style: AppTheme.bodyMedium.copyWith(
-                              color:
-                                  Theme.of(context).brightness ==
-                                      Brightness.dark
-                                  ? AppTheme.textSecondary
-                                  : Color(0xFF000000),
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -4146,8 +4217,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                           color: Colors.transparent,
                           child: InkWell(
                             onTap: () {
-                              // TODO: Navigate to premium screen
-                              _showPremiumRequiredDialog();
+                              _launchUrl('https://nexasmartai.org/premium');
                             },
                             borderRadius: BorderRadius.circular(
                               AppTheme.radiusMd,
@@ -4794,6 +4864,17 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
         shape: shape,
       ),
     );
+  }
+
+  Future<void> _launchUrl(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      _showSnackBar('Could not launch URL', isError: true);
+    }
   }
 }
 

@@ -447,7 +447,7 @@ CURRENT SEARCH REQUEST: "${currentQuery}"
 Create an enhanced search query that incorporates relevant conversation context:`,
             },
           ],
-          model: "openai/gpt-oss-20b",
+          model: "openai/gpt-oss-120b",
           max_tokens: 150,
           temperature: 0.3,
         }),
@@ -673,7 +673,7 @@ Answer the question directly with helpful, detailed information. Do not acknowle
       const response = await axios.post(
         "https://api.groq.com/openai/v1/chat/completions",
         {
-          model: "openai/gpt-oss-20b",
+          model: "openai/gpt-oss-120b",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: prompt },
@@ -709,7 +709,7 @@ Answer the question directly with helpful, detailed information. Do not acknowle
       );
 
       const response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
         {
           contents: [
             {
@@ -802,7 +802,7 @@ Answer the question directly with helpful, detailed information. Do not acknowle
       const response = await axios.post(
         "https://api.groq.com/openai/v1/chat/completions",
         {
-          model: "openai/gpt-oss-20b",
+          model: "openai/gpt-oss-120b",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: prompt },
@@ -954,9 +954,9 @@ async function generateStructuredStudyPlan(
   learnerProfile,
 ) {
   try {
-    const groqApiKey = process.env.GROQ_API_KEY;
-    if (!groqApiKey) {
-      console.warn("[StudyPlan] GROQ_API_KEY not configured");
+    const geminiApiKey = process.env.newgemini_key;
+    if (!geminiApiKey) {
+      console.warn("[StudyPlan] newgemini_key not configured");
       return null;
     }
 
@@ -1011,31 +1011,34 @@ INSTRUCTIONS:
 
 Return ONLY the JSON object, no explanations or markdown.`;
 
-    const groqRes = await axios.post(
-      "https://api.groq.com/openai/v1/chat/completions",
+    const geminiRes = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
       {
-        model: "llama-3.3-70b-versatile",
-        messages: [
+        contents: [
           {
-            role: "system",
-            content:
-              "You are a curriculum design expert. Output only valid JSON.",
+            role: "user",
+            parts: [
+              {
+                text: prompt,
+              },
+            ],
           },
-          { role: "user", content: prompt },
         ],
-        max_tokens: 2000,
-        temperature: 0.7,
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 2000,
+        },
       },
       {
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${groqApiKey}`,
         },
         timeout: 45000,
       },
     );
 
-    let responseText = groqRes?.data?.choices?.[0]?.message?.content || "";
+    let responseText =
+      geminiRes?.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
     // Clean code fences if present
     responseText = responseText.replace(/```json\n?|```/g, "").trim();
 
@@ -1109,7 +1112,7 @@ Create COMPREHENSIVE system instructions that:
     const groqRes = await axios.post(
       "https://api.groq.com/openai/v1/chat/completions",
       {
-        model: "openai/gpt-oss-20b",
+        model: "openai/gpt-oss-120b",
         messages: [{ role: "user", content: instructionPrompt }],
         max_tokens: 1500,
         temperature: 0.7,
@@ -1478,7 +1481,7 @@ OUTPUT ONLY valid JSON:
     const groqRes = await axios.post(
       "https://api.groq.com/openai/v1/chat/completions",
       {
-        model: "llama-3.3-70b-versatile",
+        model: "openai/gpt-oss-120b",
         messages: [
           {
             role: "system",

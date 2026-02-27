@@ -20,15 +20,26 @@ class _StreakCalendarFullScreenState extends State<StreakCalendarFullScreen>
   late AnimationController _flameGlowController;
   late AnimationController _statsSlideController;
   late AnimationController _gridSlideController;
+  late AnimationController _monthButtonController;
+  late AnimationController _monthTransitionController;
 
   late Animation<Offset> _headerSlideAnimation;
   late Animation<double> _flameGlowAnimation;
   late Animation<Offset> _statsSlideAnimation;
   late Animation<Offset> _gridSlideAnimation;
+  late Animation<Offset> _monthButtonAnimation;
+  late Animation<double> _monthTransitionAnimation;
+
+  DateTime _selectedMonth = DateTime.now();
+  late DateTime _displayMonth;
+  late DateTime _appDownloadDate;
 
   @override
   void initState() {
     super.initState();
+    _displayMonth = _selectedMonth;
+    _appDownloadDate =
+        _selectedMonth; // User can view from download date onwards
     _initializeAnimations();
   }
 
@@ -75,10 +86,38 @@ class _StreakCalendarFullScreenState extends State<StreakCalendarFullScreen>
           CurvedAnimation(parent: _gridSlideController, curve: Curves.easeOut),
         );
 
+    // Month button animation
+    _monthButtonController = AnimationController(
+      duration: Duration(milliseconds: 600),
+      vsync: this,
+    );
+    _monthButtonAnimation =
+        Tween<Offset>(begin: Offset(0, 0.3), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _monthButtonController,
+            curve: Curves.easeOut,
+          ),
+        );
+
+    // Month transition animation
+    _monthTransitionController = AnimationController(
+      duration: Duration(milliseconds: 500),
+      vsync: this,
+    );
+    _monthTransitionAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _monthTransitionController,
+        curve: Curves.easeInOut,
+      ),
+    );
+
     // Start animations with stagger
     _headerSlideController.forward();
     Future.delayed(Duration(milliseconds: 200), () {
       if (mounted) _statsSlideController.forward();
+    });
+    Future.delayed(Duration(milliseconds: 300), () {
+      if (mounted) _monthButtonController.forward();
     });
     Future.delayed(Duration(milliseconds: 400), () {
       if (mounted) _gridSlideController.forward();
@@ -91,7 +130,43 @@ class _StreakCalendarFullScreenState extends State<StreakCalendarFullScreen>
     _flameGlowController.dispose();
     _statsSlideController.dispose();
     _gridSlideController.dispose();
+    _monthButtonController.dispose();
+    _monthTransitionController.dispose();
     super.dispose();
+  }
+
+  void _goToPreviousMonth() {
+    // Check if we can go to previous month (not before download date)
+    final previousMonth = DateTime(_displayMonth.year, _displayMonth.month - 1);
+    if (previousMonth.year < _appDownloadDate.year ||
+        (previousMonth.year == _appDownloadDate.year &&
+            previousMonth.month < _appDownloadDate.month)) {
+      return;
+    }
+
+    _monthTransitionController.forward(from: 0.0).then((_) {
+      setState(() {
+        _displayMonth = previousMonth;
+      });
+      _monthTransitionController.reverse();
+    });
+  }
+
+  void _goToNextMonth() {
+    // Check if we can go to next month (not beyond current month)
+    final nextMonth = DateTime(_displayMonth.year, _displayMonth.month + 1);
+    final now = DateTime.now();
+    if (nextMonth.year > now.year ||
+        (nextMonth.year == now.year && nextMonth.month > now.month)) {
+      return;
+    }
+
+    _monthTransitionController.forward(from: 0.0).then((_) {
+      setState(() {
+        _displayMonth = nextMonth;
+      });
+      _monthTransitionController.reverse();
+    });
   }
 
   String _formatLastActivity(DateTime? dateTime) {
@@ -109,6 +184,100 @@ class _StreakCalendarFullScreenState extends State<StreakCalendarFullScreen>
     } else {
       return '${dateTime.month}/${dateTime.day}/${dateTime.year}';
     }
+  }
+
+  bool _canGoToPreviousMonth() {
+    final previousMonth = DateTime(_displayMonth.year, _displayMonth.month - 1);
+    return !(previousMonth.year < _appDownloadDate.year ||
+        (previousMonth.year == _appDownloadDate.year &&
+            previousMonth.month < _appDownloadDate.month));
+  }
+
+  bool _canGoToNextMonth() {
+    final nextMonth = DateTime(_displayMonth.year, _displayMonth.month + 1);
+    final now = DateTime.now();
+    return !(nextMonth.year > now.year ||
+        (nextMonth.year == now.year && nextMonth.month > now.month));
+  }
+
+  String _formatMonthYear(DateTime date) {
+    final months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    return '${months[date.month - 1]} ${date.year}';
+  }
+
+  Widget _buildMonthNavigationHeader(BuildContext context) {
+    final accentColor = AppTheme.accentBlue;
+    final now = DateTime.now();
+    final isCurrentMonth =
+        _displayMonth.year == now.year && _displayMonth.month == now.month;
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: AppTheme.surfaceCardFromContext(context),
+        border: Border.all(color: accentColor.withOpacity(0.2), width: 1),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Previous month button
+          AnimatedOpacity(
+            opacity: _canGoToPreviousMonth() ? 1.0 : 0.3,
+            duration: Duration(milliseconds: 200),
+            child: IconButton(
+              icon: Icon(Icons.chevron_left, size: 28),
+              color: accentColor,
+              onPressed: _canGoToPreviousMonth() ? _goToPreviousMonth : null,
+              tooltip: 'Previous month',
+            ),
+          ),
+          // Month and year display
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _formatMonthYear(_displayMonth),
+                style: AppTheme.headlineSmallFromContext(
+                  context,
+                ).copyWith(fontWeight: FontWeight.bold, color: accentColor),
+              ),
+              if (isCurrentMonth)
+                Text(
+                  'Current Month',
+                  style: AppTheme.labelSmallFromContext(
+                    context,
+                  ).copyWith(color: AppTheme.textTertiaryFromContext(context)),
+                ),
+            ],
+          ),
+          // Next month button
+          AnimatedOpacity(
+            opacity: _canGoToNextMonth() ? 1.0 : 0.3,
+            duration: Duration(milliseconds: 200),
+            child: IconButton(
+              icon: Icon(Icons.chevron_right, size: 28),
+              color: accentColor,
+              onPressed: _canGoToNextMonth() ? _goToNextMonth : null,
+              tooltip: 'Next month',
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildStatCard(
@@ -291,23 +460,32 @@ class _StreakCalendarFullScreenState extends State<StreakCalendarFullScreen>
   }
 
   Widget _buildCalendarSection(BuildContext context) {
-    return FutureBuilder<StudyStats>(
-      future: StudyActivityService().getStudyStats(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return SizedBox(height: 300, child: CircularProgressIndicator());
-        }
+    return Column(
+      children: [
+        // Month navigation header
+        _buildMonthNavigationHeader(context),
+        SizedBox(height: 20),
+        // Calendar grid
+        FutureBuilder<StudyStats>(
+          future: StudyActivityService().getStudyStats(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return SizedBox(height: 300, child: CircularProgressIndicator());
+            }
 
-        final stats = snapshot.data!;
-        final streakData = StreakCalendarService.generateCalendarData(
-          currentStreak: stats.currentStreak,
-          longestStreak: stats.longestStreak,
-          lastActivityDate: stats.lastStudyTime ?? DateTime.now(),
-        );
-        final weeks = StreakCalendarService.generateWeekData(streakData);
+            final stats = snapshot.data!;
+            final streakData = StreakCalendarService.generateCalendarData(
+              currentStreak: stats.currentStreak,
+              longestStreak: stats.longestStreak,
+              lastActivityDate: stats.lastStudyTime ?? DateTime.now(),
+              forMonth: _displayMonth,
+            );
+            final weeks = StreakCalendarService.generateWeekData(streakData);
 
-        return StreakCalendarGrid(calendarData: streakData, weeks: weeks);
-      },
+            return StreakCalendarGrid(calendarData: streakData, weeks: weeks);
+          },
+        ),
+      ],
     );
   }
 
@@ -462,18 +640,6 @@ class _StreakCalendarFullScreenState extends State<StreakCalendarFullScreen>
         style: AppTheme.headlineLargeFromContext(context),
       ),
       centerTitle: true,
-      actions: [
-        PopupMenuButton(
-          itemBuilder: (context) => [
-            PopupMenuItem(value: 'settings', child: Text('Settings')),
-          ],
-          onSelected: (value) {
-            if (value == 'settings') {
-              // Handle settings
-            }
-          },
-        ),
-      ],
     );
   }
 

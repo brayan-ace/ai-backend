@@ -510,9 +510,8 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     leading: SocialMediaIcon(platform: 'tiktok', size: 44),
                     title: AppLocalizations.of(context).t('settings.tiktok'),
                     subtitle: 'Follow us',
-                    onTap: () => _launchUrl(
-                      'https://www.tiktok.com/@nexa.2035?_r=1&_t=ZM-93F28qgfiV2',
-                    ),
+                    onTap: () =>
+                        _launchUrl('https://www.tiktok.com/@nexasmartai'),
                   ),
                   _buildDivider(),
                   _tile(

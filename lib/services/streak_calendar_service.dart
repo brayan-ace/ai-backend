@@ -3,18 +3,32 @@ import 'package:intl/intl.dart';
 /// Service for generating streak calendar data
 /// Handles date calculations, active days, and statistics
 class StreakCalendarService {
-  /// Generate calendar data for the last 6 weeks (42 days)
+  /// Generate calendar data for a specific month with proper weekday alignment
   /// Returns a map of dates to their streak status
   static Map<DateTime, StreakDayData> generateCalendarData({
     required int currentStreak,
     required int longestStreak,
     required DateTime lastActivityDate,
+    DateTime? forMonth,
   }) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    // Start from 42 days ago
-    final startDate = today.subtract(Duration(days: 41));
+    // Use provided month or current month
+    final targetMonth = forMonth ?? today;
+    final monthStart = DateTime(targetMonth.year, targetMonth.month, 1);
+
+    // Get the first day of the month and find the Monday of that week
+    final firstDayWeekday = monthStart.weekday; // 1=Monday, 7=Sunday
+    final daysBeforeMonth = firstDayWeekday - 1; // Days from previous month
+    final startDate = monthStart.subtract(Duration(days: daysBeforeMonth));
+
+    // Get the last day of the month
+    final lastDayOfMonth = DateTime(targetMonth.year, targetMonth.month + 1, 0);
+    final lastDayWeekday = lastDayOfMonth.weekday;
+    final daysAfterMonth = 7 - lastDayWeekday; // Days for next month
+
+    final endDate = lastDayOfMonth.add(Duration(days: daysAfterMonth));
 
     final calendarData = <DateTime, StreakDayData>{};
 
@@ -24,15 +38,22 @@ class StreakCalendarService {
       lastActivityDate: lastActivityDate,
     );
 
-    // Fill calendar
-    for (int i = 0; i < 42; i++) {
-      final date = startDate.add(Duration(days: i));
-      final dateOnly = DateTime(date.year, date.month, date.day);
+    // Fill calendar from startDate to endDate
+    var currentDate = startDate;
+    while (!currentDate.isAfter(endDate)) {
+      final dateOnly = DateTime(
+        currentDate.year,
+        currentDate.month,
+        currentDate.day,
+      );
 
       final isActive = streakDays.contains(dateOnly);
       final isToday = dateOnly.isAtSameMomentAs(today);
       final isFuture = dateOnly.isAfter(today);
-      final isMissed = !isActive && !isFuture && !isToday;
+      final isCurrentMonth =
+          dateOnly.month == monthStart.month &&
+          dateOnly.year == monthStart.year;
+      final isMissed = !isActive && !isFuture && !isToday && isCurrentMonth;
 
       calendarData[dateOnly] = StreakDayData(
         date: dateOnly,
@@ -40,9 +61,12 @@ class StreakCalendarService {
         isToday: isToday,
         isMissed: isMissed,
         isFuture: isFuture,
-        dayNumber: date.day,
-        weekday: date.weekday,
+        isCurrentMonth: isCurrentMonth,
+        dayNumber: dateOnly.day,
+        weekday: dateOnly.weekday,
       );
+
+      currentDate = currentDate.add(Duration(days: 1));
     }
 
     return calendarData;
@@ -97,21 +121,23 @@ class StreakCalendarService {
     return weeks;
   }
 
-  /// Get month statistics
+  /// Get month statistics for a specific month
   static MonthStats getMonthStats({
     required Map<DateTime, StreakDayData> calendarData,
     required int currentStreak,
     required int longestStreak,
+    DateTime? forMonth,
   }) {
     final now = DateTime.now();
-    final currentMonth = DateTime(now.year, now.month);
+    final targetMonth = forMonth ?? DateTime(now.year, now.month);
 
     int daysStudiedThisMonth = 0;
-    int totalDaysInMonth = DateTime(now.year, now.month + 1, 0).day;
+    final lastDayOfMonth = DateTime(targetMonth.year, targetMonth.month + 1, 0);
+    int totalDaysInMonth = lastDayOfMonth.day;
 
     calendarData.forEach((date, data) {
-      if (date.year == currentMonth.year &&
-          date.month == currentMonth.month &&
+      if (date.year == targetMonth.year &&
+          date.month == targetMonth.month &&
           data.isActive) {
         daysStudiedThisMonth++;
       }
@@ -152,6 +178,7 @@ class StreakDayData {
   final bool isToday; // Is today
   final bool isMissed; // Missed (gap in streak)
   final bool isFuture; // Future date
+  final bool isCurrentMonth; // In the target month
   final int dayNumber; // Day of month (1-31)
   final int weekday; // 1=Monday, 7=Sunday
 
@@ -161,6 +188,7 @@ class StreakDayData {
     required this.isToday,
     required this.isMissed,
     required this.isFuture,
+    required this.isCurrentMonth,
     required this.dayNumber,
     required this.weekday,
   });

@@ -172,9 +172,23 @@ class _StreakCalendarTileState extends State<StreakCalendarTile>
               width: 1.5,
             ),
           ),
-          child: ScaleTransition(
-            scale: _pulseScale,
-            child: Center(child: Text('🔥', style: TextStyle(fontSize: 28))),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ScaleTransition(
+                scale: _pulseScale,
+                child: Text('🔥', style: TextStyle(fontSize: 22)),
+              ),
+              SizedBox(height: 2),
+              Text(
+                '${widget.dayData.dayNumber}',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -208,13 +222,20 @@ class _StreakCalendarTileState extends State<StreakCalendarTile>
               width: 2,
             ),
           ),
-          child: Stack(
-            alignment: Alignment.center,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               ScaleTransition(
                 scale: _pulseScale,
-                child: Center(
-                  child: Text('🟢', style: TextStyle(fontSize: 28)),
+                child: Text('🟢', style: TextStyle(fontSize: 22)),
+              ),
+              SizedBox(height: 2),
+              Text(
+                '${widget.dayData.dayNumber}',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
               ),
             ],
@@ -237,18 +258,19 @@ class _StreakCalendarTileState extends State<StreakCalendarTile>
         color: bgColor,
         border: Border.all(color: borderColor.withOpacity(0.5), width: 1),
       ),
-      child: Stack(
-        alignment: Alignment.center,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          Text('❌', style: TextStyle(fontSize: 18)),
+          SizedBox(height: 2),
           Text(
-            widget.dayData.dayNumber.toString(),
+            '${widget.dayData.dayNumber}',
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: FontWeight.w500,
               color: isDark ? Color(0xFF6B7280) : Color(0xFF9CA3AF),
             ),
           ),
-          Positioned(child: Text('⛔', style: TextStyle(fontSize: 20))),
         ],
       ),
     );
@@ -269,11 +291,11 @@ class _StreakCalendarTileState extends State<StreakCalendarTile>
       ),
       child: Center(
         child: Text(
-          widget.dayData.dayNumber.toString(),
+          '${widget.dayData.dayNumber}',
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
             color: isDark ? Color(0xFF6E7891) : Color(0xFFD1D5DB),
-            fontWeight: FontWeight.w400,
           ),
         ),
       ),
