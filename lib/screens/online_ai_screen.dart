@@ -15,21 +15,19 @@ import '../utils/greeting_utils.dart';
 import '../utils/app_localizations.dart';
 import '../widgets/ai_message_bubble.dart';
 import '../widgets/typing_indicator.dart';
-import '../widgets/voice_input_dialog.dart';
 import '../widgets/streak_indicator.dart';
-import '../widgets/streak_details_modal.dart';
 import 'streak_calendar_full_screen.dart';
 import '../services/gemini_services.dart';
 import '../services/api_service.dart';
 import '../services/web_search_service.dart';
 import '../services/settings_service.dart';
+import '../services/premium_service.dart';
 import '../utils/ai_constants.dart';
 import '../services/chat_storage_service.dart';
 import '../services/user_profile_service.dart';
 import 'notes_screen.dart';
 import 'chat_history_screen.dart';
 import 'bot_creation_screen.dart';
-import '../services/onboarding_service.dart';
 import '../utils/onboarding_config.dart';
 
 class OnlineAiScreen extends StatefulWidget {
@@ -40,7 +38,7 @@ class OnlineAiScreen extends StatefulWidget {
 }
 
 class _OnlineAiScreenState extends State<OnlineAiScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final TextEditingController _controller = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
@@ -49,6 +47,8 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
   late final StreamSubscription<User?> _authSub;
   late AnimationController _greetingAnimationController;
   late Animation<double> _greetingFadeAnimation;
+  late AnimationController _arrowAnimationController;
+  late Animation<Offset> _arrowFloatAnimation;
 
   bool _webSearchEnabled = false;
   bool _wasWebSearchAutoEnabledThisRequest = false;
@@ -70,6 +70,11 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
   late WebSearchService _webSearchService;
   late ChatStorageService _chatStorage;
   late SettingsService _settingsService;
+  late PremiumService _premiumService;
+
+  // Premium status and limits
+  bool _isPremium = false;
+  StreamSubscription<bool>? _premiumStatusSub;
 
   String _selectedModel = 'GPT-OSS 120B';
   String _searchQuery = '';
@@ -78,9 +83,8 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
   bool _showScrollButton = false;
   static const double _scrollThreshold = 100.0;
 
-  // Onboarding state
-
-  bool _onboardingInitialized = false;
+  // Help hint icon visibility
+  bool _showHelpHintIcon = true;
 
   @override
   void initState() {
@@ -89,6 +93,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
     _webSearchService = WebSearchService();
     _chatStorage = ChatStorageService();
     _settingsService = SettingsService.instance;
+    _premiumService = PremiumService.instance;
 
     _messageScrollController = ScrollController();
     _messageScrollController.addListener(_onScrollListener);
@@ -103,6 +108,19 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
     );
     _greetingAnimationController.forward();
 
+    // Arrow floating animation
+    _arrowAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+    _arrowFloatAnimation =
+        Tween<Offset>(begin: Offset(0, 0), end: Offset(0, -12)).animate(
+          CurvedAnimation(
+            parent: _arrowAnimationController,
+            curve: Curves.easeInOut,
+          ),
+        );
+
     _isSavingEnabled = FirebaseAuth.instance.currentUser != null;
     _authStateStream = FirebaseAuth.instance.authStateChanges();
     _authSub = _authStateStream.listen((user) {
@@ -116,8 +134,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
 
     // Defer non-critical loading to after UI appears
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadHintIconPreference();
       _loadWebSearchCapability();
-      _initializeOnboarding();
+      _loadPremiumStatus();
       _loadDeleteConfirmationPreference();
     });
   }
@@ -125,6 +144,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
   Future<void> _loadWebSearchCapability() async {
     try {
       await _settingsService.init();
+
       final webSearchEnabled = await _settingsService.getWebSearchCapability();
       if (mounted) {
         setState(() {
@@ -155,6 +175,71 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
     }
   }
 
+  Future<void> _loadPremiumStatus() async {
+    try {
+      await _premiumService.init();
+
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        setState(() => _isPremium = false);
+        return;
+      }
+
+      // Subscribe to real-time premium status changes
+      _premiumStatusSub = _premiumService.premiumStatusStream().listen((
+        isPrem,
+      ) {
+        if (mounted) {
+          setState(() => _isPremium = isPrem);
+          _updateRemainingLimits();
+        }
+      });
+
+      // Initial load
+      final isPrem = await _premiumService.isPremium();
+      if (mounted) {
+        setState(() => _isPremium = isPrem);
+      }
+      _updateRemainingLimits();
+    } catch (e) {
+      print('[OnlineAI] Error loading premium status: $e');
+      if (mounted) {
+        setState(() => _isPremium = false);
+      }
+    }
+  }
+
+  /// Refresh remaining limits
+  Future<void> _updateRemainingLimits() async {
+    try {
+      final remaining = await _premiumService.getRemainingMessages();
+      final images = await _premiumService.getRemainingImageUploads();
+      print('[OnlineAI] Remaining: messages=$remaining, images=$images');
+
+      // Show warning notifications when limits are running low
+      if (mounted && !_isPremium) {
+        // Warn when only 2 messages left
+        if (remaining == 2) {
+          _showSnackBar(
+            '⚠️ You have 2 messages left today. Upgrade to Premium for unlimited messages!',
+            isError: false,
+            duration: const Duration(seconds: 5),
+          );
+        }
+        // Warn when only 1 message left
+        else if (remaining == 1) {
+          _showSnackBar(
+            '🔴 Last message for today! Upgrade to Premium to continue.',
+            isError: true,
+            duration: const Duration(seconds: 5),
+          );
+        }
+      }
+    } catch (e) {
+      print('[OnlineAI] Error updating limits: $e');
+    }
+  }
+
   Future<void> _loadDeleteConfirmationPreference() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -170,27 +255,293 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
     }
   }
 
-  Future<void> _initializeOnboarding() async {
-    if (_onboardingInitialized) return;
-
+  Future<void> _loadHintIconPreference() async {
     try {
-      final shouldShow = await OnboardingService.shouldShowOnboarding();
-      if (shouldShow && mounted) {
+      final prefs = await SharedPreferences.getInstance();
+      final showIcon = prefs.getBool('show_help_hint_icon') ?? true;
+      if (mounted) {
         setState(() {
-          //_showOnboarding = true;
-          _onboardingInitialized = true;
+          _showHelpHintIcon = showIcon;
         });
       }
     } catch (e) {
-      // If onboarding check fails, don't show it to avoid blocking the app
-      print('Onboarding initialization failed: $e');
+      print('Failed to load hint icon preference: $e');
     }
+  }
+
+  Future<void> _hideHelpHintIcon() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('show_help_hint_icon', false);
+      if (mounted) {
+        setState(() {
+          _showHelpHintIcon = false;
+        });
+      }
+    } catch (e) {
+      print('Failed to save hint icon preference: $e');
+    }
+  }
+
+  /// Show welcome popup dialog for first-time users
+  void _showWelcomeDialog() {
+    bool dontShowAgain = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) => StatefulBuilder(
+        builder: (context, setState) => Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          backgroundColor: Theme.of(context).brightness == Brightness.dark
+              ? const Color(0xFF1a1a2e)
+              : Colors.white,
+          child: Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.85,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [AppTheme.primaryBlue, AppTheme.accentBlue],
+                    ),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '👋 Welcome to Nexa Smart AI!',
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Discover everything this powerful AI assistant can do',
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                      ),
+                    ],
+                  ),
+                ),
+                // Scrollable content
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildFeatureSection(
+                          '💬 Advanced AI Chat',
+                          'Get instant answers to any question. Chat with multiple AI models (GPT-OSS, Sonnet, Gemini 3) and choose the one that works best for you.',
+                        ),
+                        const SizedBox(height: 16),
+                        _buildFeatureSection(
+                          '🌐 Web Search',
+                          'Enable web search to get real-time information and the latest data from across the internet.',
+                        ),
+                        const SizedBox(height: 16),
+                        _buildFeatureSection(
+                          '📚 Study Bots',
+                          'Create custom AI study bots for specific subjects. Get personalized tutoring from bots trained on your learning goals.',
+                        ),
+                        const SizedBox(height: 16),
+                        _buildFeatureSection(
+                          '🎯 Take Quizzes',
+                          'Test your knowledge with intelligent quizzes generated specifically for your study topics and learning level.',
+                        ),
+                        const SizedBox(height: 16),
+                        _buildFeatureSection(
+                          '📝 Save Notes',
+                          'Save important messages and entire conversations as notes. Access them anytime from your Notes screen.',
+                        ),
+                        const SizedBox(height: 16),
+                        _buildFeatureSection(
+                          '📸 Image Analysis',
+                          'Upload images and ask AI to analyze them. Perfect for solving problems, reading text, or explaining diagrams.',
+                        ),
+                        const SizedBox(height: 16),
+                        _buildFeatureSection(
+                          '🔥 Streak Tracking',
+                          'Build your learning streak by studying daily. Earn achievements and watch your progress grow!',
+                        ),
+                        const SizedBox(height: 16),
+                        _buildFeatureSection(
+                          '📱 Easy Navigation',
+                          'Swipe left or right on the screen for quick access to your Recent Chats and saved Notes.',
+                        ),
+                        const SizedBox(height: 16),
+                        _buildFeatureSection(
+                          '💾 Chat History',
+                          'All your conversations are saved automatically. Browse and continue any previous chat anytime.',
+                        ),
+                        const SizedBox(height: 20),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryBlue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppTheme.primaryBlue.withOpacity(0.3),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.lightbulb,
+                                color: AppTheme.primaryBlue,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Ready to explore? Just start chatting!',
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
+                                        color: AppTheme.primaryBlue,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // Don't show again checkbox
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: CheckboxListTile(
+                    value: dontShowAgain,
+                    onChanged: (value) {
+                      setState(() {
+                        dontShowAgain = value ?? false;
+                      });
+                    },
+                    title: Text(
+                      AppLocalizations.of(context).onboardingDoNotShowAgain,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    controlAffinity: ListTileControlAffinity.leading,
+                  ),
+                ),
+                // Close button
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        if (dontShowAgain) {
+                          await _hideHelpHintIcon();
+                        }
+                        if (mounted) {
+                          Navigator.pop(context);
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryBlue,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        'Get Started',
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Build feature section widget
+  Widget _buildFeatureSection(String title, String description) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          description,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white70
+                : Colors.black54,
+            height: 1.5,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Build floating arrow pointing to help icon
+  Widget _buildFloatingArrow() {
+    return SlideTransition(
+      position: _arrowFloatAnimation,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 8.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.arrow_downward, color: AppTheme.primaryBlue, size: 28),
+            const SizedBox(height: 4),
+            Text(
+              'Tap here to learn more!',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppTheme.primaryBlue,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
   void dispose() {
     _greetingAnimationController.dispose();
+    _arrowAnimationController.dispose();
     _authSub.cancel();
+    _premiumStatusSub?.cancel();
     _controller.dispose();
     _searchController.dispose();
     _messageScrollController.removeListener(_onScrollListener);
@@ -218,6 +569,13 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
         ? String.fromCharCodes(text.runes.take(800)) + '...'
         : text;
     print('📥 [Frontend Preview] $preview');
+
+    // Record message for non-premium users
+    if (!_isPremium) {
+      _premiumService.recordAiMessage();
+      _updateRemainingLimits();
+    }
+
     setState(() {
       _messages.add(_Message(text: text, fromUser: false));
     });
@@ -325,38 +683,107 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                         ),
                         SizedBox(height: 32),
 
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 20),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: _buildAttachmentCard(
-                                  icon: Icons.camera_alt_outlined,
-                                  label: AppLocalizations.of(
-                                    context,
-                                  ).t('chatScreen.camera'),
-                                  onTap: () {
-                                    Navigator.pop(context);
-                                    _pickImage(ImageSource.camera);
-                                  },
+                        if (_isPremium) ...[
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 20),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: _buildAttachmentCard(
+                                    icon: Icons.camera_alt_outlined,
+                                    label: AppLocalizations.of(
+                                      context,
+                                    ).t('chatScreen.camera'),
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      _pickImage(ImageSource.camera);
+                                    },
+                                  ),
                                 ),
-                              ),
-                              SizedBox(width: 16),
-                              Expanded(
-                                child: _buildAttachmentCard(
-                                  icon: Icons.image_outlined,
-                                  label: AppLocalizations.of(
-                                    context,
-                                  ).t('chatScreen.photos'),
-                                  onTap: () {
-                                    Navigator.pop(context);
-                                    _pickImage(ImageSource.gallery);
-                                  },
+                                SizedBox(width: 16),
+                                Expanded(
+                                  child: _buildAttachmentCard(
+                                    icon: Icons.image_outlined,
+                                    label: AppLocalizations.of(
+                                      context,
+                                    ).t('chatScreen.photos'),
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      _pickImage(ImageSource.gallery);
+                                    },
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
+                        ],
+                        if (!_isPremium)
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 20),
+                            child: Container(
+                              padding: EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: AppTheme.warning.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(
+                                  AppTheme.radiusMd,
+                                ),
+                                border: Border.all(
+                                  color: AppTheme.warning.withOpacity(0.3),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.lock_rounded,
+                                        color: AppTheme.warning,
+                                        size: 20,
+                                      ),
+                                      SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          'Image uploads available with Premium',
+                                          style: AppTheme.bodySmall.copyWith(
+                                            color: AppTheme.warning,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  SizedBox(height: 12),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: OutlinedButton(
+                                      onPressed: () {
+                                        Navigator.pop(context);
+                                        _showPremiumRequiredDialog();
+                                      },
+                                      style: OutlinedButton.styleFrom(
+                                        side: BorderSide(
+                                          color: AppTheme.warning,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            AppTheme.radiusMd,
+                                          ),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        'Upgrade to Premium',
+                                        style: AppTheme.labelSmall.copyWith(
+                                          color: AppTheme.warning,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         SizedBox(height: 28),
 
                         Divider(
@@ -685,11 +1112,21 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                     ),
                   ),
                   InkWell(
-                    onTap: () {
-                      // TODO: Check user's premium status here
-                      // For now, show premium dialog
+                    onTap: () async {
+                      // Check user's premium status
+                      final isPremium = await _premiumService.isPremium();
+
+                      if (!isPremium) {
+                        Navigator.pop(context);
+                        _showPremiumRequiredDialog();
+                        return;
+                      }
+
+                      // User is premium, allow detailed mode
                       Navigator.pop(context);
-                      _showPremiumRequiredDialog();
+                      setState(() {
+                        _responseMode = 'detailed';
+                      });
                     },
                     child: Container(
                       padding: EdgeInsets.symmetric(
@@ -883,7 +1320,13 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                       ).t('models.sonnetDesc'),
                       isSelected: _selectedModel == 'Sonnet',
                       gradient: AppTheme.primaryGradient,
+                      isLocked: !_isPremium,
                       onTap: () {
+                        if (!_isPremium) {
+                          Navigator.pop(context);
+                          _showPremiumRequiredDialog();
+                          return;
+                        }
                         setState(() => _selectedModel = 'Sonnet');
                         Navigator.pop(context);
                       },
@@ -896,7 +1339,13 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                       ).t('models.geminiDesc'),
                       isSelected: _selectedModel == 'Gemini 3',
                       gradient: AppTheme.accentGradient,
+                      isLocked: !_isPremium,
                       onTap: () {
+                        if (!_isPremium) {
+                          Navigator.pop(context);
+                          _showPremiumRequiredDialog();
+                          return;
+                        }
                         setState(() => _selectedModel = 'Gemini 3');
                         Navigator.pop(context);
                       },
@@ -930,117 +1379,120 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
     required bool isSelected,
     required List<Color> gradient,
     required VoidCallback onTap,
+    bool isLocked = false,
   }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-      child: Container(
-        padding: EdgeInsets.all(AppTheme.spaceMd),
-        decoration: BoxDecoration(
-          gradient: Theme.of(context).brightness == Brightness.dark
-              ? LinearGradient(
-                  colors: isSelected
-                      ? gradient.map((c) => c.withValues(alpha: 0.2)).toList()
-                      : AppTheme.glassGradient,
-                )
-              : LinearGradient(
-                  colors: isSelected
-                      ? [Color(0xFFF0F4FF), Color(0xFFF9FAFB)]
-                      : [Color(0xFFFAFAFA), Color(0xFFF5F5F5)],
+      child: Stack(
+        children: [
+          Container(
+            padding: EdgeInsets.all(AppTheme.spaceMd),
+            decoration: BoxDecoration(
+              gradient: Theme.of(context).brightness == Brightness.dark
+                  ? LinearGradient(
+                      colors: isSelected
+                          ? gradient
+                                .map((c) => c.withValues(alpha: 0.2))
+                                .toList()
+                          : AppTheme.glassGradient,
+                    )
+                  : LinearGradient(
+                      colors: isSelected
+                          ? [Color(0xFFF0F4FF), Color(0xFFF9FAFB)]
+                          : [Color(0xFFFAFAFA), Color(0xFFF5F5F5)],
+                    ),
+              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+              border: Border.all(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? (isSelected
+                          ? gradient[0]
+                          : AppTheme.surfaceElevated.withValues(alpha: 0.5))
+                    : (isSelected ? gradient[0] : Color(0xFFE5E7EB)),
+                width: isSelected ? 2 : 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(AppTheme.spaceSm),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(colors: gradient),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: gradient[0].withValues(alpha: 0.4),
+                              blurRadius: 12,
+                              offset: Offset(0, 4),
+                            ),
+                          ]
+                        : [],
+                  ),
+                  child: Icon(
+                    Icons.smart_toy_outlined,
+                    color: Colors.white,
+                    size: 24,
+                  ),
                 ),
-          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-          border: Border.all(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? (isSelected
-                      ? gradient[0]
-                      : AppTheme.surfaceElevated.withValues(alpha: 0.5))
-                : (isSelected ? gradient[0] : Color(0xFFE5E7EB)),
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: EdgeInsets.all(AppTheme.spaceSm),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(colors: gradient),
-                borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: gradient[0].withValues(alpha: 0.4),
-                          blurRadius: 12,
-                          offset: Offset(0, 4),
+                SizedBox(width: AppTheme.spaceMd),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: AppTheme.bodyLarge.copyWith(
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? AppTheme.textPrimary
+                              : Color(0xFF000000),
+                          fontWeight: FontWeight.w600,
                         ),
-                      ]
-                    : [],
-              ),
-              child: Icon(
-                Icons.smart_toy_outlined,
-                color: Colors.white,
-                size: 24,
-              ),
-            ),
-            SizedBox(width: AppTheme.spaceMd),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                    style: AppTheme.bodyLarge.copyWith(
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? AppTheme.textPrimary
-                          : Color(0xFF000000),
-                      fontWeight: FontWeight.w600,
-                    ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        description,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 2,
+                        style: AppTheme.bodySmall.copyWith(
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? AppTheme.textSecondary
+                              : Color(0xFF6B7280),
+                        ),
+                      ),
+                    ],
                   ),
-                  SizedBox(height: 2),
-                  Text(
-                    description,
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 2,
-                    style: AppTheme.bodySmall.copyWith(
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? AppTheme.textSecondary
-                          : Color(0xFF6B7280),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (isSelected)
-              Container(
-                padding: EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: gradient),
-                  shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.check, color: Colors.white, size: 16),
-              ),
-          ],
-        ),
+                if (isSelected)
+                  Container(
+                    padding: EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(colors: gradient),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.check, color: Colors.white, size: 16),
+                  ),
+                if (isLocked)
+                  Container(
+                    padding: EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.6),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.lock_rounded,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
-  }
-
-  void _toggleListening() async {
-    final transcribedText = await showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      barrierColor: Colors.black54,
-      builder: (context) => const VoiceInputDialog(),
-    );
-
-    if (transcribedText != null && transcribedText.isNotEmpty) {
-      setState(() {
-        _controller.text = transcribedText;
-      });
-      // Optionally auto-send the message
-      // await _sendMessage();
-    }
   }
 
   void _onScrollListener() {
@@ -1110,9 +1562,37 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
 
     if (text.isEmpty && _selectedImage == null) return;
 
+    // Check image upload limit for non-premium users (before sending)
+    if (!_isPremium && _selectedImage != null) {
+      final canUpload = await _premiumService.canUploadImage();
+      if (!canUpload) {
+        _showSnackBar(
+          'You\'ve reached your 4 daily image uploads limit. Upgrade to Premium for unlimited uploads!',
+          isError: true,
+        );
+        return;
+      }
+    }
+    // Check message limit for non-premium users
+    if (!_isPremium) {
+      final canSend = await _premiumService.canSendAiMessage();
+      if (!canSend) {
+        _showSnackBar(
+          'You\'ve reached your 18 daily AI messages limit. Upgrade to Premium for unlimited messages!',
+          isError: true,
+        );
+        return;
+      }
+    }
+
     final hasImage = _selectedImage != null;
     final imageFile = _selectedImage;
     final imageName = _selectedFileName;
+
+    // Record image upload if present
+    if (hasImage && !_isPremium) {
+      await _premiumService.recordImageUpload();
+    }
 
     if (_showGreeting) {
       _greetingAnimationController.reverse().then((_) {
@@ -1167,6 +1647,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
     String? response;
 
     bool handledLocally = false;
+
     final identityRegex = RegExp(
       r'\bwho\s+are\s+you\b|\bwhat\s+are\s+you\b|\btell\s+me\s+about\s+yourself\b',
       caseSensitive: false,
@@ -1679,56 +2160,306 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
     }).toList();
   }
 
+  /// Check if user has premium status
   void _showPremiumRequiredDialog() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     showDialog(
       context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(isDark ? 0.6 : 0.4),
       builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: AppTheme.surfaceElevated,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-            side: BorderSide(color: AppTheme.primaryBlue.withOpacity(0.3)),
-          ),
-          title: Row(
-            children: [
-              Icon(Icons.star, color: AppTheme.primaryBlue),
-              SizedBox(width: AppTheme.spaceSm),
-              Text(
-                AppLocalizations.of(context).t('premium.featureUnavailable'),
-                style: AppTheme.headlineSmall.copyWith(
-                  color: AppTheme.textPrimary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          content: Text(
-            AppLocalizations.of(context).t('premium.upgradeToPremium'),
-            style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                AppLocalizations.of(context).t('common.cancel'),
-                style: TextStyle(color: AppTheme.textSecondary),
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          insetPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.8, end: 1.0).animate(
+              CurvedAnimation(
+                parent: ModalRoute.of(context)!.animation!,
+                curve: Curves.easeOutBack,
               ),
             ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _launchUrl('https://nexasmartai.org/premium');
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.warning,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+            child: FadeTransition(
+              opacity: Tween<double>(begin: 0, end: 1.0).animate(
+                CurvedAnimation(
+                  parent: ModalRoute.of(context)!.animation!,
+                  curve: Curves.easeIn,
                 ),
               ),
-              child: Text(AppLocalizations.of(context).t('premium.upgrade')),
+              child: SingleChildScrollView(
+                child: Directionality(
+                  textDirection:
+                      Localizations.localeOf(
+                            context,
+                          ).languageCode.contains('ar') ||
+                          Localizations.localeOf(
+                            context,
+                          ).languageCode.contains('he')
+                      ? TextDirection.rtl
+                      : TextDirection.ltr,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                      color: isDark ? AppTheme.surfaceElevated : Colors.white,
+                      border: Border.all(
+                        color: isDark
+                            ? AppTheme.primaryBlue.withOpacity(0.3)
+                            : AppTheme.primaryBlue.withOpacity(0.2),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.primaryBlue.withOpacity(
+                            isDark ? 0.15 : 0.1,
+                          ),
+                          blurRadius: 20,
+                          spreadRadius: 5,
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Header with icon
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            vertical: 32,
+                            horizontal: 28,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? AppTheme.primaryBlue.withOpacity(0.08)
+                                : AppTheme.primaryBlue.withOpacity(0.05),
+                            border: Border(
+                              bottom: BorderSide(
+                                color: isDark
+                                    ? AppTheme.primaryBlue.withOpacity(0.25)
+                                    : AppTheme.primaryBlue.withOpacity(0.15),
+                              ),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryBlue.withOpacity(
+                                    isDark ? 0.2 : 0.1,
+                                  ),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.star_rounded,
+                                  color: AppTheme.primaryBlue,
+                                  size: 36,
+                                ),
+                              ),
+                              SizedBox(width: 20),
+                              Expanded(
+                                child: Text(
+                                  AppLocalizations.of(
+                                    context,
+                                  ).t('paywall.premium'),
+                                  style: AppTheme.headlineSmall.copyWith(
+                                    color: isDark
+                                        ? AppTheme.textPrimary
+                                        : Color(0xFF1F2937),
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 22,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Content
+                        Padding(
+                          padding: EdgeInsets.all(28),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                AppLocalizations.of(
+                                  context,
+                                ).t('paywall.unlockFeatures'),
+                                style: AppTheme.bodyMedium.copyWith(
+                                  color: isDark
+                                      ? AppTheme.textSecondary
+                                      : Color(0xFF6B7280),
+                                  height: 1.8,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              SizedBox(height: 24),
+                              // Benefits list
+                              Container(
+                                padding: EdgeInsets.all(18),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryBlue.withOpacity(
+                                    isDark ? 0.1 : 0.06,
+                                  ),
+                                  borderRadius: BorderRadius.circular(
+                                    AppTheme.radiusMd,
+                                  ),
+                                  border: Border.all(
+                                    color: AppTheme.primaryBlue.withOpacity(
+                                      isDark ? 0.2 : 0.12,
+                                    ),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.check_circle_rounded,
+                                      color: AppTheme.success,
+                                      size: 26,
+                                    ),
+                                    SizedBox(width: 16),
+                                    Expanded(
+                                      child: Text(
+                                        AppLocalizations.of(
+                                          context,
+                                        ).t('paywall.unlockFeatures'),
+                                        style: AppTheme.bodySmall.copyWith(
+                                          color: isDark
+                                              ? AppTheme.textPrimary
+                                              : Color(0xFF1F2937),
+                                          fontWeight: FontWeight.w500,
+                                          fontSize: 15,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Action buttons
+                        Container(
+                          padding: EdgeInsets.all(28),
+                          decoration: BoxDecoration(
+                            border: Border(
+                              top: BorderSide(
+                                color: isDark
+                                    ? AppTheme.primaryBlue.withOpacity(0.25)
+                                    : AppTheme.primaryBlue.withOpacity(0.15),
+                              ),
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      AppTheme.primaryBlue,
+                                      AppTheme.primaryBlue.withOpacity(0.8),
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(
+                                    AppTheme.radiusMd,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppTheme.primaryBlue.withOpacity(
+                                        isDark ? 0.3 : 0.2,
+                                      ),
+                                      blurRadius: 10,
+                                      offset: Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.pop(context);
+                                    _launchUrl(
+                                      'https://nexasmartai.org/premium',
+                                    );
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.transparent,
+                                    shadowColor: Colors.transparent,
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: 18,
+                                      horizontal: 32,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(
+                                        AppTheme.radiusMd,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.star_rounded,
+                                        color: Colors.white,
+                                        size: 22,
+                                      ),
+                                      SizedBox(width: 12),
+                                      Flexible(
+                                        child: Text(
+                                          AppLocalizations.of(
+                                            context,
+                                          ).t('paywall.getPremium'),
+                                          overflow: TextOverflow.ellipsis,
+                                          style: AppTheme.labelMedium.copyWith(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              SizedBox(height: 16),
+                              SizedBox(
+                                width: double.infinity,
+                                child: TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  style: TextButton.styleFrom(
+                                    padding: EdgeInsets.symmetric(vertical: 16),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(
+                                        AppTheme.radiusMd,
+                                      ),
+                                      side: BorderSide(
+                                        color: isDark
+                                            ? AppTheme.textSecondary
+                                                  .withOpacity(0.3)
+                                            : Color(0xFFD1D5DB),
+                                      ),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    AppLocalizations.of(
+                                      context,
+                                    ).t('common.cancel'),
+                                    style: AppTheme.labelMedium.copyWith(
+                                      color: isDark
+                                          ? AppTheme.textSecondary
+                                          : Color(0xFF6B7280),
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
-          ],
+          ),
         );
       },
     );
@@ -3978,6 +4709,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
             key: _scaffoldKey,
             backgroundColor: Colors.transparent,
             extendBodyBehindAppBar: true,
+            resizeToAvoidBottomInset: true,
             drawerEnableOpenDragGesture: true,
             drawer: _buildDrawer(),
             appBar: PreferredSize(
@@ -4195,8 +4927,8 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
               child: SafeArea(
                 child: Column(
                   children: [
-                    // Premium Upgrade Button (shown only when no messages)
-                    if (_messages.isEmpty)
+                    // Premium Upgrade Button (shown only when no messages and user is not premium)
+                    if (_messages.isEmpty && !_isPremium)
                       Container(
                         margin: EdgeInsets.symmetric(
                           horizontal: AppTheme.spaceMd,
@@ -4275,7 +5007,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                           ),
                         ),
                       ),
-                    Expanded(
+                    Flexible(
                       child: Stack(
                         children: [
                           _showGreeting && _messages.isEmpty
@@ -4562,6 +5294,7 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                       controller: _controller,
                                       textInputAction: TextInputAction.newline,
                                       maxLines: null,
+                                      minLines: 1,
                                       keyboardType: TextInputType.multiline,
                                       style: AppTheme.bodyLarge.copyWith(
                                         color: AppTheme.textPrimaryFromContext(
@@ -4589,32 +5322,46 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
                                         isDense: true,
                                         contentPadding: EdgeInsets.symmetric(
                                           horizontal: 8,
-                                          vertical: 16,
+                                          vertical: 12,
                                         ),
                                       ),
                                     ),
                                   ),
 
-                                  // Voice button
-                                  Container(
-                                    margin: EdgeInsets.only(bottom: 8),
-                                    child: IconButton(
-                                      icon: Icon(
-                                        Icons.mic_none,
-                                        color:
-                                            AppTheme.textSecondaryFromContext(
-                                              context,
-                                            ),
-                                        size: 22,
+                                  // Help/Hint icon with floating arrow
+                                  if (_showHelpHintIcon)
+                                    Container(
+                                      margin: EdgeInsets.only(
+                                        right: 4,
+                                        bottom: 8,
                                       ),
-                                      onPressed: _toggleListening,
-                                      padding: EdgeInsets.all(8),
-                                      constraints: BoxConstraints(
-                                        minWidth: 40,
-                                        minHeight: 40,
+                                      child: Stack(
+                                        alignment: Alignment.topCenter,
+                                        clipBehavior: Clip.none,
+                                        children: [
+                                          IconButton(
+                                            icon: Icon(
+                                              Icons.help_outline,
+                                              color: AppTheme.primaryBlue,
+                                              size: 22,
+                                            ),
+                                            onPressed: _showWelcomeDialog,
+                                            padding: EdgeInsets.all(8),
+                                            constraints: BoxConstraints(
+                                              minWidth: 40,
+                                              minHeight: 40,
+                                            ),
+                                            tooltip:
+                                                'Learn about Nexa Smart AI',
+                                          ),
+                                          // Floating arrow
+                                          Positioned(
+                                            top: -50,
+                                            child: _buildFloatingArrow(),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  ),
 
                                   // Send button
                                   Container(

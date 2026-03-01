@@ -57,6 +57,9 @@ class AppLocalizations {
   String get noData => translate('common.noData');
   String get tryAgain => translate('common.tryAgain');
   String get back => translate('common.back');
+
+  // Onboarding
+  String get onboardingDoNotShowAgain => translate('onboarding.doNotShowAgain');
 }
 
 class _AppLocalizationsDelegate

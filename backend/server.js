@@ -120,6 +120,19 @@ function calculateGranularProgress(
   return Math.min(Math.round(progressPercentage), 99);
 }
 
+/**
+ * Calculate message-based progress for real-time feedback
+ * Users see progress increase as they engage in conversation
+ * Max: 90% (reserved for actual concept completion)
+ */
+function calculateMessageBasedProgress(messageCount = 0) {
+  // Every 2 messages = 5% progress (smooth curve)
+  // Message 0-2 = 5%, 2-4 = 10%, 4-6 = 15%, etc.
+  // Caps at 90% to leave room for concept completion (100%)
+  const messageProgress = Math.min(Math.floor(messageCount / 2) * 5, 90);
+  return messageProgress;
+}
+
 function shouldAutoTriggerWebSearch(message) {
   if (!message) return false;
   const msg = message.toLowerCase();
@@ -2826,14 +2839,15 @@ Always prioritize intellectual clarity, aesthetic presentation, and cognitive en
       );
     }
 
-    // STEP 9: Calculate granular progress before responding
-    // Fetch latest progress data to calculate smooth, continuous progress
+    // STEP 9: Calculate HYBRID progress (message-based + completion markers)
+    // Show real-time progress as user chats, jump when they complete concepts/modules
     let finalProgressPercentage = newProgressPercentage;
     let finalCompletedModules = 0;
     let finalTotalModules = 0;
     try {
       const progressData = await pool.query(
-        `SELECT study_plan, completed_modules, current_module, completed_concepts 
+        `SELECT study_plan, completed_modules, current_module, completed_concepts, 
+                (SELECT COUNT(*) FROM chat_messages WHERE bot_id = $1 AND user_id = $2 AND message_type = 'user') as user_message_count
          FROM bot_progress WHERE bot_id = $1 AND user_id = $2 LIMIT 1`,
         [botId, userId],
       );
@@ -2844,6 +2858,7 @@ Always prioritize intellectual clarity, aesthetic presentation, and cognitive en
         const completedMods = row.completed_modules || [];
         const currentMod = row.current_module || 0;
         const completedConcepts = row.completed_concepts || [];
+        const userMessageCount = parseInt(row.user_message_count) || 0;
 
         finalTotalModules = plan.modules?.length || 0;
         finalCompletedModules = completedMods.length;
@@ -2858,8 +2873,9 @@ Always prioritize intellectual clarity, aesthetic presentation, and cognitive en
             0;
         }
 
-        // Calculate granular progress using the new helper function
-        finalProgressPercentage = calculateGranularProgress(
+        // Calculate TWO progress values
+        // 1. Granular: Based on completed concepts/modules (0-100%)
+        const granularProgress = calculateGranularProgress(
           completedMods,
           finalTotalModules,
           currentMod,
@@ -2867,13 +2883,23 @@ Always prioritize intellectual clarity, aesthetic presentation, and cognitive en
           totalConceptsInCurrentModule,
         );
 
+        // 2. Message-based: Shows real-time progress as they chat (0-90%)
+        const messageProgress = calculateMessageBasedProgress(userMessageCount);
+
+        // Use HYBRID: Take the HIGHER of the two values
+        // This ensures:
+        // - Real-time progress (messages) shows movement
+        // - Concept completion jumps progress (granular)
+        // - Smooth, encouraging user experience
+        finalProgressPercentage = Math.max(granularProgress, messageProgress);
+
         console.log(
-          `[Chat-Enhanced] 📊 Granular progress calculated: ${finalProgressPercentage}% (${completedMods.length}/${finalTotalModules} modules, ${completedConcepts.length}/${totalConceptsInCurrentModule} concepts in module ${currentMod})`,
+          `[Chat-Enhanced] 📊 Hybrid Progress | Messages: ${userMessageCount} (${messageProgress}%) | Concepts: ${completedConcepts.length} (${granularProgress}%) | Using: ${finalProgressPercentage}%`,
         );
       }
     } catch (progErr) {
       console.warn(
-        "[Chat-Enhanced] Failed to calculate granular progress:",
+        "[Chat-Enhanced] Failed to calculate hybrid progress:",
         progErr.message,
       );
       // Use the module-completion-based calculation as fallback

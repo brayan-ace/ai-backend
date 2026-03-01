@@ -27,10 +27,10 @@ import '../services/study_activity_service.dart';
 import '../services/study_notification_service.dart';
 import '../services/push_notification_service.dart';
 import '../services/text_to_speech_service.dart';
-import '../widgets/voice_input_dialog.dart';
 import 'main_tabs.dart';
 import '../services/checkpoint_quiz_service.dart';
 import '../widgets/checkpoint_quiz_widget.dart';
+import '../widgets/save_to_notes_dialog.dart';
 
 // Premium color palette matching bot creation and processing screens
 class PremiumColors {
@@ -757,6 +757,69 @@ class _StudyPlanChatScreenState extends State<StudyPlanChatScreen> {
     );
   }
 
+  /// Show login prompt dialog when user tries to send message without being logged in
+  void _showLoginPrompt() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return AlertDialog(
+          backgroundColor: isDark ? AppTheme.surfaceElevated : Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(
+              color: AppTheme.primaryBlue.withOpacity(0.2),
+              width: 1,
+            ),
+          ),
+          title: Text(
+            AppLocalizations.of(context).t('auth.loginRequired'),
+            style: TextStyle(
+              color: isDark ? AppTheme.textPrimary : Colors.black87,
+              fontWeight: FontWeight.w700,
+              fontSize: 18,
+            ),
+          ),
+          content: Text(
+            AppLocalizations.of(context).t('auth.mustLoginToStudyBot'),
+            style: TextStyle(
+              color: isDark ? AppTheme.textSecondary : Colors.black54,
+              fontSize: 14,
+              height: 1.5,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close dialog
+              },
+              child: Text(
+                AppLocalizations.of(context).t('common.cancel'),
+                style: TextStyle(
+                  color: isDark ? AppTheme.textSecondary : Colors.grey,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close dialog
+                Navigator.of(context).pushNamed('/login'); // Navigate to login
+              },
+              child: Text(
+                AppLocalizations.of(context).t('auth.goToLogin'),
+                style: const TextStyle(
+                  color: AppTheme.primaryBlue,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   /// Add study plan card to chat when plan is generated
   Future<void> _addStudyPlanToChat(Map<String, dynamic> plan) async {
     final modules = plan['modules'] as List? ?? [];
@@ -1212,9 +1275,15 @@ Remember: The user is learning ${modules.length} interconnected modules. Each su
       print('[ChatScreen] Sending message to backend: $userMessage');
       print('[ChatScreen] Bot ID: ${widget.botId}');
 
-      // Get current user ID from Firebase Auth
+      // Check if user is logged in
       final currentUser = FirebaseAuth.instance.currentUser;
-      final userId = currentUser?.uid ?? 'anonymous';
+      if (currentUser == null) {
+        print('[ChatScreen] User not logged in - showing login prompt');
+        _showLoginPrompt();
+        return;
+      }
+
+      final userId = currentUser.uid;
       print('[ChatScreen] User ID: $userId');
 
       // Get conversation history from Firebase for AI context
@@ -1345,10 +1414,25 @@ Remember: The user is learning ${modules.length} interconnected modules. Each su
             setState(() {
               _botCurrentState = newState;
               if (progress != null) {
-                _progressPercentage = (progress['percentage'] ?? 0).toDouble();
-                print(
-                  '[ChatScreen] 📊 Progress updated: $_progressPercentage%',
-                );
+                final backendProgress = (progress['percentage'] ?? 0)
+                    .toDouble();
+                // CRITICAL FIX: Only update if backend has HIGHER progress (trust frontend tracking)
+                // This prevents resetting progress when backend hasn't synced milestone save yet
+                if (backendProgress > _progressPercentage) {
+                  _progressPercentage = backendProgress;
+                  print(
+                    '[ChatScreen] 📊 Progress updated from bot response: $_progressPercentage%',
+                  );
+                } else if (_progressPercentage > backendProgress &&
+                    backendProgress > 0) {
+                  print(
+                    '[ChatScreen] ℹ️ Keeping frontend progress: $_progressPercentage% (bot response: $backendProgress%)',
+                  );
+                } else if (backendProgress == 0.0 && _progressPercentage > 0) {
+                  print(
+                    '[ChatScreen] ℹ️ Backend progress still syncing - keeping frontend: $_progressPercentage%',
+                  );
+                }
               }
               // Update message counts
               _totalMessageCount = _messages.length;
@@ -2319,6 +2403,15 @@ Remember: The user is learning ${modules.length} interconnected modules. Each su
                             botName: widget.botName,
                             showAvatar: isBot,
                             animate: isLastMessage,
+                            botId: widget.botId,
+                            fullConversation: _messages
+                                .map(
+                                  (m) => {
+                                    'senderType': m.senderType,
+                                    'text': m.text,
+                                  },
+                                )
+                                .toList(),
                             onLongPress: () {
                               HapticFeedback.mediumImpact();
                             },
@@ -2788,14 +2881,7 @@ Remember: The user is learning ${modules.length} interconnected modules. Each su
                     ).t('studyBotChat.saveNote'),
                     onTap: () {
                       Navigator.pop(context);
-                    },
-                  ),
-                  _buildAttachmentOption(
-                    icon: Icons.mic,
-                    label: 'Voice',
-                    onTap: () {
-                      Navigator.pop(context);
-                      _toggleListening();
+                      _showSaveToNotesDialog();
                     },
                   ),
                 ],
@@ -3685,6 +3771,8 @@ Remember: The user is learning ${modules.length} interconnected modules. Each su
         final body = jsonDecode(response.body);
         final loadedPlan = body['study_plan'] as Map<String, dynamic>?;
         final modules = loadedPlan?['modules'] as List?;
+        final backendProgress =
+            (body['progress']?['percentage'] as num?)?.toDouble() ?? 0.0;
 
         print('[ChatScreen] 📡 study_plan in response: ${loadedPlan != null}');
         print('[ChatScreen] 📡 modules count: ${modules?.length ?? 0}');
@@ -3692,8 +3780,17 @@ Remember: The user is learning ${modules.length} interconnected modules. Each su
         setState(() {
           _studyPlan = loadedPlan;
           _planVersion = body['plan_version'] as int? ?? 1;
-          _progressPercentage =
-              (body['progress']?['percentage'] as num?)?.toDouble() ?? 0.0;
+          // Only update progress if backend has a higher value (trust frontend first)
+          if (backendProgress > _progressPercentage) {
+            _progressPercentage = backendProgress;
+            print(
+              '[ChatScreen] ✅ Updated progress from backend: $backendProgress%',
+            );
+          } else if (_progressPercentage > backendProgress) {
+            print(
+              '[ChatScreen] ℹ️ Keeping frontend progress: $_progressPercentage% (backend: $backendProgress%)',
+            );
+          }
           _botCurrentState = body['bot_state'] as String? ?? 'intro';
         });
         print(
@@ -4026,22 +4123,67 @@ Remember: The user is learning ${modules.length} interconnected modules. Each su
     );
   }
 
-  /// Toggle voice input - opens voice recording dialog
-  void _toggleListening() async {
-    final transcribedText = await showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      barrierColor: Colors.black54,
-      builder: (context) => const VoiceInputDialog(),
-    );
-
-    if (transcribedText != null && transcribedText.isNotEmpty) {
-      setState(() {
-        _inputController.text = transcribedText;
-      });
-      // Text is now in the input field as a preview before sending
-      // User can edit or press send to add as a message
+  /// Show save to notes dialog - fully functional note saving
+  void _showSaveToNotesDialog() {
+    if (_messages.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No messages to save yet'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
     }
+
+    // Get the last AI message as default content
+    String messageContent = '';
+    for (int i = _messages.length - 1; i >= 0; i--) {
+      if (_messages[i].senderType == 'bot') {
+        messageContent = _messages[i].text;
+        break;
+      }
+    }
+
+    if (messageContent.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No bot responses to save yet'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    // Convert messages to format expected by SaveToNotesDialog
+    final fullConversation = _messages
+        .map(
+          (msg) => {
+            'senderType': msg.senderType,
+            'text': msg.text,
+            'timestamp': msg.timestamp.toIso8601String(),
+          },
+        )
+        .toList();
+
+    showDialog(
+      context: context,
+      builder: (context) => SaveToNotesDialog(
+        messageContent: messageContent,
+        botId: widget.botId ?? 'study-bot',
+        botName: widget.botName ?? 'Study Bot',
+        fullConversation: fullConversation,
+        onSaveSuccess: () {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('✅ Saved to notes successfully!'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        },
+      ),
+    );
   }
 
   /// Show quiz configuration screen
@@ -4762,6 +4904,7 @@ Remember: The user is learning ${modules.length} interconnected modules. Each su
   }
 
   /// Refresh progress from backend and update UI
+  /// IMPORTANT: Only update if backend has HIGHER progress (trust frontend tracking)
   Future<void> _refreshProgressFromBackend() async {
     try {
       final currentUser = FirebaseAuth.instance.currentUser;
@@ -4791,10 +4934,28 @@ Remember: The user is learning ${modules.length} interconnected modules. Each su
 
         setState(() {
           if (body['progress'] != null) {
-            _progressPercentage =
-                (body['progress']['percentage'] as num?)?.toDouble() ??
-                _progressPercentage;
-            print('[ChatScreen] 🔄 Progress refreshed: $_progressPercentage%');
+            final backendProgress =
+                (body['progress']['percentage'] as num?)?.toDouble() ?? 0.0;
+
+            // CRITICAL FIX: Only update if backend is ahead of frontend
+            // This prevents resetting progress when backend hasn't synced yet
+            if (backendProgress > _progressPercentage) {
+              _progressPercentage = backendProgress;
+              print(
+                '[ChatScreen] 🔄 Progress updated from backend: $_progressPercentage%',
+              );
+            } else if (_progressPercentage > backendProgress &&
+                backendProgress > 0) {
+              print(
+                '[ChatScreen] ℹ️ Keeping frontend progress: $_progressPercentage% (backend: $backendProgress%)',
+              );
+            }
+            // If backend is 0 and frontend is > 0, keep frontend (it's more up-to-date)
+            if (backendProgress == 0.0 && _progressPercentage > 0) {
+              print(
+                '[ChatScreen] ℹ️ Backend sync pending - keeping frontend progress: $_progressPercentage%',
+              );
+            }
           }
           // Also update message counts from current state
           _totalMessageCount = _messages.length;

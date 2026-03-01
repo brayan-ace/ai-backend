@@ -163,7 +163,12 @@
     "signUpWithGoogle": "Registrarse con Google",
     "loginWithGoogle": "Iniciar sesión con Google",
     "signupSuccess": "¡Registro exitoso!",
-    "loginSuccess": "¡Inicio de sesión exitoso!"
+    "loginSuccess": "¡Inicio de sesión exitoso!",
+    "loginRequired": "Sesión Requerida",
+    "mustLoginToChat": "Necesitas iniciar sesión para chatear con la IA. Por favor, inicia sesión para continuar.",
+    "mustLoginToCreateBot": "Necesitas iniciar sesión para crear un bot de estudio. Por favor, inicia sesión para continuar.",
+    "mustLoginToStudyBot": "Necesitas iniciar sesión para chatear con tu bot de estudio. Por favor, inicia sesión para continuar.",
+    "goToLogin": "Ir al Inicio de Sesión"
   },
   "streak": {
     "dailyStreak": "Racha Diaria 🔥",
@@ -222,7 +227,8 @@
     "slide2Title": "Estudia Eficientemente",
     "slide2Desc": "Crea planes de estudio y realiza un seguimiento de tu progreso",
     "slide3Title": "Logra Tus Objetivos",
-    "slide3Desc": "Domina cualquier tema con nuestro tutoreo inteligente"
+    "slide3Desc": "Domina cualquier tema con nuestro tutoreo inteligente",
+    "doNotShowAgain": "Si no quieres verlo de nuevo, simplemente marca esta casilla"
   },
   "emptyStates": {
     "noChats": "Sin chats todavía. ¡Inicia una conversación!",
@@ -359,6 +365,12 @@
     "justNow": "Justo ahora",
     "minutesAgo": "Hace {count}m",
     "hoursAgo": "Hace {count}h",
+    "saveToNotes": "Guardar en Notas",
+    "chooseWhatToSave": "Elige qué guardar de esta conversación",
+    "saveThisMessage": "Guardar Este Mensaje",
+    "saveOnlyThisResponse": "Guardar solo esta respuesta",
+    "saveFullConversation": "Guardar Conversación Completa",
+    "saveAllMessagesInChat": "Guardar todos los mensajes en este chat",
     "daysAgo": "Hace {count}d"
   },
   "screens": {

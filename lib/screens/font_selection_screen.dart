@@ -24,7 +24,7 @@ class _FontSelectionScreenState extends State<FontSelectionScreen> {
 
   Future<void> _loadSelectedFont() async {
     final prefs = await SharedPreferences.getInstance();
-    final font = prefs.getString('font_family') ?? 'Roboto';
+    final font = prefs.getString('font_family') ?? 'Georgia'; // Default font
     setState(() => _selectedFont = font);
   }
 

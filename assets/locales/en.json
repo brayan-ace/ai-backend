@@ -117,7 +117,12 @@
     "signUpWithGoogle": "Sign up with Google",
     "loginWithGoogle": "Login with Google",
     "signupSuccess": "Signup successful!",
-    "loginSuccess": "Login successful!"
+    "loginSuccess": "Login successful!",
+    "loginRequired": "Login Required",
+    "mustLoginToChat": "You need to be logged in to chat with the AI. Please log in to continue.",
+    "mustLoginToCreateBot": "You need to be logged in to create a study bot. Please log in to continue.",
+    "mustLoginToStudyBot": "You need to be logged in to chat with your study bot. Please log in to continue.",
+    "goToLogin": "Go to Login"
   },
   "streak": {
     "dailyStreak": "Daily Streak 🔥",
@@ -185,7 +190,8 @@
     "slide2Title": "Study Efficiently",
     "slide2Desc": "Create study plans and track your progress",
     "slide3Title": "Achieve Your Goals",
-    "slide3Desc": "Master any subject with our intelligent tutoring"
+    "slide3Desc": "Master any subject with our intelligent tutoring",
+    "doNotShowAgain": "If you don't want to see it again, just check this box"
   },
   "emptyStates": {
     "noChats": "No chats yet. Start a conversation!",
@@ -385,6 +391,12 @@
     "justNow": "Just now",
     "minutesAgo": "{count}m ago",
     "hoursAgo": "{count}h ago",
+    "saveToNotes": "Save to Notes",
+    "chooseWhatToSave": "Choose what to save from this conversation",
+    "saveThisMessage": "Save This Message",
+    "saveOnlyThisResponse": "Save only this response",
+    "saveFullConversation": "Save Full Conversation",
+    "saveAllMessagesInChat": "Save all messages in this chat",
     "daysAgo": "{count}d ago"
   },
   "topicSelection": {

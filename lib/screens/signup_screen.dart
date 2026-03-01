@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../utils/theme.dart';
-
-import '../widgets/google_sign_in_button.dart';
 import 'email_verification_screen.dart';
 
 /// Sign-up screen with username, email, password fields
@@ -232,7 +230,9 @@ class _SignUpScreenState extends State<SignUpScreen>
 
                   // Back button
                   IconButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/signup-choice');
+                    },
                     icon: Icon(
                       Icons.arrow_back_ios_rounded,
                       color: AppTheme.textPrimary,
@@ -247,7 +247,7 @@ class _SignUpScreenState extends State<SignUpScreen>
 
                   // Header
                   Text(
-                    'Create Account',
+                    'Complete Your Profile',
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
@@ -257,7 +257,7 @@ class _SignUpScreenState extends State<SignUpScreen>
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Join Nexa Smart AI and start your learning journey',
+                    'Add your details to get started',
                     style: TextStyle(
                       fontSize: 16,
                       color: AppTheme.textSecondary,
@@ -282,7 +282,7 @@ class _SignUpScreenState extends State<SignUpScreen>
                           textInputAction: TextInputAction.next,
                         ),
 
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 24),
 
                         // Email field
                         _buildTextField(
@@ -296,7 +296,7 @@ class _SignUpScreenState extends State<SignUpScreen>
                           textInputAction: TextInputAction.next,
                         ),
 
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 24),
 
                         // Password field
                         _buildTextField(
@@ -326,10 +326,10 @@ class _SignUpScreenState extends State<SignUpScreen>
                         ),
 
                         // Password requirements
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 16),
                         _buildPasswordRequirements(),
 
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 32),
 
                         // Error message
                         if (_errorMessage != null)
@@ -367,76 +367,6 @@ class _SignUpScreenState extends State<SignUpScreen>
 
                         // Sign up button
                         _buildSignUpButton(),
-
-                        const SizedBox(height: 24),
-
-                        // Divider with "or"
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Divider(
-                                color: AppTheme.surfaceElevated,
-                                thickness: 1,
-                              ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              child: Text(
-                                'or',
-                                style: TextStyle(
-                                  color: AppTheme.textTertiary,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              child: Divider(
-                                color: AppTheme.surfaceElevated,
-                                thickness: 1,
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 24),
-
-                        // Google Sign-In Button
-                        const GoogleSignInButton(),
-
-                        const SizedBox(height: 24),
-
-                        // Login link
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'Already have an account? ',
-                              style: TextStyle(
-                                color: AppTheme.textSecondary,
-                                fontSize: 15,
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.pushReplacementNamed(
-                                  context,
-                                  '/login',
-                                );
-                              },
-                              child: Text(
-                                'Log In',
-                                style: TextStyle(
-                                  color: AppTheme.primaryBlue,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
 
                         const SizedBox(height: 32),
                       ],
@@ -497,7 +427,12 @@ class _SignUpScreenState extends State<SignUpScreen>
             keyboardType: keyboardType,
             textInputAction: textInputAction,
             onSubmitted: onSubmitted,
-            style: TextStyle(color: AppTheme.textPrimary, fontSize: 16),
+            style: TextStyle(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? AppTheme.textPrimary
+                  : Color(0xFF374151),
+              fontSize: 16,
+            ),
             decoration: InputDecoration(
               hintText: hint,
               hintStyle: TextStyle(color: AppTheme.textTertiary, fontSize: 16),

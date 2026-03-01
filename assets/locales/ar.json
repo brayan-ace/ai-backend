@@ -222,7 +222,8 @@
     "slide2Title": "ادرس بكفاءة",
     "slide2Desc": "أنشئ خطط دراسة وتتبع تقدمك",
     "slide3Title": "حقق أهدافك",
-    "slide3Desc": "أتقن أي موضوع مع نظام التدريس الذكي لدينا"
+    "slide3Desc": "أتقن أي موضوع مع نظام التدريس الذكي لدينا",
+    "doNotShowAgain": "إذا كنت لا تريد رؤيته مرة أخرى، فقط حدد هذا المربع"
   },
   "emptyStates": {
     "noChats": "لا توجد دردشات حتى الآن. ابدأ محادثة!",
@@ -359,7 +360,13 @@
     "justNow": "للتو",
     "minutesAgo": "قبل {count}م",
     "hoursAgo": "قبل {count}س",
-    "daysAgo": "قبل {count}ي"
+    "daysAgo": "قبل {count}ي",
+    "saveToNotes": "حفظ في الملاحظات",
+    "chooseWhatToSave": "اختر ما تريد حفظه من هذه المحادثة",
+    "saveThisMessage": "حفظ هذه الرسالة",
+    "saveOnlyThisResponse": "حفظ هذه الرسالة فقط",
+    "saveFullConversation": "حفظ المحادثة الكاملة",
+    "saveAllMessagesInChat": "حفظ جميع الرسائل في هذه المحادثة"
   },
   "screens": {
     "billingComingSoon": "ستكون ميزات الفواتير متاحة قريباً",

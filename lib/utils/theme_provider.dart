@@ -4,8 +4,8 @@ import 'theme.dart';
 
 class ThemeProvider extends ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.dark;
-  double _textScaleFactor = 1.0;
-  String _fontFamily = 'Roboto';
+  double _textScaleFactor = 0.91; // Default: 91% text size
+  String _fontFamily = 'Georgia'; // Default font
 
   ThemeMode get themeMode => _themeMode;
   double get textScaleFactor => _textScaleFactor;
@@ -18,8 +18,9 @@ class ThemeProvider extends ChangeNotifier {
   Future<void> _loadFromPreferences() async {
     final prefs = await SharedPreferences.getInstance();
     final themeModeStr = prefs.getString('theme_mode') ?? 'dark';
-    _textScaleFactor = prefs.getDouble('text_size') ?? 1.0;
-    _fontFamily = prefs.getString('font_family') ?? 'Roboto';
+    _textScaleFactor =
+        prefs.getDouble('text_size') ?? 0.91; // Default: 91% text size
+    _fontFamily = prefs.getString('font_family') ?? 'Georgia'; // Default font
 
     switch (themeModeStr) {
       case 'light':

@@ -1,7 +1,9 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 /// Study Activity Service
 /// Tracks study interactions, manages learning streaks, and persists activity data
+/// ACCOUNT-SPECIFIC: All streaks and activities are tied to the Firebase user UID
 ///
 /// What counts as "Studying":
 /// - Sending a message in a Study Bot chat
@@ -13,12 +15,15 @@ class StudyActivityService {
 
   factory StudyActivityService() => _instance;
 
+  static StudyActivityService get instance => _instance;
+
   StudyActivityService._internal();
 
   late SharedPreferences _prefs;
   bool _isInitialized = false;
+  String? _currentUserUID; // Track current user for account-specific data
 
-  // Preference keys
+  // Preference keys (will be prefixed with user UID)
   static const String _lastStudyTimestampKey = 'study_last_timestamp';
   static const String _lastActivityDateKey =
       'study_last_activity_date'; // UNIFIED: Both app open AND study activity use this
@@ -34,23 +39,57 @@ class StudyActivityService {
       _prefs = await SharedPreferences.getInstance();
       _isInitialized = true;
       print('[StudyActivity] ✅ Study activity service initialized');
-      _logCurrentState();
     } catch (e) {
       print('[StudyActivity] ❌ Error initializing: $e');
       rethrow;
     }
   }
 
+  /// Set the current user for account-specific streak tracking
+  /// Call this when user logs in or whenever auth state changes
+  void setCurrentUser(String? uid) {
+    _currentUserUID = uid;
+    if (uid != null) {
+      print('[StudyActivity] 👤 Current user set to: $uid');
+      _logCurrentState();
+    } else {
+      print('[StudyActivity] 👤 Current user cleared');
+    }
+  }
+
+  /// Get the current user UID
+  String? getCurrentUserUID() => _currentUserUID;
+
+  /// Generate a user-specific key by prefixing with UID
+  /// If no user is set, throws an error
+  String _getUserSpecificKey(String baseKey) {
+    if (_currentUserUID == null) {
+      throw Exception('No user set. Call setCurrentUser(uid) first.');
+    }
+    return '${_currentUserUID}_$baseKey';
+  }
+
   /// Record a study activity (message in chat, quiz, module, etc.)
   /// Returns the updated streak information
   /// Uses CALENDAR DAY tracking (not 24-hour windows)
   /// UNIFIED: Now shares date tracking with app open
+  /// ACCOUNT-SPECIFIC: Only tracks if a user is logged in
   Future<StudyStreakData> recordStudyActivity({
     required String activityType, // 'message', 'quiz', 'module', etc.
     String? botId,
     String? metadata,
   }) async {
     _ensureInitialized();
+
+    // Skip if no user is logged in
+    if (_currentUserUID == null) {
+      print('[StudyActivity] ⏭️  No user logged in. Skipping streak update.');
+      return StudyStreakData(
+        currentStreak: 0,
+        streakIncremented: false,
+        timestamp: DateTime.now(),
+      );
+    }
 
     try {
       final now = DateTime.now();
@@ -61,7 +100,9 @@ class StudyActivityService {
       if (lastActivityDate == null) {
         await _setLastActivityDate(today);
         await _setCurrentStreak(1);
-        print('[StudyActivity] 🎯 First activity recorded. Streak: 1');
+        print(
+          '[StudyActivity] 🎯 First activity recorded for user $_currentUserUID. Streak: 1',
+        );
         return _buildStreakData(1, false);
       }
 
@@ -69,7 +110,7 @@ class StudyActivityService {
       if (lastActivityDate.isAtSameMomentAs(today)) {
         final currentStreak = _getCurrentStreak();
         print(
-          '[StudyActivity] ⏱️  Already active today. Streak remains: $currentStreak',
+          '[StudyActivity] ⏱️  User already active today. Streak remains: $currentStreak',
         );
         return _buildStreakData(currentStreak, false);
       }
@@ -98,7 +139,7 @@ class StudyActivityService {
         }
 
         print(
-          '[StudyActivity] 🔥 New day! Streak incremented! New streak: $newStreak',
+          '[StudyActivity] 🔥 New day! Streak incremented for user $_currentUserUID! New streak: $newStreak',
         );
         return _buildStreakData(newStreak, true);
       }
@@ -108,9 +149,9 @@ class StudyActivityService {
         await _setCurrentStreak(1);
         await _setLastActivityDate(today);
         // Reset milestone when streak resets
-        await _prefs.remove(_lastStreakMilestoneKey);
+        await _prefs.remove(_getUserSpecificKey(_lastStreakMilestoneKey));
         print(
-          '[StudyActivity] 🔄 Streak broken (${(hoursDiff / 24).toStringAsFixed(1)} days). Reset to 1.',
+          '[StudyActivity] 🔄 Streak broken for user $_currentUserUID (${(hoursDiff / 24).toStringAsFixed(1)} days). Reset to 1.',
         );
         return _buildStreakData(1, false);
       }
@@ -128,8 +169,19 @@ class StudyActivityService {
   /// Returns the updated streak information
   /// Uses CALENDAR DAY tracking (not 24-hour windows)
   /// UNIFIED: Now shares date tracking with study activity
+  /// ACCOUNT-SPECIFIC: Only tracks if a user is logged in
   Future<StudyStreakData> recordAppOpen() async {
     _ensureInitialized();
+
+    // Skip if no user is logged in
+    if (_currentUserUID == null) {
+      print('[StudyActivity] ⏭️  No user logged in. Skipping streak update.');
+      return StudyStreakData(
+        currentStreak: 0,
+        streakIncremented: false,
+        timestamp: DateTime.now(),
+      );
+    }
 
     try {
       final now = DateTime.now();
@@ -140,7 +192,9 @@ class StudyActivityService {
       if (lastActivityDate == null) {
         await _setLastActivityDate(today);
         await _setCurrentStreak(1);
-        print('[StudyActivity] 🎯 First app open. Streak: 1');
+        print(
+          '[StudyActivity] 🎯 First app open for user $_currentUserUID. Streak: 1',
+        );
         return _buildStreakData(1, false);
       }
 
@@ -148,7 +202,7 @@ class StudyActivityService {
       if (lastActivityDate.isAtSameMomentAs(today)) {
         final currentStreak = _getCurrentStreak();
         print(
-          '[StudyActivity] ⏱️  Already opened app today. Streak remains: $currentStreak',
+          '[StudyActivity] ⏱️  User already opened app today. Streak remains: $currentStreak',
         );
         return _buildStreakData(currentStreak, false);
       }
@@ -177,7 +231,7 @@ class StudyActivityService {
         }
 
         print(
-          '[StudyActivity] 🔥 Streak incremented on app open! New streak: $newStreak',
+          '[StudyActivity] 🔥 New day! Streak incremented for user $_currentUserUID! New streak: $newStreak',
         );
         return _buildStreakData(newStreak, true);
       }
@@ -187,9 +241,9 @@ class StudyActivityService {
         await _setCurrentStreak(1);
         await _setLastActivityDate(today);
         // Reset milestone when streak resets
-        await _prefs.remove(_lastStreakMilestoneKey);
+        await _prefs.remove(_getUserSpecificKey(_lastStreakMilestoneKey));
         print(
-          '[StudyActivity] 🔄 Streak broken (${(hoursDiff / 24).toStringAsFixed(1)} days). Reset to 1.',
+          '[StudyActivity] 🔄 Streak broken for user $_currentUserUID (${(hoursDiff / 24).toStringAsFixed(1)} days). Reset to 1.',
         );
         return _buildStreakData(1, false);
       }
@@ -283,10 +337,10 @@ class StudyActivityService {
     _ensureInitialized();
 
     try {
-      await _prefs.remove(_lastStudyTimestampKey);
-      await _prefs.remove(_currentStreakKey);
-      await _prefs.remove(_lastStreakMilestoneKey);
-      print('[StudyActivity] 🔄 Streak reset');
+      await _prefs.remove(_getUserSpecificKey(_lastStudyTimestampKey));
+      await _prefs.remove(_getUserSpecificKey(_currentStreakKey));
+      await _prefs.remove(_getUserSpecificKey(_lastStreakMilestoneKey));
+      print('[StudyActivity] 🔄 Streak reset for user $_currentUserUID');
     } catch (e) {
       print('[StudyActivity] ❌ Error resetting streak: $e');
     }
@@ -322,14 +376,16 @@ class StudyActivityService {
   }
 
   DateTime? _getLastStudyTimestamp() {
-    final timestamp = _prefs.getString(_lastStudyTimestampKey);
+    final timestamp = _prefs.getString(
+      _getUserSpecificKey(_lastStudyTimestampKey),
+    );
     if (timestamp == null) return null;
     return DateTime.parse(timestamp);
   }
 
   // Get last activity date (calendar day only) - UNIFIED for both app open and study activity
   DateTime? _getLastActivityDate() {
-    final dateStr = _prefs.getString(_lastActivityDateKey);
+    final dateStr = _prefs.getString(_getUserSpecificKey(_lastActivityDateKey));
     if (dateStr == null) return null;
     return DateTime.parse(dateStr);
   }
@@ -337,27 +393,30 @@ class StudyActivityService {
   // Set last activity date (calendar day only) - UNIFIED for both app open and study activity
   Future<void> _setLastActivityDate(DateTime dateTime) async {
     final dateOnly = _dateOnly(dateTime);
-    await _prefs.setString(_lastActivityDateKey, dateOnly.toIso8601String());
+    await _prefs.setString(
+      _getUserSpecificKey(_lastActivityDateKey),
+      dateOnly.toIso8601String(),
+    );
   }
 
   int _getCurrentStreak() {
-    return _prefs.getInt(_currentStreakKey) ?? 0;
+    return _prefs.getInt(_getUserSpecificKey(_currentStreakKey)) ?? 0;
   }
 
   Future<void> _setCurrentStreak(int streak) async {
-    await _prefs.setInt(_currentStreakKey, streak);
+    await _prefs.setInt(_getUserSpecificKey(_currentStreakKey), streak);
   }
 
   int _getLongestStreak() {
-    return _prefs.getInt(_longestStreakKey) ?? 0;
+    return _prefs.getInt(_getUserSpecificKey(_longestStreakKey)) ?? 0;
   }
 
   Future<void> _setLongestStreak(int streak) async {
-    await _prefs.setInt(_longestStreakKey, streak);
+    await _prefs.setInt(_getUserSpecificKey(_longestStreakKey), streak);
   }
 
   int? _getLastStreakMilestone() {
-    final value = _prefs.getInt(_lastStreakMilestoneKey);
+    final value = _prefs.getInt(_getUserSpecificKey(_lastStreakMilestoneKey));
     return value == 0 ? null : value;
   }
 
@@ -370,7 +429,11 @@ class StudyActivityService {
   }
 
   void _logCurrentState() {
-    print('[StudyActivity] Current state:');
+    if (_currentUserUID == null) {
+      print('[StudyActivity] ⚠️  No user set. Cannot log state.');
+      return;
+    }
+    print('[StudyActivity] Current state for user $_currentUserUID:');
     print('  - Current Streak: ${_getCurrentStreak()}');
     print('  - Longest Streak: ${_getLongestStreak()}');
     print('  - Last Activity Date: ${_getLastActivityDate()}');

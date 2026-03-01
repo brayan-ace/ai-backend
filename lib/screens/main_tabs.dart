@@ -30,64 +30,64 @@ class _MainTabsState extends State<MainTabs> {
       const NotesScreen(), // Notes
     ];
 
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppTheme.backgroundGradientStartFromContext(context),
-            AppTheme.backgroundGradientEndFromContext(context),
-          ],
-        ),
-      ),
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: IndexedStack(index: _selected, children: pages),
-        bottomNavigationBar: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: AppTheme.surfaceGradientFromContext(context),
-            ),
-            border: Border(
-              top: BorderSide(
-                color: AppTheme.surfaceElevatedFromContext(
-                  context,
-                ).withOpacity(0.3),
-                width: 1,
-              ),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.3),
-                blurRadius: 12,
-                offset: Offset(0, -4),
-              ),
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppTheme.backgroundGradientStartFromContext(context),
+              AppTheme.backgroundGradientEndFromContext(context),
             ],
           ),
-          child: SafeArea(
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: AppTheme.spaceLg,
-                vertical: AppTheme.spaceSm,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildNavItem(
-                    icon: Icons.chat_bubble_rounded,
-                    label: 'Your AI',
-                    index: 0,
-                    gradient: AppTheme.primaryGradient,
-                  ),
-                  _buildNavItem(
-                    icon: Icons.note_alt_rounded,
-                    label: 'Notes',
-                    index: 1,
-                    gradient: AppTheme.accentGradient,
-                  ),
-                ],
-              ),
+        ),
+        child: IndexedStack(index: _selected, children: pages),
+      ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: AppTheme.surfaceGradientFromContext(context),
+          ),
+          border: Border(
+            top: BorderSide(
+              color: AppTheme.surfaceElevatedFromContext(
+                context,
+              ).withOpacity(0.3),
+              width: 1,
+            ),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 12,
+              offset: Offset(0, -4),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: AppTheme.spaceLg,
+              vertical: AppTheme.spaceSm,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildNavItem(
+                  icon: Icons.chat_bubble_rounded,
+                  label: 'Your AI',
+                  index: 0,
+                  gradient: AppTheme.primaryGradient,
+                ),
+                _buildNavItem(
+                  icon: Icons.note_alt_rounded,
+                  label: 'Notes',
+                  index: 1,
+                  gradient: AppTheme.accentGradient,
+                ),
+              ],
             ),
           ),
         ),

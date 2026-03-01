@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/auth/google_auth_service.dart';
 import '../../utils/theme.dart';
 import '../../services/user_profile_service.dart';
+import '../screens/google_username_confirmation_screen.dart';
 
 /// Google Sign-In Button Widget - Production-Safe Implementation
 ///
@@ -19,7 +20,9 @@ import '../../services/user_profile_service.dart';
 /// - If anything goes wrong, error is caught and shown gracefully
 /// - The app checks auth state has ACTUALLY changed before navigating
 class GoogleSignInButton extends StatefulWidget {
-  const GoogleSignInButton({super.key});
+  final bool isSignup;
+
+  const GoogleSignInButton({super.key, this.isSignup = false});
 
   @override
   State<GoogleSignInButton> createState() => _GoogleSignInButtonState();
@@ -48,6 +51,14 @@ class _GoogleSignInButtonState extends State<GoogleSignInButton> {
 
     try {
       print('[GoogleSignInButton] 🔐 Starting Google Sign-In flow...');
+
+      // For signup flow: clear Google cache to force fresh account picker
+      if (widget.isSignup) {
+        print(
+          '[GoogleSignInButton] Signup flow - clearing cached Google account...',
+        );
+        await _googleAuthService.clearGoogleAccountCache();
+      }
 
       // Step 1: Call Google Sign-In
       // This returns User if successful, null if user cancelled or error occurred
@@ -118,16 +129,32 @@ class _GoogleSignInButtonState extends State<GoogleSignInButton> {
 
       print('[GoogleSignInButton] 🔐 Auth state verified: ${currentUser.uid}');
 
-      // Step 7: Navigate to main app
-      // By this point, auth state is guaranteed to be updated
-      // AuthGate will catch the state change and show the appropriate screen
+      // Step 7: Navigate based on flow (signup vs login)
+      // For signup flow: go to username confirmation screen
+      // For login flow: go to main app (AuthGate will handle email verification)
       if (mounted) {
-        print('[GoogleSignInButton] 🚀 Navigating to main app...');
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/ai',
-          (route) => false, // Remove all previous routes
-        );
+        if (widget.isSignup) {
+          // Signup flow: need username confirmation
+          print(
+            '[GoogleSignInButton] 🚀 Navigating to username confirmation...',
+          );
+          // Import GoogleUsernameConfirmationScreen at the top
+          // For now, use Navigator.push to pass the User object
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) =>
+                  _buildGoogleUsernameConfirmation(currentUser),
+            ),
+          );
+        } else {
+          // Login flow: go directly to app
+          print('[GoogleSignInButton] 🚀 Navigating to main app...');
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/main',
+            (route) => false, // Remove all previous routes
+          );
+        }
       }
     } on FirebaseAuthException catch (e) {
       // Firebase-specific errors
@@ -198,6 +225,14 @@ class _GoogleSignInButtonState extends State<GoogleSignInButton> {
       default:
         return 'Sign-in failed ($errorCode). Please try again.';
     }
+  }
+
+  /// Helper to build GoogleUsernameConfirmationScreen with proper parameters
+  Widget _buildGoogleUsernameConfirmation(User user) {
+    return GoogleUsernameConfirmationScreen(
+      user: user,
+      photoUrl: user.photoURL,
+    );
   }
 
   @override
@@ -279,7 +314,9 @@ class _GoogleSignInButtonState extends State<GoogleSignInButton> {
                               ],
                             )
                           : Text(
-                              'Continue with Google',
+                              widget.isSignup
+                                  ? 'Continue with Google'
+                                  : 'Sign in with Google',
                               style: TextStyle(
                                 color: AppTheme.textPrimary,
                                 fontSize: 18,

@@ -176,7 +176,8 @@
     "slide2Title": "Estude Eficientemente",
     "slide2Desc": "Crie planos de estudo e acompanhe seu progresso",
     "slide3Title": "Alcance Seus Objetivos",
-    "slide3Desc": "Domine qualquer assunto com nosso sistema de tutoria inteligente"
+    "slide3Desc": "Domine qualquer assunto com nosso sistema de tutoria inteligente",
+    "doNotShowAgain": "Se você não quiser vê-lo novamente, apenas marque esta caixa"
   },
   "emptyStates": {
     "noChats": "Nenhum chat ainda. Inicie uma conversa!",
@@ -362,7 +363,13 @@
     "modeComingSoon": "Alternância de modo em breve!",
     "messageHint": "Mensagem {botName}...",
     "takeQuiz": "Fazer Quiz",
-    "saveNote": "Salvar Nota"
+    "saveNote": "Salvar Nota",
+    "saveToNotes": "Salvar em Notas",
+    "chooseWhatToSave": "Escolha o que deseja salvar desta conversa",
+    "saveThisMessage": "Salvar Esta Mensagem",
+    "saveOnlyThisResponse": "Salvar apenas esta resposta",
+    "saveFullConversation": "Salvar Conversa Completa",
+    "saveAllMessagesInChat": "Salvar todas as mensagens neste chat"
   },
   "notes": {
     "notesTitle": "Notas",

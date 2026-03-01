@@ -74,6 +74,11 @@ class _AuthScreenState extends State<AuthScreen> {
                   SizedBox(height: AppTheme.spaceMd),
                   TextFormField(
                     controller: emailController,
+                    style: AppTheme.bodyLarge.copyWith(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? AppTheme.textPrimary
+                          : Color(0xFF374151),
+                    ),
                     decoration: InputDecoration(
                       labelText: 'Email Address',
                       prefixIcon: Icon(
@@ -285,7 +290,10 @@ class _AuthScreenState extends State<AuthScreen> {
                           validator: (val) =>
                               val == null || val.isEmpty ? 'Enter email' : null,
                           style: AppTheme.bodyLarge.copyWith(
-                            color: AppTheme.textPrimary,
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                ? AppTheme.textPrimary
+                                : Color(0xFF374151),
                           ),
                         ),
                         const SizedBox(height: AppTheme.spaceMd),
@@ -310,7 +318,10 @@ class _AuthScreenState extends State<AuthScreen> {
                               ? 'Password must be >= 6 chars'
                               : null,
                           style: AppTheme.bodyLarge.copyWith(
-                            color: AppTheme.textPrimary,
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                ? AppTheme.textPrimary
+                                : Color(0xFF374151),
                           ),
                         ),
                         const SizedBox(height: AppTheme.spaceLg),

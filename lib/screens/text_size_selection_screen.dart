@@ -24,7 +24,8 @@ class _TextSizeSelectionScreenState extends State<TextSizeSelectionScreen> {
 
   Future<void> _loadTextScale() async {
     final prefs = await SharedPreferences.getInstance();
-    final scale = prefs.getDouble('text_size') ?? 1.0;
+    final scale =
+        prefs.getDouble('text_size') ?? 0.91; // Default: 91% text size
     setState(() => _textScale = scale);
   }
 

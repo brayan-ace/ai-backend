@@ -32,7 +32,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _themeMode = prefs.getString('theme_mode') ?? 'dark';
-      _textSize = prefs.getDouble('text_size') ?? 1.0;
+      _textSize =
+          prefs.getDouble('text_size') ?? 0.91; // Default: 91% text size
       _autoSaveChats = prefs.getBool('auto_save_chats') ?? true;
       _notificationsEnabled = prefs.getBool('notifications') ?? true;
       _soundEffects = prefs.getBool('sound_effects') ?? true;

@@ -29,6 +29,8 @@ class GoogleAuthService {
     scopes: ['email', 'profile', 'openid'],
     // SignInOption.games prevents unnecessary consent screens
     signInOption: SignInOption.standard,
+    // Force fresh login each time to ensure account picker appears
+    forceCodeForRefreshToken: true,
   );
 
   // Max retries for transient failures
@@ -220,6 +222,20 @@ class GoogleAuthService {
       try {
         await _auth.signOut();
       } catch (_) {}
+    }
+  }
+
+  /// Clear Google account cache without affecting Firebase login
+  /// This ensures the account picker appears fresh on next sign-in
+  /// Used primarily for signup flow to force account selection
+  Future<void> clearGoogleAccountCache() async {
+    try {
+      print('[GoogleAuth] 🧹 Clearing Google account cache...');
+      await _googleSignIn.signOut();
+      print('[GoogleAuth] ✅ Google account cache cleared');
+    } catch (e) {
+      print('[GoogleAuth] ⚠️ Error clearing Google cache: $e');
+      // Non-critical error, continue anyway
     }
   }
 

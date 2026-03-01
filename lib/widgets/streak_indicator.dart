@@ -160,10 +160,10 @@ class _StreakIndicatorState extends State<StreakIndicator>
       return SizedBox.shrink();
     }
 
-    // Only show if streak > 0
-    if (_currentStreak == 0) {
-      return SizedBox.shrink();
-    }
+    // Show motivational message when streak is 0
+    final streakText = _currentStreak == 0
+        ? 'Start streak!'
+        : '$_currentStreak';
 
     return GestureDetector(
       onTap: widget.onTap,
@@ -222,13 +222,13 @@ class _StreakIndicatorState extends State<StreakIndicator>
                     child: Text('🔥', style: TextStyle(fontSize: 20)),
                   ),
                   SizedBox(width: AppTheme.spaceXs),
-                  // Streak count
+                  // Streak count or motivational message
                   ShaderMask(
                     shaderCallback: (bounds) => LinearGradient(
                       colors: AppTheme.primaryGradient,
                     ).createShader(bounds),
                     child: Text(
-                      '$_currentStreak',
+                      streakText,
                       style: AppTheme.labelLargeFromContext(context).copyWith(
                         fontWeight: FontWeight.w700,
                         color: Colors.white,

@@ -176,7 +176,8 @@
     "slide2Title": "高效学习",
     "slide2Desc": "创建学习计划并跟踪您的进度",
     "slide3Title": "实现您的目标",
-    "slide3Desc": "使用我们的智能辅导掌握任何科目"
+    "slide3Desc": "使用我们的智能辅导掌握任何科目",
+    "doNotShowAgain": "如果您不想再看到它，只需勾选此框"
   },
   "emptyStates": {
     "noChats": "还没有聊天。开始对话！",
@@ -379,6 +380,12 @@
     "justNow": "刚刚",
     "minutesAgo": "{count}分钟前",
     "hoursAgo": "{count}小时前",
+    "saveToNotes": "保存到笔记",
+    "chooseWhatToSave": "选择要从此对话中保存的内容",
+    "saveThisMessage": "保存此消息",
+    "saveOnlyThisResponse": "仅保存此响应",
+    "saveFullConversation": "保存完整对话",
+    "saveAllMessagesInChat": "保存此聊天中的所有消息",
     "daysAgo": "{count}天前"
   },
   "topicSelection": {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../utils/globals.dart';
 import '../utils/theme.dart';
 import '../utils/app_localizations.dart';
@@ -6,6 +7,7 @@ import 'bot_processing_screen.dart';
 import 'recent_study_bots_screen.dart';
 import 'topic_selection_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../services/premium_service.dart';
 
 class BotCreationScreen extends StatefulWidget {
   const BotCreationScreen({super.key});
@@ -228,6 +230,16 @@ class _BotCreationScreenState extends State<BotCreationScreen>
         // ignore and keep fallback
       }
 
+      // Record bot creation in premium service
+      try {
+        final premiumService = PremiumService.instance;
+        await premiumService.init();
+        await premiumService.recordBotCreation();
+        print('[BotCreationScreen] Bot creation recorded in premium service');
+      } catch (e) {
+        print('[BotCreationScreen] Error recording bot creation: $e');
+      }
+
       // Use planName as topic fallback
       final topic = planName;
 
@@ -279,6 +291,38 @@ class _BotCreationScreenState extends State<BotCreationScreen>
   // Handle Create Study Bot button tap - validate all fields and navigate
   Future<void> _handleCreateStudyBot() async {
     print('[BotCreationScreen] _handleCreateStudyBot entry');
+
+    // Check if user is logged in
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      print('[BotCreationScreen] User not logged in - showing login prompt');
+      _showLoginPrompt(context);
+      return;
+    }
+
+    // Check premium status and bot creation limit
+    try {
+      final premiumService = PremiumService.instance;
+      await premiumService.init();
+      final canCreate = await premiumService.canCreateBot();
+
+      if (!canCreate) {
+        // User has reached bot limit - show premium dialog
+        print('[BotCreationScreen] Bot limit reached');
+        scaffoldMessengerKey.currentState?.showSnackBar(
+          _buildPremiumSnackBar(
+            'You have reached your limit of ${PremiumService.maxCustomBotsPerMonth} bots per month. Upgrade to Premium to create unlimited bots!',
+            backgroundColor: Colors.orange.shade900,
+          ),
+        );
+        // Optionally show premium dialog
+        _showPremiumUpgradeDialog();
+        return;
+      }
+    } catch (e) {
+      print('[BotCreationScreen] Error checking bot limit: $e');
+    }
+
     final planName = _planNameCtrl.text.trim();
     final planDescription = _planDescriptionCtrl.text.trim();
     final botName = _botNameCtrl.text.trim();
@@ -1153,5 +1197,318 @@ class _BotCreationScreenState extends State<BotCreationScreen>
         ),
       ],
     );
+  }
+
+  // Show login prompt dialog
+  void _showLoginPrompt(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return AlertDialog(
+          backgroundColor: isDark ? AppTheme.surfaceElevated : Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(
+              color: AppTheme.primaryBlue.withOpacity(0.2),
+              width: 1,
+            ),
+          ),
+          title: Text(
+            AppLocalizations.of(context).t('auth.loginRequired'),
+            style: TextStyle(
+              color: isDark ? AppTheme.textPrimary : Colors.black87,
+              fontWeight: FontWeight.w700,
+              fontSize: 18,
+            ),
+          ),
+          content: Text(
+            AppLocalizations.of(context).t('auth.mustLoginToCreateBot'),
+            style: TextStyle(
+              color: isDark ? AppTheme.textSecondary : Colors.black54,
+              fontSize: 14,
+              height: 1.5,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close dialog
+              },
+              child: Text(
+                AppLocalizations.of(context).t('common.cancel'),
+                style: TextStyle(
+                  color: isDark ? AppTheme.textSecondary : Colors.grey,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close dialog
+                Navigator.of(context).pushNamed('/login'); // Navigate to login
+              },
+              child: Text(
+                AppLocalizations.of(context).t('auth.goToLogin'),
+                style: const TextStyle(
+                  color: AppTheme.primaryBlue,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Show premium upgrade dialog for bot limit
+  void _showPremiumUpgradeDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: isDark ? AppTheme.surfaceElevated : Colors.white,
+              border: Border.all(
+                color: AppTheme.primaryBlue.withOpacity(isDark ? 0.3 : 0.2),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.primaryBlue.withOpacity(isDark ? 0.15 : 0.1),
+                  blurRadius: 20,
+                  spreadRadius: 5,
+                ),
+              ],
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header
+                  Container(
+                    padding: EdgeInsets.symmetric(vertical: 24, horizontal: 24),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? AppTheme.primaryBlue.withOpacity(0.1)
+                          : AppTheme.primaryBlue.withOpacity(0.05),
+                      border: Border(
+                        bottom: BorderSide(
+                          color: isDark
+                              ? AppTheme.primaryBlue.withOpacity(0.25)
+                              : AppTheme.primaryBlue.withOpacity(0.15),
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryBlue.withOpacity(
+                              isDark ? 0.2 : 0.1,
+                            ),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.star_rounded,
+                            color: AppTheme.primaryBlue,
+                            size: 28,
+                          ),
+                        ),
+                        SizedBox(width: 16),
+                        Expanded(
+                          child: Text(
+                            'Bot Creation Limit Reached',
+                            style: TextStyle(
+                              color: isDark
+                                  ? AppTheme.textPrimary
+                                  : Color(0xFF1F2937),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 20,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Content
+                  Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'You can create up to ${PremiumService.maxCustomBotsPerMonth} study bots per month. Upgrade to Premium to create unlimited bots and unlock all features!',
+                          style: TextStyle(
+                            color: isDark
+                                ? AppTheme.textSecondary
+                                : Color(0xFF6B7280),
+                            fontSize: 15,
+                            height: 1.6,
+                          ),
+                        ),
+                        SizedBox(height: 20),
+                        Container(
+                          padding: EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryBlue.withOpacity(
+                              isDark ? 0.1 : 0.06,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppTheme.primaryBlue.withOpacity(
+                                isDark ? 0.2 : 0.12,
+                              ),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.check_circle_rounded,
+                                color: AppTheme.primaryBlue,
+                                size: 22,
+                              ),
+                              SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Unlimited bot creation & all premium features',
+                                  style: TextStyle(
+                                    color: isDark
+                                        ? AppTheme.textPrimary
+                                        : Color(0xFF1F2937),
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Action buttons
+                  Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Column(
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                AppTheme.primaryBlue,
+                                AppTheme.primaryBlue.withOpacity(0.8),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppTheme.primaryBlue.withOpacity(
+                                  isDark ? 0.3 : 0.2,
+                                ),
+                                blurRadius: 12,
+                                offset: Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _launchUrl('https://nexasmartai.org/premium');
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              shadowColor: Colors.transparent,
+                              padding: EdgeInsets.symmetric(
+                                vertical: 16,
+                                horizontal: 32,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.star_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                                SizedBox(width: 10),
+                                Text(
+                                  AppLocalizations.of(
+                                    context,
+                                  ).t('paywall.getPremium'),
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: BorderSide(
+                                  color: isDark
+                                      ? AppTheme.textSecondary.withOpacity(0.3)
+                                      : Color(0xFFD1D5DB),
+                                ),
+                              ),
+                            ),
+                            child: Text(
+                              AppLocalizations.of(context).t('common.cancel'),
+                              style: TextStyle(
+                                color: isDark
+                                    ? AppTheme.textSecondary
+                                    : Color(0xFF6B7280),
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Launch URL in external browser
+  Future<void> _launchUrl(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        print('Could not launch $url');
+      }
+    } catch (e) {
+      print('Error launching URL: $e');
+    }
   }
 }

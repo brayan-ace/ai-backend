@@ -520,7 +520,12 @@ class _LoginScreenState extends State<LoginScreen>
             keyboardType: keyboardType,
             textInputAction: textInputAction,
             onSubmitted: onSubmitted,
-            style: TextStyle(color: AppTheme.textPrimary, fontSize: 16),
+            style: TextStyle(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? AppTheme.textPrimary
+                  : Color(0xFF374151),
+              fontSize: 16,
+            ),
             decoration: InputDecoration(
               hintText: hint,
               hintStyle: TextStyle(color: AppTheme.textTertiary, fontSize: 16),

@@ -18,6 +18,8 @@ import 'screens/notes_screen.dart';
 import 'screens/main_tabs.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/signup_screen.dart';
+import 'screens/signup_choice_screen.dart';
+import 'screens/google_username_confirmation_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/settings_screen_new.dart';
@@ -171,7 +173,9 @@ class MyApp extends StatelessWidget {
       home: const AuthGate(),
       routes: {
         '/welcome': (_) => const WelcomeScreen(),
-        '/signup': (_) => const SignUpScreen(),
+        '/signup-choice': (_) => const SignupChoiceScreen(),
+        '/signup': (_) => const SignupChoiceScreen(),
+        '/signup-form': (_) => const SignUpScreen(),
         '/login': (_) => const LoginScreen(),
         '/main': (_) => const MainTabs(),
         '/profile': (_) => ProfileScreen(),

@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../utils/theme.dart';
+import '../utils/theme_provider.dart';
+import '../utils/language_provider.dart';
+import '../utils/app_localizations.dart';
 
 /// Welcome/Onboarding screen for new users
 /// Features animated elements, app branding, and navigation to auth flows
@@ -73,119 +77,294 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
 
-    return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppTheme.backgroundGradientStart,
-              AppTheme.backgroundGradientEnd,
-              Color(0xFF0A1628),
-            ],
-            stops: const [0.0, 0.5, 1.0],
-          ),
-        ),
-        child: Stack(
-          children: [
-            // Animated background particles/orbs
-            ..._buildBackgroundOrbs(size),
+    return Consumer2<ThemeProvider, LanguageProvider>(
+      builder: (context, themeProvider, languageProvider, _) {
+        return Scaffold(
+          body: Container(
+            width: double.infinity,
+            height: double.infinity,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppTheme.backgroundGradientStart,
+                  AppTheme.backgroundGradientEnd,
+                  const Color(0xFF0A1628),
+                ],
+                stops: const [0.0, 0.5, 1.0],
+              ),
+            ),
+            child: Stack(
+              children: [
+                // Animated background particles/orbs
+                ..._buildBackgroundOrbs(size),
 
-            // Main content
-            SafeArea(
-              child: AnimatedBuilder(
-                animation: _fadeAnimation,
-                builder: (context, child) {
-                  return Opacity(
-                    opacity: _fadeAnimation.value,
-                    child: Transform.translate(
-                      offset: Offset(0, _slideAnimation.value),
-                      child: child,
-                    ),
-                  );
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
-                  child: Column(
-                    children: [
-                      const Spacer(flex: 2),
+                // Main content
+                SafeArea(
+                  child: AnimatedBuilder(
+                    animation: _fadeAnimation,
+                    builder: (context, child) {
+                      return Opacity(
+                        opacity: _fadeAnimation.value,
+                        child: Transform.translate(
+                          offset: Offset(0, _slideAnimation.value),
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 32),
+                      child: Column(
+                        children: [
+                          const Spacer(flex: 2),
 
-                      // Animated Logo with glow
-                      _buildAnimatedLogo(),
+                          // Animated Logo with glow
+                          _buildAnimatedLogo(),
 
-                      const SizedBox(height: 32),
+                          const SizedBox(height: 32),
 
-                      // App Name
-                      ShaderMask(
-                        shaderCallback: (bounds) => LinearGradient(
-                          colors: [
-                            AppTheme.primaryBlue,
-                            AppTheme.accentBlueLight,
-                            Colors.white,
-                          ],
-                        ).createShader(bounds),
-                        child: const Text(
-                          'Nexa Smart AI',
-                          style: TextStyle(
-                            fontSize: 36,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            letterSpacing: 1.2,
+                          // App Name
+                          ShaderMask(
+                            shaderCallback: (bounds) => LinearGradient(
+                              colors: [
+                                AppTheme.primaryBlue,
+                                AppTheme.accentBlueLight,
+                                Colors.white,
+                              ],
+                            ).createShader(bounds),
+                            child: const Text(
+                              'Nexa Smart AI',
+                              style: TextStyle(
+                                fontSize: 36,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
                           ),
-                        ),
+
+                          const SizedBox(height: 12),
+
+                          // Tagline
+                          Text(
+                            AppLocalizations.of(
+                              context,
+                            ).t('onboarding.subtitle'),
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w400,
+                              color: AppTheme.textSecondary,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+
+                          const SizedBox(height: 48),
+
+                          // Feature highlights
+                          _buildFeatureHighlights(),
+
+                          const SizedBox(height: 32),
+
+                          // Select Language and Theme Section
+                          _buildLanguageThemeSelector(),
+
+                          const Spacer(flex: 2),
+
+                          // Get Started Button (Primary)
+                          _buildPrimaryButton(
+                            label: AppLocalizations.of(
+                              context,
+                            ).t('onboarding.letsGetStarted'),
+                            icon: Icons.rocket_launch_rounded,
+                            onPressed: () {
+                              Navigator.pushNamed(context, '/signup-choice');
+                            },
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // Already have account (Secondary)
+                          _buildSecondaryButton(
+                            label: AppLocalizations.of(
+                              context,
+                            ).t('auth.alreadyHaveAccount'),
+                            onPressed: () {
+                              Navigator.pushNamed(context, '/login');
+                            },
+                          ),
+
+                          const SizedBox(height: 24),
+                        ],
                       ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
-                      const SizedBox(height: 12),
-
-                      // Tagline
-                      Text(
-                        'The Ultimate Studying AI',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w400,
-                          color: AppTheme.textSecondary,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-
-                      const SizedBox(height: 48),
-
-                      // Feature highlights
-                      _buildFeatureHighlights(),
-
-                      const Spacer(flex: 2),
-
-                      // Get Started Button (Primary)
-                      _buildPrimaryButton(
-                        label: 'Get Started',
-                        icon: Icons.rocket_launch_rounded,
-                        onPressed: () {
-                          Navigator.pushNamed(context, '/signup');
-                        },
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // Already have account (Secondary)
-                      _buildSecondaryButton(
-                        label: 'I Already Have an Account',
-                        onPressed: () {
-                          Navigator.pushNamed(context, '/login');
-                        },
-                      ),
-
-                      const SizedBox(height: 24),
-                    ],
+  Widget _buildLanguageThemeSelector() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: GestureDetector(
+        onTap: () => _showLanguageSelectionDialogContent(),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: AppTheme.primaryBlue.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: AppTheme.primaryBlue.withOpacity(0.3),
+              width: 1.5,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.language_rounded,
+                color: AppTheme.primaryBlue,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  'Select Preferred Language',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppTheme.primaryBlue,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(width: 8),
+              Icon(
+                Icons.arrow_forward_rounded,
+                color: AppTheme.primaryBlue,
+                size: 18,
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  void _showLanguageSelectionDialogContent() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      barrierColor: Colors.black45,
+      builder: (bottomContext) => _buildLanguageSelectionContent(bottomContext),
+    );
+  }
+
+  Widget _buildLanguageSelectionContent(BuildContext dialogContext) {
+    return Consumer2<LanguageProvider, ThemeProvider>(
+      builder: (consumerContext, languageProvider, themeProvider, _) {
+        final supportedLanguages = languageProvider.supportedLanguageCodes;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A1A2E),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryBlue.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Select Language',
+                  style: Theme.of(consumerContext).textTheme.headlineSmall
+                      ?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                ),
+                const SizedBox(height: 24),
+                // Language Options Grid
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 3,
+                  ),
+                  itemCount: supportedLanguages.length,
+                  itemBuilder: (context, index) {
+                    final langCode = supportedLanguages[index];
+                    final langName = languageProvider.getLanguageName(langCode);
+                    final isSelected =
+                        languageProvider.currentLanguageCode == langCode;
+
+                    return GestureDetector(
+                      onTap: () async {
+                        await languageProvider.setLanguage(langCode);
+                        if (mounted) {
+                          Navigator.pop(dialogContext);
+                        }
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? AppTheme.primaryBlue.withOpacity(0.2)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isSelected
+                                ? AppTheme.primaryBlue
+                                : AppTheme.primaryBlue.withOpacity(0.2),
+                            width: isSelected ? 2 : 1,
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            langName,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: isSelected
+                                  ? AppTheme.primaryBlue
+                                  : AppTheme.textSecondary,
+                              fontSize: 14,
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 32),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -210,6 +389,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                   color: AppTheme.primaryBlue.withOpacity(
                     _pulseAnimation.value,
                   ),
+
                   blurRadius: 40,
                   spreadRadius: 10,
                 ),

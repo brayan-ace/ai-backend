@@ -6,6 +6,7 @@ import '../utils/theme.dart';
 import 'package:flutter/services.dart';
 import 'professional_message_widget.dart';
 import 'tts_speaker_icon.dart';
+import 'save_to_notes_dialog.dart';
 
 class PremiumColors {
   static const Color darkBg = Color(0xFF0a0a0a);
@@ -26,6 +27,8 @@ class PremiumMessageBubble extends StatefulWidget {
   final bool animate;
   final VoidCallback? onLongPress;
   final VoidCallback? onDoubleTap;
+  final String? botId;
+  final List<Map<String, dynamic>>? fullConversation;
 
   const PremiumMessageBubble({
     Key? key,
@@ -37,6 +40,8 @@ class PremiumMessageBubble extends StatefulWidget {
     this.animate = true,
     this.onLongPress,
     this.onDoubleTap,
+    this.botId,
+    this.fullConversation,
   }) : super(key: key);
 
   @override
@@ -124,7 +129,7 @@ class _PremiumMessageBubbleState extends State<PremiumMessageBubble>
             ),
           ),
         ),
-        // Speaker icon and action buttons for AI messages
+        // Speaker icon and save to notes button for AI messages
         if (widget.isBot)
           Padding(
             padding: EdgeInsets.only(
@@ -139,6 +144,9 @@ class _PremiumMessageBubbleState extends State<PremiumMessageBubble>
                   messageText: widget.message,
                   isAiMessage: true,
                 ),
+                SizedBox(width: 8),
+                // Save to notes button
+                _buildSaveToNotesButton(),
               ],
             ),
           ),
@@ -265,6 +273,57 @@ class _PremiumMessageBubbleState extends State<PremiumMessageBubble>
     final hour = time.hour.toString().padLeft(2, '0');
     final minute = time.minute.toString().padLeft(2, '0');
     return '$hour:$minute';
+  }
+
+  /// Build the save to notes button - appears below AI messages
+  Widget _buildSaveToNotesButton() {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        showDialog(
+          context: context,
+          builder: (context) => SaveToNotesDialog(
+            messageContent: widget.message,
+            botId: widget.botId ?? 'unknown',
+            botName: widget.botName,
+            fullConversation: widget.fullConversation,
+            onSaveSuccess: () {
+              // Refresh UI if needed
+            },
+          ),
+        );
+      },
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppTheme.primaryBlue.withOpacity(0.25),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: AppTheme.primaryBlue.withOpacity(0.5),
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.bookmark_add_outlined,
+              size: 18,
+              color: AppTheme.primaryBlue,
+            ),
+            SizedBox(width: 6),
+            Text(
+              'Save',
+              style: TextStyle(
+                color: AppTheme.primaryBlue,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showMessageOptions() {

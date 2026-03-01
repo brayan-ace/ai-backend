@@ -418,8 +418,8 @@ class GamificationService {
       final prefs = await _prefs;
       _userLevel = prefs.getInt('user_level') ?? 1;
       _totalXP = prefs.getInt('total_xp') ?? 0;
-      _currentStreak = prefs.getInt('current_streak') ?? 0;
-      _longestStreak = prefs.getInt('longest_streak') ?? 0;
+      _currentStreak = prefs.getInt('current_streak') ?? 1;
+      _longestStreak = prefs.getInt('longest_streak') ?? 1;
       _unlockedAchievements =
           prefs.getStringList('unlocked_achievements') ?? [];
       _earnedBadges = prefs.getStringList('earned_badges') ?? [];

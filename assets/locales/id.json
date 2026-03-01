@@ -176,7 +176,8 @@
     "slide2Title": "Belajar Secara Efisien",
     "slide2Desc": "Buat rencana belajar dan lacak kemajuan Anda",
     "slide3Title": "Capai Tujuan Anda",
-    "slide3Desc": "Kuasai topik apa pun dengan sistem bimbingan cerdas kami"
+    "slide3Desc": "Kuasai topik apa pun dengan sistem bimbingan cerdas kami",
+    "doNotShowAgain": "Jika Anda tidak ingin melihatnya lagi, cukup centang kotak ini"
   },
   "emptyStates": {
     "noChats": "Belum ada obrolan. Mulai percakapan!",
@@ -362,7 +363,13 @@
     "modeComingSoon": "Peralihan mode akan segera hadir!",
     "messageHint": "Pesan {botName}...",
     "takeQuiz": "Ikuti Kuis",
-    "saveNote": "Simpan Catatan"
+    "saveNote": "Simpan Catatan",
+    "saveToNotes": "Simpan ke Catatan",
+    "chooseWhatToSave": "Pilih apa yang ingin disimpan dari percakapan ini",
+    "saveThisMessage": "Simpan Pesan Ini",
+    "saveOnlyThisResponse": "Simpan hanya respons ini",
+    "saveFullConversation": "Simpan Percakapan Lengkap",
+    "saveAllMessagesInChat": "Simpan semua pesan dalam obrolan ini"
   },
   "notes": {
     "notesTitle": "Catatan",

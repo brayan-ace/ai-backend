@@ -204,7 +204,8 @@
     "slide2Title": "Étudiez Efficacement",
     "slide2Desc": "Créez des plans d'étude et suivez votre progrès",
     "slide3Title": "Atteignez Vos Objectifs",
-    "slide3Desc": "Maîtrisez n'importe quel sujet avec notre tutorat intelligent"
+    "slide3Desc": "Maîtrisez n'importe quel sujet avec notre tutorat intelligent",
+    "doNotShowAgain": "Si vous ne voulez plus le voir, cochez simplement cette case"
   },
   "emptyStates": {
     "noChats": "Aucun chat pour le moment. Démarrez une conversation !",
@@ -404,6 +405,12 @@
     "justNow": "À l'instant",
     "minutesAgo": "Il y a {count}m",
     "hoursAgo": "Il y a {count}h",
+    "saveToNotes": "Enregistrer dans Notes",
+    "chooseWhatToSave": "Choisissez ce que vous voulez enregistrer de cette conversation",
+    "saveThisMessage": "Enregistrer Ce Message",
+    "saveOnlyThisResponse": "Enregistrer uniquement cette réponse",
+    "saveFullConversation": "Enregistrer la Conversation Complète",
+    "saveAllMessagesInChat": "Enregistrer tous les messages dans ce chat",
     "daysAgo": "Il y a {count}j"
   },
   "topicSelection": {

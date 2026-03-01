@@ -16,6 +16,7 @@ import '../services/user_profile_service.dart';
 import '../services/push_notification_service.dart';
 import '../services/onboarding_service.dart';
 import '../widgets/social_media_icons.dart';
+import 'premium_status_test_screen.dart';
 
 class SettingsScreenNew extends StatefulWidget {
   const SettingsScreenNew({super.key});
@@ -317,9 +318,6 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
               // User Profile Card
               _buildUserProfileCard(context),
 
-              // Access Plans / Subscription Card (Prominent)
-              _buildAccessPlansCard(context),
-
               // GENERAL SETTINGS Section
               _sectionHeader('General'),
               _buildCard(
@@ -333,6 +331,21 @@ class _SettingsScreenNewState extends State<SettingsScreenNew> {
                     gradient: AppTheme.accentGradient,
                     onTap: () =>
                         Navigator.pushNamed(context, '/profile-settings'),
+                  ),
+                  _buildDivider(),
+                  // Test Premium Status
+                  _tile(
+                    context,
+                    icon: Icons.star,
+                    title: 'Test Premium Status',
+                    subtitle: 'Check subscription status',
+                    gradient: AppTheme.accentGradient,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const PremiumStatusTestScreen(),
+                      ),
+                    ),
                   ),
                   _buildDivider(),
                   // App Theme
