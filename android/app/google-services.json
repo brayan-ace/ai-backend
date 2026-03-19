@@ -41,6 +41,51 @@
           ]
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:356182134428:android:da87d79f579eb20630a759",
+        "android_client_info": {
+          "package_name": "com.nexasmartai.nexasmartai"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "356182134428-hnms3bp43fl6lcorgv5r3ffu5fql17qv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.nexasmartai.nexasmartai",
+            "certificate_hash": "5c98c3a5b840c701cc90c5af7ace98e886f7e68a"
+          }
+        },
+        {
+          "client_id": "356182134428-okj6th0spc6jpul93tgdr12johfeutnb.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.nexasmartai.nexasmartai",
+            "certificate_hash": "255e62a129ba0fcb1695493da19e5ecbd273db4c"
+          }
+        },
+        {
+          "client_id": "356182134428-q7oe29n3oe5mfpi03efn8ffjn764ka8f.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDH-d9tC853bXoDpvxGJNW3IEka1hxcJA8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "356182134428-q7oe29n3oe5mfpi03efn8ffjn764ka8f.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
     }
   ],
   "configuration_version": "1"

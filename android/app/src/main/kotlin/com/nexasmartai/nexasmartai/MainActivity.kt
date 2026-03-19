@@ -1,4 +1,4 @@
-package com.example.myai
+package com.nexasmartai.nexasmartai
 
 import io.flutter.embedding.android.FlutterActivity
 

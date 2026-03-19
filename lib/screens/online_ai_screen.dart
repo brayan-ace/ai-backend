@@ -1533,24 +1533,29 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
       bottom: MediaQuery.of(context).viewInsets.bottom + 72,
       right: 20,
       child: AnimatedOpacity(
-        opacity: 1.0,
+        opacity: _showScrollButton ? 1.0 : 0.0,
         duration: const Duration(milliseconds: 300),
         child: GestureDetector(
           onTap: _scrollToLatestMessage,
           child: Container(
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
+              borderRadius: BorderRadius.circular(24),
               color: AppTheme.primaryBlue,
               boxShadow: [
                 BoxShadow(
-                  color: AppTheme.primaryBlue.withOpacity(0.4),
-                  blurRadius: 8,
+                  color: AppTheme.primaryBlue.withOpacity(0.5),
+                  blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
               ],
             ),
-            padding: const EdgeInsets.all(10),
-            child: Icon(Icons.expand_more, color: Colors.white, size: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.expand_more, color: Colors.white, size: 20),
+              ],
+            ),
           ),
         ),
       ),
@@ -1614,6 +1619,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
       _selectedImage = null;
       _selectedFileName = null;
     });
+
+    // Auto-scroll to show the user's message and input area
+    await _scrollToLatestMessage();
 
     setState(() {
       _currentStatusMessage = hasImage
@@ -1896,6 +1904,9 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
       _messages.add(streamingMessage);
     });
 
+    // Auto-scroll to show the new AI response message
+    await _scrollToLatestMessage();
+
     // Stream by Unicode code points (runes) to avoid splitting surrogate pairs
     // This prevents temporary invalid UTF-16 halves (which crash rendering)
     final buffer = StringBuffer();
@@ -1908,6 +1919,8 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
         setState(() {
           streamingMessage.text = buffer.toString();
         });
+        // Auto-scroll smoothly as AI response streams in
+        await _scrollToLatestMessage();
       }
       await Future.delayed(const Duration(milliseconds: 6));
     }
@@ -1916,6 +1929,8 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
     setState(() {
       streamingMessage.isStreaming = false;
     });
+    // Final scroll after streaming completes
+    await _scrollToLatestMessage();
   }
 
   /// Intelligent web search detection: determines if a question needs recent information
@@ -2551,6 +2566,23 @@ class _OnlineAiScreenState extends State<OnlineAiScreen>
       };
 
       final fullResp = await ApiService.sendRaw('chat', input);
+
+      // Check if fallback model system was used (Groq fallback to alternative models)
+      final bool fallbackOccurred = fullResp['fallbackMessage'] == true;
+      final List<dynamic>? attemptedModels =
+          fullResp['attemptedModels'] as List<dynamic>?;
+      final bool multipleModelsAttempted =
+          attemptedModels != null && attemptedModels.length > 1;
+
+      if (multipleModelsAttempted || fallbackOccurred) {
+        print(
+          '[API FALLBACK] Fallback model was used: ${attemptedModels?.join(', ')}',
+        );
+        // Update status message to indicate longer processing time
+        setState(() {
+          _currentStatusMessage = 'Taking more time...';
+        });
+      }
 
       // REMOVED: Auto-disable web search toggle after response
       // Keep the toggle state as the user set it (or as it was auto-enabled)

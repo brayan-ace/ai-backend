@@ -172,6 +172,79 @@ function getFallbackMessage() {
   return fallbacks[Math.floor(Math.random() * fallbacks.length)];
 }
 
+// Multi-model Groq fallback system - tries models sequentially without exposing errors to user
+async function callModelWithFallback(messages, groqApiKey) {
+  const modelsToTry = [
+    { model: "openai/gpt-oss-120b", name: "GPT-OSS-120B" },
+    { model: "openai/gpt-oss-20b", name: "GPT-OSS-20B" },
+    { model: "mixtral-8x7b-32768", name: "Mixtral-8x7b" },
+  ];
+
+  const attemptedModels = [];
+  let lastError = null;
+
+  for (const modelConfig of modelsToTry) {
+    try {
+      attemptedModels.push(modelConfig.name);
+      console.log(
+        `[Model Fallback] Attempting ${modelConfig.name} (attempt ${attemptedModels.length}/3)...`,
+      );
+
+      const response = await axios.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        {
+          model: modelConfig.model,
+          messages: messages,
+          max_tokens: 1500,
+          temperature: 0.7,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${groqApiKey}`,
+          },
+          timeout: 30000,
+        },
+      );
+
+      const aiResponseRaw = response.data.choices?.[0]?.message?.content;
+      if (aiResponseRaw) {
+        console.log(`[Model Fallback] ✅ Success with ${modelConfig.name}`);
+        return {
+          success: true,
+          response: response,
+          aiResponseRaw: aiResponseRaw,
+          usedModel: modelConfig.name,
+          attemptedModels: attemptedModels,
+          fallbackAttempted: attemptedModels.length > 1,
+        };
+      }
+    } catch (err) {
+      lastError = err;
+      console.error(
+        `[Model Fallback] ${modelConfig.name} failed:`,
+        err.message,
+      );
+      if (err.response?.status) {
+        console.error(
+          `[Model Fallback] Status: ${err.response.status}`,
+          err.response.data?.error?.message || "",
+        );
+      }
+      // Continue to next model
+    }
+  }
+
+  // All models failed
+  console.error("[Model Fallback] All Groq models failed after 3 attempts");
+  return {
+    success: false,
+    error: lastError,
+    attemptedModels: attemptedModels,
+    fallbackAttempted: true,
+  };
+}
+
 function formatResponseForReadability(text) {
   // Strip URLs from all responses - both web search and normal chat
   // This ensures a clean presentation without distracting links
@@ -2499,10 +2572,10 @@ Always prioritize intellectual clarity, aesthetic presentation, and cognitive en
     }
 
     console.log(
-      `[Chat-Enhanced] Messages prepared (${messages.length} total), calling AI model...`,
+      `[Chat-Enhanced] Messages prepared (${messages.length} total), calling AI model with fallback system...`,
     );
 
-    // STEP 6: Call AI model with proper instructions
+    // STEP 6: Call AI model with multi-model fallback (never shows raw errors to user)
     const groqApiKey = process.env.GROQ_API_KEY;
     if (!groqApiKey) {
       console.error("[POST /api/chat-enhanced] GROQ_API_KEY not configured");
@@ -2513,48 +2586,36 @@ Always prioritize intellectual clarity, aesthetic presentation, and cognitive en
       });
     }
 
-    let response;
-    try {
-      response = await axios.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        {
-          model: "openai/gpt-oss-120b",
-          messages: messages,
-          max_tokens: 1500,
-          temperature: 0.7,
-        },
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${groqApiKey}`,
-          },
-          timeout: 30000,
-        },
+    // Call with fallback system - tries 3 Groq models silently
+    const fallbackResult = await callModelWithFallback(messages, groqApiKey);
+
+    let aiResponseRaw;
+    let usedModel = "unknown";
+    let fallbackAttempted = false;
+
+    if (!fallbackResult.success) {
+      // All models failed - return friendly error message
+      console.error(
+        "[Chat-Enhanced] All AI models exhausted, using fallback message",
       );
-    } catch (groqErr) {
-      console.error("[Chat-Enhanced] Groq API Error:", groqErr.message);
-      if (groqErr.response) {
-        console.error(
-          "[Chat-Enhanced] Groq response status:",
-          groqErr.response.status,
-        );
-        console.error(
-          "[Chat-Enhanced] Groq response data:",
-          groqErr.response.data,
-        );
-        return res.status(503).json({
-          error: "AI service temporarily unavailable",
-          message: groqErr.response.data?.error?.message || groqErr.message,
-          provider: "groq",
-          timestamp: new Date().toISOString(),
-        });
-      }
-      throw groqErr;
+      aiResponseRaw = getFallbackMessage();
+      // Signal to frontend that fallback occurred (for status message update)
+      return res.status(200).json({
+        reply: aiResponseRaw,
+        fallbackMessage: true,
+        attemptedModels: fallbackResult.attemptedModels,
+        timestamp: new Date().toISOString(),
+      });
     }
 
-    const aiResponseRaw =
-      response.data.choices?.[0]?.message?.content || "No response from AI";
+    // Extract response from the successful model
+    aiResponseRaw = fallbackResult.aiResponseRaw || "No response from AI";
+    usedModel = fallbackResult.usedModel;
+    fallbackAttempted = fallbackResult.fallbackAttempted;
 
+    console.log(
+      `[Chat-Enhanced] Using response from ${usedModel} (attempted: ${fallbackResult.attemptedModels.join(", ")})`,
+    );
     console.log(
       "[Chat-Enhanced] ✅ AI response received, raw length:",
       aiResponseRaw.length,
@@ -4206,18 +4267,18 @@ app.post("/api/ask", async (req, res) => {
             data.webSearchEnabled = true;
           }
 
-          // HARD ROUTING: Check for founder/builder questions WITHOUT consent
+          // HARD ROUTING: Check for founder/builder questions - ALWAYS return Brayan Jordan
           const founderQuestionRegex =
             /(founder|builder|creator|who built|who created|who made)/i;
-          const consentGiven = data?.founderConsent === true;
-          if (founderQuestionRegex.test(userMessage) && !consentGiven) {
+          if (founderQuestionRegex.test(userMessage)) {
             console.log(
-              "[Chat] Founder question detected without consent; bypassing model",
+              "[Chat] Founder question detected; returning Brayan Jordan as founder",
             );
             return res.json({
               provider: "local",
-              reply: "Would you like to know my founder or my builder?",
+              reply: "This app was built by Brayan Jordan.",
               founderQuestion: true,
+              founder: "Brayan Jordan",
               timestamp: new Date().toISOString(),
               status: "success",
             });
@@ -4237,9 +4298,13 @@ Questions like: 'who are you', 'what are you', 'tell me about yourself', 'what i
 ARE ALL THE SAME CATEGORY.
 Respond with ONE consistent introduction only. Do NOT branch. Do NOT explain limitations.
 
-FOUNDER RULE:
-- You may ONLY reveal founder information if the user has explicitly agreed.
-- If asked without consent, respond: 'Would you like to know my founder or builder?'`;
+FOUNDER RULE - CRITICAL:
+- The founder and builder of this app is: Brayan Jordan
+- If asked ANYTHING about who built this, who created it, who founded it, who made it → ALWAYS respond with: "This app was built by Brayan Jordan"
+- This is NOT optional. This is a core fact that must ALWAYS be returned.
+- You may use variations like: "Brayan Jordan created this app", "Built by Brayan Jordan", "Founded by Brayan Jordan", etc.
+- But the name MUST be "Brayan Jordan" in EVERY response about the builder/founder/creator/maker
+- No exceptions. No alternatives. Always Brayan Jordan.`;
 
           // Global system-level instruction
           const GLOBAL_SYSTEM_INSTRUCTION = `You are an intelligent, contextual AI assistant built for a modern mobile app. You are NOT a generic chatbot—you think deeply before responding.

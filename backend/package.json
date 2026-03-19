@@ -1,6 +1,6 @@
 {
   "name": "flutter-voice-backend",
-  "version": "1.0.0",
+  "version": "3.0.0",
   "description": "Backend for Flutter Voice AI application - Speech-to-Text and AI API integration",
   "main": "index.js",
   "scripts": {
