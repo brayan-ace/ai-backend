@@ -5658,8 +5658,16 @@ app.post("/transcribe", upload.single("audio"), async (req, res) => {
   try {
     // Check if file was uploaded
     if (!req.file) {
+      console.error("[Transcription] No file uploaded");
       return res.status(400).json({ error: "No audio file uploaded" });
     }
+
+    console.log("[Transcription] File received:", {
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      path: req.file.path,
+      size: req.file.size,
+    });
 
     // Create a new SpeechClient with credentials from environment variable
     const speechClient = new speech.SpeechClient({
@@ -5672,20 +5680,34 @@ app.post("/transcribe", upload.single("audio"), async (req, res) => {
     // Convert to base64
     const base64String = audioBuffer.toString("base64");
 
-    // Configure audio
-    const audio = {
-      content: base64String,
+    // Validate audio data
+    if (!base64String || base64String.length === 0) {
+      return res.status(400).json({
+        error: "Audio file is empty",
+        details: `File size: ${audioBuffer.length} bytes`,
+      });
+    }
+
+    console.log("[Transcription] Audio file loaded:", {
+      filePath: req.file.path,
+      fileSize: audioBuffer.length,
+      base64Length: base64String.length,
+    });
+
+    // Call Google Cloud Speech API with proper request structure
+    const request = {
+      audio: {
+        content: base64String,
+      },
+      config: {
+        encoding: "LINEAR16",
+        sampleRateHertz: 16000,
+        languageCode: "en-US",
+      },
     };
 
-    // Configure speech recognition
-    const config = {
-      encoding: "LINEAR16",
-      sampleRateHertz: 16000,
-      languageCode: "en-US",
-    };
-
-    // Call Google Cloud Speech API
-    const response = await speechClient.recognize({ audio, config });
+    console.log("[Transcription] Sending request to Google Cloud Speech API");
+    const response = await speechClient.recognize(request);
 
     // Extract transcription from response
     const transcription = response[0].results
@@ -5701,7 +5723,12 @@ app.post("/transcribe", upload.single("audio"), async (req, res) => {
       timestamp: new Date().toISOString(),
     });
   } catch (err) {
-    console.error("[Transcription] Error:", err.message);
+    console.error("[Transcription] Error:", err.code || err.message);
+    console.error("[Transcription] Error details:", {
+      code: err.code,
+      message: err.message,
+      details: err.details,
+    });
 
     // Clean up file if it exists
     if (req.file && fs.existsSync(req.file.path)) {
@@ -5712,8 +5739,16 @@ app.post("/transcribe", upload.single("audio"), async (req, res) => {
       }
     }
 
+    // Provide helpful error message
+    let errorMessage = "Transcription failed";
+    if (err.code === 3 || err.message?.includes("RecognitionAudio not set")) {
+      errorMessage = "Audio data not properly received - please try again";
+    } else if (err.message?.includes("UNAUTHENTICATED")) {
+      errorMessage = "Google Cloud authentication failed - contact support";
+    }
+
     res.status(500).json({
-      error: "Transcription failed",
+      error: errorMessage,
       message: err.message,
       timestamp: new Date().toISOString(),
     });
